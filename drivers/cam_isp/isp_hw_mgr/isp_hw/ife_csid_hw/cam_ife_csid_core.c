@@ -24,8 +24,9 @@
 #define IFE_CSID_TIMEOUT                               1000
 
 /* TPG VC/DT values */
-#define CAM_IFE_CSID_TPG_VC_VAL                        0xA
-#define CAM_IFE_CSID_TPG_DT_VAL                        0x2B
+#define CAM_IFE_CSID_TPG_VC_VAL                        0
+#define CAM_IFE_CSID_TPG_DT_VAL                        0x2b
+#define CAM_IFE_CSID_TPG_YUV_DT_VAL                    0x1e
 
 /* Timeout values in usec */
 #define CAM_IFE_CSID_TIMEOUT_SLEEP_US                  1000
@@ -244,6 +245,7 @@ static int cam_ife_csid_is_ipp_ppp_format_supported(
 	case CAM_FORMAT_DPCM_14_8_14:
 	case CAM_FORMAT_DPCM_14_10_14:
 	case CAM_FORMAT_DPCM_12_10_12:
+	case CAM_FORMAT_YUV422:
 		rc = 0;
 		break;
 	default:
@@ -428,6 +430,10 @@ static int cam_ife_csid_get_format_rdi(
 		*decode_fmt  = 0xD;
 		*plain_fmt = 0x1;
 		break;
+	case CAM_FORMAT_YUV422:
+		*decode_fmt  = 0x1;
+		*plain_fmt = 0x0;
+		break;
 	default:
 		rc = -EINVAL;
 		break;
@@ -504,6 +510,10 @@ static int cam_ife_csid_get_format_ipp_ppp(
 		break;
 	case CAM_FORMAT_DPCM_12_10_12:
 		*decode_fmt  = 0xD;
+		*plain_fmt = 0x1;
+		break;
+	case CAM_FORMAT_YUV422:
+		*decode_fmt  = 0x1;
 		*plain_fmt = 0x1;
 		break;
 	default:
@@ -1133,8 +1143,10 @@ int cam_ife_csid_cid_reserve(struct cam_ife_csid_hw *csid_hw,
 
 		/* Below code is executed only for TPG in_res type */
 		csid_hw->csi2_rx_cfg.phy_sel = 0;
-		if (cid_reserv->in_port->format >
-		    CAM_FORMAT_MIPI_RAW_16) {
+
+		if ((cid_reserv->in_port->format != CAM_FORMAT_YUV422) &&
+			(cid_reserv->in_port->format >
+			    CAM_FORMAT_MIPI_RAW_16)) {
 			CAM_ERR(CAM_ISP, " Wrong TPG format");
 			rc = -EINVAL;
 			goto end;
@@ -1330,7 +1342,10 @@ int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 		path_data->crop_enable);
 
 	if (reserve->in_port->res_type == CAM_ISP_IFE_IN_RES_TPG) {
-		path_data->dt = CAM_IFE_CSID_TPG_DT_VAL;
+		if (path_data->in_format == CAM_FORMAT_YUV422)
+			path_data->dt = CAM_IFE_CSID_TPG_YUV_DT_VAL;
+		else
+			path_data->dt = CAM_IFE_CSID_TPG_DT_VAL;
 		path_data->vc = CAM_IFE_CSID_TPG_VC_VAL;
 	} else {
 		path_data->dt = reserve->in_port->dt[0];
@@ -1686,6 +1701,8 @@ static int cam_ife_csid_config_tpg(struct cam_ife_csid_hw   *csid_hw,
 	const struct cam_ife_csid_reg_offset *csid_reg;
 	struct cam_hw_soc_info               *soc_info;
 	uint32_t val = 0;
+	uint32_t dt, in_format;
+	uint32_t test_pattern;
 
 	csid_reg = csid_hw->csid_info->csid_reg;
 	soc_info = &csid_hw->hw_info->soc_info;
@@ -1711,14 +1728,24 @@ static int cam_ife_csid_config_tpg(struct cam_ife_csid_hw   *csid_hw,
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 		csid_reg->tpg_reg->csid_tpg_dt_n_cfg_0_addr);
 
-	cam_io_w_mb(CAM_IFE_CSID_TPG_DT_VAL, soc_info->reg_map[0].mem_base +
-		csid_reg->tpg_reg->csid_tpg_dt_n_cfg_1_addr);
-
 	/*
 	 * in_format is the same as the input resource format.
 	 * it is one larger than the register spec format.
 	 */
-	val = ((csid_hw->tpg_cfg.in_format - 1) << 16) | 0x8;
+	if (csid_hw->tpg_cfg.in_format == CAM_FORMAT_YUV422) {
+		in_format = 2;
+		dt = CAM_IFE_CSID_TPG_YUV_DT_VAL;
+		test_pattern = 4;
+	} else {
+		in_format = csid_hw->tpg_cfg.in_format;
+		dt = CAM_IFE_CSID_TPG_DT_VAL;
+		test_pattern = csid_hw->tpg_cfg.test_pattern;
+	}
+
+	cam_io_w_mb(dt, soc_info->reg_map[0].mem_base +
+		csid_reg->tpg_reg->csid_tpg_dt_n_cfg_1_addr);
+
+	val = ((in_format - 1) << 16) | 0x8;
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 		csid_reg->tpg_reg->csid_tpg_dt_n_cfg_2_addr);
 
@@ -1727,7 +1754,7 @@ static int cam_ife_csid_config_tpg(struct cam_ife_csid_hw   *csid_hw,
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 		csid_reg->tpg_reg->csid_tpg_color_bars_cfg_addr);
 	/* config pix pattern */
-	cam_io_w_mb(csid_hw->tpg_cfg.test_pattern,
+	cam_io_w_mb(test_pattern,
 		soc_info->reg_map[0].mem_base +
 		csid_reg->tpg_reg->csid_tpg_common_gen_cfg_addr);
 
