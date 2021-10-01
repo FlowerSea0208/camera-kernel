@@ -1063,7 +1063,7 @@ int cam_ife_csid_cid_reserve(struct cam_ife_csid_hw *csid_hw,
 				"CSID:%d RDI:%d resource not available",
 				csid_hw->hw_intf->hw_idx,
 				cid_reserv->res_id);
-			rc = -EINVAL;
+			rc = -EAGAIN;
 			goto end;
 		}
 		break;
