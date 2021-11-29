@@ -95,6 +95,7 @@ struct cam_sensor_ctrl_t {
 	enum cci_i2c_master_t cci_i2c_master;
 	enum cci_device_num cci_num;
 	struct camera_io_master io_master_info;
+	struct camera_io_master circuit_master_info;
 	enum cam_sensor_state_t sensor_state;
 	uint8_t is_probe_succeed;
 	uint32_t id;
@@ -115,6 +116,8 @@ struct cam_sensor_ctrl_t {
 	uint8_t isDeSerializer;
 	uint32_t readAddr[2][CAM_READ_MAX_NUM];
 	uint32_t readData;
+	int irq;
+	uint8_t is_power_probe_succeed;
 };
 
 #endif /* _CAM_SENSOR_DEV_H_ */

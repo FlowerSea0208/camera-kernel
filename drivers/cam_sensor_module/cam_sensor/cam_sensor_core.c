@@ -749,6 +749,134 @@ uint32_t cam_sensor_read_reg(struct cam_sensor_ctrl_t *s_ctrl)
 	return rc;
 }
 
+uint32_t cam_power_protector_update_signal(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int      rc       = 0;
+	uint32_t stat     = 0;
+	char     *envp[6];
+	char     IRQ_key[50];
+	char     STAT_key[50];
+	char     ID_key[50];
+	char     ADDR_key[50];
+	int      i;
+
+	struct cam_hw_soc_info *soc_info   = &s_ctrl->soc_info;
+	struct device *dev                 = soc_info->dev;
+
+	for(i = 0; i < POWER_PROTECTOR_STAT_MAX_BASE; i++){
+		uint32_t chipid   = 0;
+		if (s_ctrl->readAddr[0][i] != 0x0){
+			rc = camera_io_dev_read(
+				&(s_ctrl->circuit_master_info),
+				soc_info->power_prtector_stat[i],
+				&chipid, CAMERA_SENSOR_I2C_TYPE_BYTE,
+				CAMERA_SENSOR_I2C_TYPE_BYTE);
+
+			stat = (stat << 8) | chipid;
+			CAM_DBG(CAM_SENSOR,
+				"Read for power protector stat[%d] :0x%x, stat:0x%x", i, chipid, stat);
+		}
+	}
+
+	snprintf(IRQ_key, sizeof(IRQ_key),"IRQ_NUM=%d", s_ctrl->irq);
+	snprintf(STAT_key, sizeof(STAT_key),"STAT=%d", stat);
+	snprintf(ID_key, sizeof(ID_key),"SENSOR_ID=%d", soc_info->index);
+	snprintf(ADDR_key, sizeof(ADDR_key),"SLAVE_ADDR=%d", s_ctrl->sensordata->slave_info.sensor_slave_addr);
+
+	envp[0] = "NAME=power_protector";
+	envp[1] = IRQ_key;
+	envp[2] = STAT_key;
+	envp[3] = ID_key;
+	envp[4] = ADDR_key;
+	envp[5] = NULL;
+
+	CAM_WARN(CAM_SENSOR,
+		"Uevent update[%d]： %s", s_ctrl->irq, kobject_name(&dev->kobj));
+	kobject_uevent_env(&dev->kobj, KOBJ_CHANGE, envp);
+
+	return rc;
+}
+
+
+static irqreturn_t cam_power_protector_irq_thread_handler(int irq, void *dev_id)
+{
+	struct cam_sensor_ctrl_t *s_ctrl = (struct cam_sensor_ctrl_t *)dev_id;
+	CAM_WARN(CAM_SENSOR,"Get camera power protector ERROR IRQ");
+
+	cam_power_protector_update_signal(s_ctrl);
+
+	return IRQ_HANDLED;
+}
+
+
+uint32_t cam_sensor_request_power_protector_irq(struct cam_sensor_ctrl_t *s_ctrl)
+{
+
+	int rc = 0;
+	struct cam_hw_soc_info *soc_info = &s_ctrl->soc_info;
+
+
+	s_ctrl->irq = gpio_to_irq(soc_info->irq_gpio);
+	rc = request_threaded_irq(s_ctrl->irq, NULL, cam_power_protector_irq_thread_handler,
+		IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "cam_power_protector_irq", s_ctrl);
+	if (rc) {
+		CAM_ERR(CAM_SENSOR,"failed to request irq\n");
+		return -ENODEV;
+	}
+
+	return rc;
+}
+
+uint32_t cam_sensor_release_power_protector_irq(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	disable_irq(s_ctrl->irq);
+	free_irq(s_ctrl->irq, s_ctrl);
+
+	return 0;
+}
+
+uint32_t cam_sensor_power_protector_probe(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int rc = 0;
+	uint32_t chipid = 0;
+
+	s_ctrl->circuit_master_info
+		= s_ctrl->io_master_info;
+
+	switch (s_ctrl->circuit_master_info.master_type) {
+		case CCI_MASTER:
+			s_ctrl->circuit_master_info.cci_client->sid =
+				s_ctrl->soc_info.power_prtector_addr >> 1;
+			break;
+
+		case I2C_MASTER:
+			s_ctrl->circuit_master_info.client->addr =
+				s_ctrl->soc_info.power_prtector_addr;
+			break;
+	}
+
+	rc = camera_io_dev_read(
+		&(s_ctrl->circuit_master_info),
+		s_ctrl->soc_info.power_prtector_id,
+		&chipid,
+		CAMERA_SENSOR_I2C_TYPE_BYTE,
+		CAMERA_SENSOR_I2C_TYPE_BYTE);
+
+	CAM_DBG(CAM_SENSOR, "power protector slave:0x%x read id[0x%x]: 0x%x expected id 0x%x:",
+		s_ctrl->soc_info.power_prtector_addr, s_ctrl->soc_info.power_prtector_id,
+		chipid, s_ctrl->soc_info.power_prtector_data);
+
+	if ((chipid & s_ctrl->soc_info.power_prtector_data) != s_ctrl->soc_info.power_prtector_data) {
+		CAM_WARN(CAM_SENSOR, "power protector probe failed, read id: 0x%x expected id 0x%x:",
+			chipid, s_ctrl->soc_info.power_prtector_data);
+		return -ENODEV;
+	}
+
+	if(rc)
+		return -ENODEV;
+
+	return rc;
+}
 
 int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	void *arg)
@@ -841,8 +969,23 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				cam_sensor_power_down(s_ctrl);
 				msleep(20);
 				goto free_power_settings;
+			} else if(s_ctrl->soc_info.irq_gpio) {
+				CAM_INFO(CAM_SENSOR,
+					"Have protect circuit irq by GPIO:%d", s_ctrl->soc_info.irq_gpio);
+				rc = cam_sensor_power_protector_probe(s_ctrl);
+				if (rc < 0) {
+					s_ctrl->is_power_probe_succeed = 0;
+					CAM_ERR(CAM_SENSOR, "Power protector probe failed");
+				} else {
+					s_ctrl->is_power_probe_succeed = 1;
+					CAM_INFO(CAM_SENSOR, "Power protector Probe success");
+				}
+			} else {
+				CAM_ERR(CAM_SENSOR,
+					"DeSerializer mode not have power protector irq");
 			}
 		}
+
 		CAM_INFO(CAM_SENSOR,
 			"Probe success,slot:%d,slave_addr:0x%x,sensor_id:0x%x",
 			s_ctrl->soc_info.index,
@@ -915,6 +1058,16 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
+		if(s_ctrl->isDeSerializer && s_ctrl->is_power_probe_succeed) {
+			CAM_DBG(CAM_SENSOR,
+				"request power protector irq");
+			rc = cam_sensor_request_power_protector_irq(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"cannot request power protector irq");
+			}
+		}
+
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
 		s_ctrl->last_flush_req = 0;
 		CAM_INFO(CAM_SENSOR,
@@ -931,6 +1084,17 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			"Not in right state to release : %d",
 			s_ctrl->sensor_state);
 			goto release_mutex;
+		}
+
+		if(s_ctrl->isDeSerializer && s_ctrl->is_power_probe_succeed){
+			CAM_DBG(CAM_SENSOR,
+				"release power protector irq");
+			rc = cam_sensor_release_power_protector_irq(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"cannot release power protector irq");
+			}
+
 		}
 
 		if (s_ctrl->bridge_intf.link_hdl != -1) {

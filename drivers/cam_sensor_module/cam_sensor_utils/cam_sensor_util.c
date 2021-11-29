@@ -1112,6 +1112,22 @@ int cam_sensor_util_request_gpio_table(
 		cam_res_mgr_gpio_free_arry(soc_info->dev, gpio_tbl, size);
 	}
 
+	if (!gpio_en || !soc_info->irq_gpio) {
+		CAM_INFO(CAM_SENSOR, "irq gpio not specified\n");
+		gpio_free(soc_info->irq_gpio);
+	} else {
+		CAM_INFO(CAM_SENSOR, "irq_gpio=%d\n", soc_info->irq_gpio);
+		rc = gpio_request(soc_info->irq_gpio, "cam-irq-gpio");
+		if (rc) {
+			CAM_ERR(CAM_SENSOR,"cam irq gpio request failed\n");
+			gpio_free(soc_info->irq_gpio);
+			rc = 0;
+		} else {
+			rc = gpio_direction_input(soc_info->irq_gpio);
+		}
+	}
+
+
 	return rc;
 }
 
