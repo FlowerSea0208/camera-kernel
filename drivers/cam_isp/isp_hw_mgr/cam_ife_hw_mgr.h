@@ -265,6 +265,8 @@ struct cam_ife_hw_concrete_ctx {
 	uint32_t                        dual_ife_irq_mismatch_cnt;
 	atomic_t                        ctx_state;
 	uint32_t                        offline_clk;
+	bool                            waiting_start;
+	uint32_t                        start_ctx_idx;
 };
 
 /**
