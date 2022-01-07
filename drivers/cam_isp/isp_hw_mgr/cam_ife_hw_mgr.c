@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -2196,7 +2197,8 @@ static int cam_ife_hw_mgr_acquire_res_ife_csid_rdi(
 		csid_res->res_type = (enum cam_ife_hw_mgr_res_type)
 			CAM_ISP_RESOURCE_PIX_PATH;
 		csid_res->res_id = csid_acquire.res_id;
-		*acq_res_id = ((uint32_t)csid_acquire.res_id) << (16 + org_path_res_id*2);
+		*acq_res_id |= ((uint32_t)csid_acquire.res_id) <<
+						(16 + org_path_res_id*2);
 		csid_res->is_dual_vfe = 0;
 		csid_res->hw_res[0] = csid_acquire.node_res;
 		csid_res->hw_res[1] = NULL;
