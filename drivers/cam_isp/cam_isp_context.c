@@ -965,7 +965,8 @@ static int __cam_isp_ctx_handle_buf_done_in_activated_state(
 		bubble_state, &done_next_req);
 
 	/*only for the res buffer done delay, singal current and next*/
-	if (done_next_req.num_handles == 0) {
+	if (ctx_isp->rdi_only_context == true &&
+		done_next_req.num_handles == 0) {
 		if (ctx_isp->irq_delay_detected == true) {
 			struct cam_ctx_request  *next_req = list_last_entry(
 				&ctx->active_req_list, struct cam_ctx_request, list);
