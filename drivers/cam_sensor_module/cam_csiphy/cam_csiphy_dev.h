@@ -292,6 +292,7 @@ struct csiphy_device {
 					CSIPHY_MAX_INSTANCES_PER_PHY];
 	uint32_t                       clk_lane;
 	uint32_t                       acquire_count;
+	uint32_t                       share_count;
 	uint32_t                       start_dev_count;
 	struct cam_hw_soc_info         soc_info;
 	uint32_t                       cpas_handle;
