@@ -749,6 +749,36 @@ uint32_t cam_sensor_read_reg(struct cam_sensor_ctrl_t *s_ctrl)
 	return rc;
 }
 
+static int32_t cam_power_protector_restore_slave_info(struct cam_sensor_ctrl_t *s_ctrl)
+{
+	int32_t rc = 0;
+
+	switch (s_ctrl->io_master_info.master_type) {
+	case CCI_MASTER:
+		s_ctrl->io_master_info.cci_client->sid =
+			(s_ctrl->soc_info.power_prtector_addr >> 1);
+		s_ctrl->io_master_info.cci_client->i2c_freq_mode =
+			s_ctrl->sensordata->slave_info.i2c_freq_mode;
+		break;
+
+	case I2C_MASTER:
+		s_ctrl->io_master_info.client->addr =
+			 s_ctrl->soc_info.power_prtector_addr;
+		break;
+
+	case SPI_MASTER:
+		break;
+
+	default:
+		CAM_ERR(CAM_SENSOR, "Invalid master type: %d",
+				s_ctrl->io_master_info.master_type);
+		rc = -EINVAL;
+		break;
+	}
+
+	return rc;
+}
+
 uint32_t cam_power_protector_update_signal(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int      rc       = 0;
@@ -762,12 +792,13 @@ uint32_t cam_power_protector_update_signal(struct cam_sensor_ctrl_t *s_ctrl)
 
 	struct cam_hw_soc_info *soc_info   = &s_ctrl->soc_info;
 	struct device *dev                 = soc_info->dev;
+	cam_power_protector_restore_slave_info(s_ctrl);
 
 	for(i = 0; i < POWER_PROTECTOR_STAT_MAX_BASE; i++){
 		uint32_t chipid   = 0;
 		if (s_ctrl->readAddr[0][i] != 0x0){
 			rc = camera_io_dev_read(
-				&(s_ctrl->circuit_master_info),
+				&(s_ctrl->io_master_info),
 				soc_info->power_prtector_stat[i],
 				&chipid, CAMERA_SENSOR_I2C_TYPE_BYTE,
 				CAMERA_SENSOR_I2C_TYPE_BYTE);
@@ -778,6 +809,7 @@ uint32_t cam_power_protector_update_signal(struct cam_sensor_ctrl_t *s_ctrl)
 		}
 	}
 
+	cam_sensor_restore_slave_info(s_ctrl);
 	snprintf(IRQ_key, sizeof(IRQ_key),"IRQ_NUM=%d", s_ctrl->irq);
 	snprintf(STAT_key, sizeof(STAT_key),"STAT=%d", stat);
 	snprintf(ID_key, sizeof(ID_key),"SENSOR_ID=%d", soc_info->index);
@@ -839,29 +871,16 @@ uint32_t cam_sensor_power_protector_probe(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int rc = 0;
 	uint32_t chipid = 0;
-
-	s_ctrl->circuit_master_info
-		= s_ctrl->io_master_info;
-
-	switch (s_ctrl->circuit_master_info.master_type) {
-		case CCI_MASTER:
-			s_ctrl->circuit_master_info.cci_client->sid =
-				s_ctrl->soc_info.power_prtector_addr >> 1;
-			break;
-
-		case I2C_MASTER:
-			s_ctrl->circuit_master_info.client->addr =
-				s_ctrl->soc_info.power_prtector_addr;
-			break;
-	}
+	cam_power_protector_restore_slave_info(s_ctrl);
 
 	rc = camera_io_dev_read(
-		&(s_ctrl->circuit_master_info),
+		&(s_ctrl->io_master_info),
 		s_ctrl->soc_info.power_prtector_id,
 		&chipid,
 		CAMERA_SENSOR_I2C_TYPE_BYTE,
 		CAMERA_SENSOR_I2C_TYPE_BYTE);
 
+	cam_sensor_restore_slave_info(s_ctrl);
 	CAM_DBG(CAM_SENSOR, "power protector slave:0x%x read id[0x%x]: 0x%x expected id 0x%x:",
 		s_ctrl->soc_info.power_prtector_addr, s_ctrl->soc_info.power_prtector_id,
 		chipid, s_ctrl->soc_info.power_prtector_data);

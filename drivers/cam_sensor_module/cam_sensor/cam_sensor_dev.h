@@ -95,7 +95,6 @@ struct cam_sensor_ctrl_t {
 	enum cci_i2c_master_t cci_i2c_master;
 	enum cci_device_num cci_num;
 	struct camera_io_master io_master_info;
-	struct camera_io_master circuit_master_info;
 	enum cam_sensor_state_t sensor_state;
 	uint8_t is_probe_succeed;
 	uint32_t id;
