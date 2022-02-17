@@ -115,6 +115,8 @@ struct cam_sensor_ctrl_t {
 	uint8_t isDeSerializer;
 	uint32_t readAddr[2][CAM_READ_MAX_NUM];
 	uint32_t readData;
+	int irq;
+	uint8_t is_power_probe_succeed;
 };
 
 #endif /* _CAM_SENSOR_DEV_H_ */

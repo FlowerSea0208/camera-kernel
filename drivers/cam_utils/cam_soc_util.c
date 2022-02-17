@@ -1353,6 +1353,61 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 		}
 	}
 
+	rc = of_property_read_string_index(of_node, "cam-interrupt-names", 0,
+		&soc_info->irq_gpio_name);
+	if (rc) {
+		CAM_DBG(CAM_UTIL, "No gpio interrupt preset for: %s",
+			soc_info->dev_name);
+		soc_info->irq_gpio = 0;
+		rc = 0;
+	} else {
+		soc_info->irq_gpio =
+			of_get_named_gpio(of_node, "cam-irq-gpio", 0);
+		if (!gpio_is_valid(soc_info->irq_gpio)) {
+			CAM_ERR(CAM_UTIL, "irq gpio not specified\n");
+			soc_info->irq_gpio = 0;
+			rc = 0;
+		}
+		CAM_DBG(CAM_UTIL, "irq_gpio=%d\n", soc_info->irq_gpio);
+
+		rc = of_property_read_u32(of_node, "cam-power-protector-addr",
+			&soc_info->power_prtector_addr);
+		if (rc) {
+			CAM_ERR(CAM_UTIL, "failed to read cam-power-protector-addr");
+			soc_info->irq_gpio = 0;
+			rc = 0;
+		}
+		CAM_DBG(CAM_UTIL, "cam-power-protector-addr=%d\n", soc_info->power_prtector_addr);
+
+		rc = of_property_read_u32(of_node, "cam-power-protector-id",
+			&soc_info->power_prtector_id);
+		if (rc) {
+			CAM_ERR(CAM_UTIL, "failed to read power_prtector_id");
+			soc_info->irq_gpio = 0;
+			rc = 0;
+		}
+		CAM_DBG(CAM_UTIL, "cam-power-protector-id=%d\n", soc_info->power_prtector_id);
+
+		rc = of_property_read_u32(of_node, "cam-power-protector-data",
+			&soc_info->power_prtector_data);
+		if (rc) {
+			CAM_ERR(CAM_UTIL, "failed to read power_prtector_data");
+			soc_info->irq_gpio = 0;
+			rc = 0;
+		}
+		CAM_DBG(CAM_UTIL, "cam-power-protector-data=%d\n", soc_info->power_prtector_data);
+
+		rc = of_property_read_u32_array(of_node, "cam-power-protector-stat",
+			soc_info->power_prtector_stat, POWER_PROTECTOR_STAT_MAX_BASE);
+		if (rc) {
+			CAM_ERR(CAM_UTIL, "failed to read power_prtector_stat");
+			soc_info->irq_gpio = 0;
+			rc = 0;
+		}
+
+	}
+
+
 	rc = of_property_read_string_index(of_node, "compatible", 0,
 		(const char **)&soc_info->compatible);
 	if (rc) {

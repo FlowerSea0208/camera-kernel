@@ -44,6 +44,10 @@
 /* Maximum length of tag while dumping */
 #define CAM_SOC_HW_DUMP_TAG_MAX_LEN 32
 
+/* maximum number of power protector stat */
+#define POWER_PROTECTOR_STAT_MAX_BASE       3
+
+
 /**
  * enum cam_vote_level - Enum for voting level
  *
@@ -221,6 +225,12 @@ struct cam_hw_soc_info {
 	int32_t                         cam_cx_ipeak_bit;
 
 	void                           *soc_private;
+	const char                     *irq_gpio_name;
+	uint32_t                        irq_gpio;
+	uint32_t                        power_prtector_addr;
+	uint32_t                        power_prtector_id;
+	uint32_t                        power_prtector_data;
+	uint32_t                        power_prtector_stat[POWER_PROTECTOR_STAT_MAX_BASE];
 };
 
 /**
