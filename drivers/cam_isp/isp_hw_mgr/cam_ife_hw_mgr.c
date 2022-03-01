@@ -1137,6 +1137,10 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_rdi(
 
 		CAM_DBG(CAM_ISP, "i = %d, vfe_out_res_id = %d, out_port: %d",
 			i, vfe_out_res_id, out_port->res_type);
+		if ((vfe_out_res_id != out_port->res_type) &&
+		    (out_port->res_type < CAM_ISP_IFE_OUT_RES_RDI_0 ||
+		     out_port->res_type > CAM_ISP_IFE_OUT_RES_RDI_3))
+			continue;
 		out_port->res_type = vfe_out_res_id;
 		vfe_acquire.vfe_out.cdm_ops = c_ctx->cdm_ops;
 		vfe_acquire.vfe_out.out_port_info = out_port;
