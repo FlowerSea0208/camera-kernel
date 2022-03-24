@@ -214,6 +214,7 @@ struct cam_ife_hw_mgr_ctx {
  *                         HW manager during the initialization.
  * @ife_devices:           IFE device instances array. This will be filled by
  *                         HW layer during initialization
+ * @wm_cfg_mutex:          mutex for updating the wm configuration in CDtM
  * @ctx_mutex:             mutex for the hw context pool
  * @free_ctx_list:         free hw context list
  * @used_ctx_list:         used hw context list
@@ -228,6 +229,7 @@ struct cam_ife_hw_mgr {
 	struct cam_hw_intf            *csid_devices[CAM_IFE_CSID_HW_NUM_MAX];
 	struct cam_hw_intf            *ife_devices[CAM_IFE_HW_NUM_MAX];
 	struct cam_soc_reg_map        *cdm_reg_map[CAM_IFE_HW_NUM_MAX];
+	struct mutex                   wm_cfg_mutex[CAM_IFE_HW_NUM_MAX];
 
 	struct mutex                   ctx_mutex;
 	atomic_t                       active_ctx_cnt;
