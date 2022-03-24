@@ -1138,10 +1138,12 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_rdi(
 
 		CAM_DBG(CAM_ISP, "i = %d, vfe_out_res_id = %d, out_port: %d",
 			i, vfe_out_res_id, out_port->res_type);
+
 		if ((vfe_out_res_id != out_port->res_type) &&
 		    (out_port->res_type < CAM_ISP_IFE_OUT_RES_RDI_0 ||
 		     out_port->res_type > CAM_ISP_IFE_OUT_RES_RDI_3))
 			continue;
+
 		out_port->res_type = vfe_out_res_id;
 		vfe_acquire.vfe_out.cdm_ops = c_ctx->cdm_ops;
 		vfe_acquire.vfe_out.out_port_info = out_port;
@@ -6492,6 +6494,8 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		}
 
 		/* get IO buffers */
+
+		mutex_lock(&g_ife_hw_mgr.wm_cfg_mutex[ctx->base[i].idx]);
 		rc = cam_isp_add_io_buffers(
 			hw_mgr->mgr_common.img_iommu_hdl,
 			hw_mgr->mgr_common.img_iommu_hdl_secure,
@@ -6501,6 +6505,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 			CAM_IFE_HW_OUT_RES_MAX, fill_fence,
 			&frame_header_info,
 			ife_ctx->unpacker_fmt);
+		mutex_unlock(&g_ife_hw_mgr.wm_cfg_mutex[ctx->base[i].idx]);
 
 		if (rc) {
 			CAM_ERR(CAM_ISP,
@@ -8901,6 +8906,9 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 	memset(&g_ife_hw_mgr, 0, sizeof(g_ife_hw_mgr));
 
 	mutex_init(&g_ife_hw_mgr.ctx_mutex);
+	for (i = 0, j = 0; i < CAM_IFE_HW_NUM_MAX; i++) {
+		mutex_init(&g_ife_hw_mgr.wm_cfg_mutex[i]);
+	}
 	spin_lock_init(&g_ife_hw_mgr.ctx_lock);
 
 	if (CAM_IFE_HW_NUM_MAX != CAM_IFE_CSID_HW_NUM_MAX) {
