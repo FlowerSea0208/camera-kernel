@@ -339,7 +339,6 @@ static int cam_sensor_serdes_init(void *data)
 		goto error;
 	}
 
-	mutex_lock(&(b_ctrl->s_ctrl->cam_sensor_mutex));
 	rc = sensor_powerup(b_ctrl->s_ctrl);
 	if (rc) {
 		CAM_ERR(CAM_SENSOR, "Bridgechip%d Powerup Failed",
@@ -355,7 +354,6 @@ static int cam_sensor_serdes_init(void *data)
 			b_ctrl->s_ctrl->soc_info.index);
 		goto error;
 	}
-	mutex_unlock(&(b_ctrl->s_ctrl->cam_sensor_mutex));
 
 	snprintf(boot_marker, sizeof(boot_marker), "M - DRIVER BC%d init Ready",
 		b_ctrl->s_ctrl->soc_info.index);
