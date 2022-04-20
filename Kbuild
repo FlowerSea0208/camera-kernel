@@ -50,6 +50,10 @@ ifeq ($(CONFIG_ARCH_PARROT), y)
 include $(CAMERA_KERNEL_ROOT)/config/parrot.mk
 endif
 
+ifeq ($(CONFIG_ARCH_NEO), y)
+include $(CAMERA_KERNEL_ROOT)/config/neo_la.mk
+endif
+
 # List of all camera-kernel headers
 cam_include_dirs := $(shell dirname `find $(CAMERA_KERNEL_ROOT) -name '*.h'` | uniq)
 
