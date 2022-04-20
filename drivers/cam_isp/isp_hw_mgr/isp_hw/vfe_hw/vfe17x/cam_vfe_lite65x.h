@@ -572,7 +572,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650x_bus_hw_info = {
 			},
 		},
 		{
-			.vfe_out_type  = CAM_VFE_BUS_VER3_VFE_OUT_STATS_BHIST,
+			.vfe_out_type  = CAM_VFE_BUS_VER3_VFE_OUT_STATS_LITE_BHIST,
 			.max_width     = -1,
 			.max_height    = -1,
 			.source_group  = CAM_VFE_BUS_VER3_SRC_GRP_0,
@@ -590,7 +590,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650x_bus_hw_info = {
 	.support_consumed_addr = true,
 	.comp_done_shift = 0,
 	.top_irq_shift   = 0,
-	.max_out_res = CAM_ISP_IFE_OUT_RES_BASE + 33,
+	.max_out_res = CAM_ISP_IFE_OUT_RES_BASE + 36,
 };
 
 static struct cam_vfe_irq_hw_info vfe65x_irq_hw_info = {
