@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CSID_HW_INTF_H_
@@ -10,7 +11,7 @@
 #include "cam_hw_intf.h"
 
 /* MAX IFE CSID instance */
-#define CAM_IFE_CSID_HW_NUM_MAX                        8
+#define CAM_IFE_CSID_HW_NUM_MAX                        10
 #define CAM_IFE_CSID_UDI_MAX                           3
 #define RT_BASE_IDX                                    2
 
