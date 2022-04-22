@@ -3775,6 +3775,7 @@ static int cam_ife_hw_mgr_preprocess_port(
 				switch(out_port->res_type) {
 				case CAM_ISP_IFE_LITE_OUT_RES_PREPROCESS_RAW:
 				case CAM_ISP_IFE_LITE_OUT_RES_STATS_BG:
+				case CAM_ISP_IFE_LITE_OUT_RES_STATS_BHIST:
 					in_port->lite_path_count++;
 				break;
 				default:
