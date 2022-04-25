@@ -400,7 +400,7 @@ int32_t cam_sensor_restore_slave_info(struct cam_sensor_ctrl_t *s_ctrl)
 	return rc;
 }
 
-static int32_t cam_sensor_update_i2c_info(struct cam_cmd_i2c_info *i2c_info,
+int32_t cam_sensor_update_i2c_info(struct cam_cmd_i2c_info *i2c_info,
 	struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
