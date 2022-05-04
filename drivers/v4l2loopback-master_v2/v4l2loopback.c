@@ -319,6 +319,7 @@ struct v4l2_loopback_device {
 	atomic_t open_count;
 
 	int max_openers;
+	int stream_status;
 
 	struct mutex dev_mutex;
 
@@ -363,6 +364,7 @@ struct v4l2_streamdata {
 	struct v4l2l_buffer buffers[MAX_BUFFERS]; /* inner driver buffers */
 	int used_buffers; /* number of the actually used buffers */
 	unsigned int use_buf_width;
+	u8 is_streaming;
 
 	struct list_head outbufs_list; /* buffers in output DQBUF order */
 	struct list_head capbufs_list; /* buffers in capture DQBUF order */
@@ -540,7 +542,7 @@ static struct v4l2_loopback_device *v4l2loopback_cd2dev(struct device *cd);
 /* device attributes */
 /* available via sysfs: /sys/devices/virtual/video4linux/video* */
 
-static ssize_t attr_show_maxopeners(struct device *cd,
+static ssize_t attr_show_stream_status(struct device *cd,
 		struct device_attribute *attr, char *buf)
 {
 	struct v4l2_loopback_device *dev = v4l2loopback_cd2dev(cd);
@@ -550,11 +552,11 @@ static ssize_t attr_show_maxopeners(struct device *cd,
 		return -EINVAL;
 	}
 
-	return scnprintf(buf, sizeof(dev->max_openers), "%d",
-			dev->max_openers);
+	return scnprintf(buf, sizeof(dev->stream_status), "%d",
+			dev->stream_status);
 }
 
-static ssize_t attr_store_maxopeners(struct device *cd,
+static ssize_t attr_store_stream_status(struct device *cd,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct v4l2_loopback_device *dev = NULL;
@@ -570,24 +572,17 @@ static ssize_t attr_store_maxopeners(struct device *cd,
 		return -EINVAL;
 	}
 
-	if (dev->max_openers == curr)
+	if (dev->stream_status == curr)
 		return len;
 
-	if (dev->open_count.counter > curr) {
-		/* request to limit to less openers as are
-		 * currently attached to us
-		 */
-		return -EINVAL;
-	}
-
-	dev->max_openers = (int)curr;
+	dev->stream_status = (int)curr;
 
 	return len;
 }
 
 
-static DEVICE_ATTR(max_openers, 0644, attr_show_maxopeners,
-		attr_store_maxopeners);
+static DEVICE_ATTR(stream_status, 0644, attr_show_stream_status,
+		attr_store_stream_status);
 
 static void v4l2loopback_remove_sysfs(struct video_device *vdev)
 {
@@ -596,7 +591,7 @@ static void v4l2loopback_remove_sysfs(struct video_device *vdev)
 	if (vdev) {
 		do {
 
-			V4L2_SYSFS_DESTROY(max_openers);
+			V4L2_SYSFS_DESTROY(stream_status);
 			/* ... */
 		} while (0);
 	}
@@ -618,7 +613,7 @@ static void v4l2loopback_create_sysfs(struct video_device *vdev)
 		return;
 	do {
 
-		V4L2_SYSFS_CREATE(max_openers);
+		V4L2_SYSFS_CREATE(stream_status);
 		/* ... */
 	} while (0);
 
@@ -695,6 +690,8 @@ static void vidioc_fill_name(char *buf, int len, int nr)
 		snprintf(buf, len, "%s", card_label[nr]);
 	else
 		snprintf(buf, len, "Dummy video device (0x%04X)", nr);
+
+	CAM_DBG(CAM_V4L2, "name is %s", buf);
 }
 
 /* V4L2 ioctl caps and params calls
@@ -920,7 +917,7 @@ static int vidioc_g_fmt_cap(struct file *file, void *priv,
 	}
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "%s opener: %pK data: %pK",
+	CAM_DBG(CAM_V4L2, "%s opener: %p data: %p",
 		opener, data);
 
 	if (!(dev->state & V4L2L_READY_FOR_CAPTURE))
@@ -959,7 +956,7 @@ static int vidioc_try_fmt_cap(struct file *file, void *priv,
 	}
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p",
 		opener, data);
 
 	if (!(dev->state & V4L2L_READY_FOR_CAPTURE)) {
@@ -1089,7 +1086,7 @@ static int vidioc_g_fmt_out(struct file *file, void *priv,
 	}
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p",
 		opener, data);
 
 	/*
@@ -1133,7 +1130,7 @@ static int vidioc_try_fmt_out(struct file *file, void *priv,
 	}
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p",
 		opener, data);
 
 	/* TODO(vasaka) loopback does not care about formats writer want to set,
@@ -1198,7 +1195,7 @@ static int vidioc_s_fmt_out(struct file *file, void *priv,
 	}
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p",
 		opener, data);
 
 	ret = vidioc_try_fmt_out(file, priv, fmt);
@@ -1644,7 +1641,7 @@ static int set_bufstate(struct v4l2_streamdata *data,
 	}
 
 	if (ret == -1) {
-		CAM_ERR(CAM_V4L2, "[dev %pK] fail to set buffer state %u current state %u",
+		CAM_ERR(CAM_V4L2, "[data %p] fail to set buffer state %u current state %u",
 			data, state, b->state);
 	}
 
@@ -1705,17 +1702,21 @@ static int vidioc_qbuf(struct file *file,
 	switch (buf->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		CAM_DBG(CAM_V4L2, "[dev %s] capture QBUF index: %d", dev->vdev->name, index);
-
 		rc = set_bufstate(data, b, V4L2L_BUF_READY_Q);
 		if (rc < 0)
 			CAM_ERR(CAM_V4L2, "[dev %s] capture QBUF index: %d fail",
 				dev->vdev->name, b->buffer.index);
 		else {
-			mutex_lock(&data->outbufs_mutex);
-			list_add_tail(&b->list_head, &data->outbufs_list);
-			mutex_unlock(&data->outbufs_mutex);
-			send_v4l2_event(opener->connected_opener, AIS_V4L2_CLIENT_OUTPUT,
-				AIS_V4L2_OUTPUT_BUF_READY);
+			/* since when app VIDIOC_REQBUFS, proxy side will allocate buf and export,
+			 * so before start, no need qbuf the outbufs_list for proxy to dquf.
+			 */
+			if (data->is_streaming) {
+				mutex_lock(&data->outbufs_mutex);
+				list_add_tail(&b->list_head, &data->outbufs_list);
+				mutex_unlock(&data->outbufs_mutex);
+				send_v4l2_event(opener->connected_opener, AIS_V4L2_CLIENT_OUTPUT,
+					AIS_V4L2_OUTPUT_BUF_READY);
+			}
 		}
 		return rc;
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT: {
@@ -1896,13 +1897,19 @@ static int vidioc_streamon(struct file *file,
 
 	data = opener->data;
 
-	CAM_INFO(CAM_V4L2, "opener: %pK data: %pK", opener, data);
+	CAM_INFO(CAM_V4L2, "opener: %p data: %p", opener, data);
 
 	switch (type) {
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
-		return 0;
+		rc = 0;
+		break;
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE: {
-		CAM_INFO(CAM_V4L2, "streamon");
+		if (data->is_streaming) {
+			CAM_WARN(CAM_V4L2, "data: %p already is streamoned, return", data);
+			rc = -EINVAL;
+			break;
+		}
+		CAM_INFO(CAM_V4L2, "data: %p streamon", data);
 		set_allbufs_state(data, V4L2L_BUF_PROXY_ACQUIRED);
 		mutex_lock(&data->outbufs_mutex);
 		list_for_each_entry_safe(pos, n,
@@ -1926,15 +1933,19 @@ static int vidioc_streamon(struct file *file,
 					msecs_to_jiffies(START_TIMEOUT));
 		if (rc) {
 			rc = data->qcarcam_ctrl_ret;
+			if (data->qcarcam_ctrl_ret == 0)
+				dev->stream_status = 1;
 		} else {
 			CAM_ERR(CAM_V4L2, "streamon fail, timeout %d", rc);
 			rc = -ETIMEDOUT;
 		}
-		return rc;
+		break;
 	}
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
 	}
+
+	return rc;
 }
 
 /* stop streaming
@@ -1968,11 +1979,14 @@ static int vidioc_streamoff(struct file *file,
 		return -EINVAL;
 	}
 
-	CAM_INFO(CAM_V4L2, "opener: %pK data: %pK", opener, data);
+	CAM_INFO(CAM_V4L2, "opener: %p data: %p", opener, data);
+
+	data->is_streaming = 0;
 
 	switch (type) {
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
-		return 0;
+		rc = 0;
+		break;
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		CAM_INFO(CAM_V4L2, "streamoff");
 		set_allbufs_state(data, V4L2L_BUF_PENDING);
@@ -1984,6 +1998,8 @@ static int vidioc_streamoff(struct file *file,
 						msecs_to_jiffies(STOP_TIMEOUT));
 			if (rc) {
 				rc = data->qcarcam_ctrl_ret;
+				if (data->qcarcam_ctrl_ret == 0)
+					dev->stream_status = 0;
 				CAM_INFO(CAM_V4L2, "clear list when streamoff");
 				mutex_lock(&data->outbufs_mutex);
 				list_for_each_entry_safe(pos, n,
@@ -2000,18 +2016,18 @@ static int vidioc_streamoff(struct file *file,
 				}
 				INIT_LIST_HEAD(&data->capbufs_list);
 				mutex_unlock(&data->capbufs_mutex);
-
 			} else {
 				CAM_ERR(CAM_V4L2, "streamoff fail, timeout %d", rc);
 				rc = -ETIMEDOUT;
 			}
 		}
 
-		return rc;
+		break;
 	default:
-		return -EINVAL;
+		rc = -EINVAL;
 	}
-	return -EINVAL;
+
+	return rc;
 }
 
 static int cam_subscribe_event(struct v4l2_fh *fh,
@@ -2045,7 +2061,7 @@ static int process_capture_cmd(struct v4l2_loopback_device *dev,
 		return -EINVAL;
 	}
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK cmd %d",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p cmd %d",
 		opener, data, kcmd->cmd);
 
 	switch (kcmd->cmd) {
@@ -2171,7 +2187,7 @@ static int process_output_cmd(struct v4l2_loopback_device *dev,
 
 	data = opener->data;
 
-	CAM_DBG(CAM_V4L2, "opener: %pK data: %pK cmd %d",
+	CAM_DBG(CAM_V4L2, "opener: %p data: %p cmd %d",
 		opener, data, kcmd->cmd);
 
 	switch (kcmd->cmd) {
@@ -2473,6 +2489,7 @@ static int v4l2_loopback_open(struct file *file)
 	enum v4l2_loopback_opener_type etype;
 
 	MARK();
+
 	dev = v4l2loopback_getdevice(file);
 
 	if (dev == NULL) {
@@ -2481,14 +2498,15 @@ static int v4l2_loopback_open(struct file *file)
 	}
 
 	if (dev->state == V4L2L_OPENED) {
-		CAM_ERR(CAM_V4L2, "\ndev state is busy");
+		CAM_ERR(CAM_V4L2, "\ndev state is busy dev=%s", dev->vdev->name);
 		return -EBUSY;
 	}
 
 	/* WRITEONLY should be open operation from proxy */
 	if ((file->f_mode & (FMODE_READ | FMODE_WRITE)) == FMODE_WRITE) {
 		if (dev->state == V4L2L_READY_FOR_OUTPUT) {
-			CAM_INFO(CAM_V4L2, "proxy open at the first time");
+			CAM_INFO(CAM_V4L2, "proxy open at the first time dev=%s",
+				dev->vdev->name);
 			etype = V4L2L_WRITER;
 			dev->state = V4L2L_READY_FOR_CAPTURE;
 
@@ -2499,7 +2517,8 @@ static int v4l2_loopback_open(struct file *file)
 			dev->main_opener = opener;
 		} else if (dev->state == V4L2L_READY_FOR_CAPTURE) {
 		// when capture state, proxy open it can succeed
-			CAM_INFO(CAM_V4L2, "proxy open when app open");
+			CAM_INFO(CAM_V4L2, "proxy open when app open dev=%s",
+				dev->vdev->name);
 			etype = V4L2L_WRITER;
 
 			opener = create_opener(file, etype);
@@ -2517,7 +2536,7 @@ static int v4l2_loopback_open(struct file *file)
 	} else {
 		/* app open it */
 		if (dev->state == V4L2L_READY_FOR_CAPTURE) {
-			// todo: add the mutex protect for open operation
+			CAM_INFO(CAM_V4L2, "app open dev=%s", dev->vdev->name);
 			mutex_lock(&dev->dev_mutex);
 			etype = V4L2L_READER;
 			send_v4l2_event(dev->main_opener, AIS_V4L2_CLIENT_OUTPUT,
@@ -2527,21 +2546,23 @@ static int v4l2_loopback_open(struct file *file)
 			if (rc) {
 				rc = dev->qcarcam_ctrl_ret;
 				if (!dev->qcarcam_ctrl_ret) {
-					CAM_INFO(CAM_V4L2, "app open succeed");
+					CAM_INFO(CAM_V4L2, "app open succeed dev=%s",
+						dev->vdev->name);
 				} else {
-					CAM_ERR(CAM_V4L2, "app open fail");
+					CAM_ERR(CAM_V4L2, "app open fail dev=%s",
+						dev->vdev->name);
 					mutex_unlock(&dev->dev_mutex);
 					return rc;
 				}
 			} else {
-				CAM_ERR(CAM_V4L2, "open fail, timeout %d", rc);
+				CAM_ERR(CAM_V4L2, "open fail dev=%s, timeout %d",
+					dev->vdev->name, rc);
 				rc = -ETIMEDOUT;
 				mutex_unlock(&dev->dev_mutex);
 				return rc;
 			}
 
 			connected_opener = fh_to_opener(dev->open_ret_fh);
-			// TODO unlock here
 
 			if (connected_opener == NULL) {
 				CAM_ERR(CAM_V4L2, "connected opener error");
@@ -2562,7 +2583,7 @@ static int v4l2_loopback_open(struct file *file)
 			connected_opener->connected_opener = opener;
 			opener->data = connected_opener->data;
 
-			CAM_INFO(CAM_V4L2, "capture opener %pK, proxy opener %pK, data %pK",
+			CAM_INFO(CAM_V4L2, "capture opener %p, proxy opener %p, data %p",
 				opener, connected_opener, data);
 			mutex_unlock(&dev->dev_mutex);
 		} else {
@@ -2576,7 +2597,7 @@ static int v4l2_loopback_open(struct file *file)
 		dev->state = V4L2L_OPENED;
 	}
 
-	CAM_DBG(CAM_V4L2, "opened dev:%pK", dev);
+	CAM_DBG(CAM_V4L2, "opened dev:%p", dev);
 	MARK();
 	return rc;
 }
@@ -2656,7 +2677,6 @@ static int v4l2_loopback_close(struct file *file)
 	v4l2_fh_exit(file->private_data);
 
 	kfree(opener);
-	mutex_destroy(&dev->dev_mutex);
 
 	MARK();
 
@@ -2675,7 +2695,7 @@ static int free_buffers(struct v4l2_streamdata *data)
 		return -EINVAL;
 	}
 
-	CAM_INFO(CAM_V4L2, "freeing buffer %pK", data);
+	CAM_INFO(CAM_V4L2, "freeing buffer %p", data);
 
 	mutex_lock(&data->buf_mutex);
 
@@ -2785,6 +2805,7 @@ int init_stream_data(struct v4l2_streamdata *data)
 	init_capture_param(&data->capture_param);
 
 	data->buffer_size = 0;
+	data->is_streaming = 0;
 
 	/* Set initial format */
 	data->pix_format.width = 0; /* V4L2LOOPBACK_SIZE_DEFAULT_WIDTH; */
@@ -2869,7 +2890,12 @@ static int v4l2_loopback_init(struct v4l2_loopback_device *dev, int nr)
 	struct v4l2_ctrl *ctrl;
 
 	snprintf(dev->v4l2_dev.name, sizeof(dev->v4l2_dev.name),
-				"v4l2loopback-%03d", nr);
+				"v4l2loopback-video%03d", video_nr[nr]);
+
+	CAM_INFO(CAM_V4L2, "v4l2_dev.name %s", dev->v4l2_dev.name);
+
+	card_label[nr] = dev->v4l2_dev.name;
+
 	ret = v4l2_device_register(NULL, &dev->v4l2_dev);
 	if (ret)
 		return ret;
@@ -2900,6 +2926,7 @@ static int v4l2_loopback_init(struct v4l2_loopback_device *dev, int nr)
 	dev->state = V4L2L_READY_FOR_OUTPUT;
 	dev->announce_all_caps = (!exclusive_caps[nr]);
 	dev->max_openers = max_openers;
+	dev->stream_status = 0;
 
 	ret = v4l2_ctrl_handler_init(hdl, 1);
 	if (ret)
@@ -3021,6 +3048,7 @@ static void free_devices(void)
 			video_unregister_device(devs[i]->vdev);
 			v4l2_device_unregister(&devs[i]->v4l2_dev);
 			v4l2_ctrl_handler_free(&devs[i]->ctrl_handler);
+			mutex_destroy(&devs[i]->dev_mutex);
 			kfree(devs[i]);
 			devs[i] = NULL;
 		}
