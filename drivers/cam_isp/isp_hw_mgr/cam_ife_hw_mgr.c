@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -2279,6 +2280,10 @@ static int cam_convert_hw_idx_to_ife_hw_num(int hw_idx)
 		case 2: return CAM_ISP_IFE2_LITE_HW;
 		case 3: return CAM_ISP_IFE3_LITE_HW;
 		case 4: return CAM_ISP_IFE4_LITE_HW;
+		case 5: return CAM_ISP_IFE5_LITE_HW;
+		case 6: return CAM_ISP_IFE6_LITE_HW;
+		case 7: return CAM_ISP_IFE7_LITE_HW;
+
 		}
 	} else {
 		CAM_ERR(CAM_ISP, "hw idx %d out-of-bounds", hw_idx);
@@ -3770,6 +3775,7 @@ static int cam_ife_hw_mgr_preprocess_port(
 				switch(out_port->res_type) {
 				case CAM_ISP_IFE_LITE_OUT_RES_PREPROCESS_RAW:
 				case CAM_ISP_IFE_LITE_OUT_RES_STATS_BG:
+				case CAM_ISP_IFE_LITE_OUT_RES_STATS_BHIST:
 					in_port->lite_path_count++;
 				break;
 				default:
@@ -9278,7 +9284,6 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 			CAM_ERR(CAM_ISP, "UBWC Update Failed rc: %d", rc);
 	}
 		break;
-
 	case CAM_ISP_GENERIC_BLOB_TYPE_UBWC_CONFIG_V2: {
 		struct cam_ubwc_config_v2 *ubwc_config;
 
