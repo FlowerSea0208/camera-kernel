@@ -21,6 +21,14 @@ static int cam_sensor_subdev_open(struct v4l2_subdev *sd,
 	}
 
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
+	if (s_ctrl->open_cnt == NUM_MAX_OPEN)
+	{
+		CAM_DBG(CAM_SENSOR, "sensor Subdev up to max open count %d",
+			 s_ctrl->open_cnt);
+		mutex_unlock(&(s_ctrl->cam_sensor_mutex));
+		return -EINVAL;
+	}
+
 	s_ctrl->open_cnt++;
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
 
