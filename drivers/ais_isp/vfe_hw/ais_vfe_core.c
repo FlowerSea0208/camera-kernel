@@ -1,4 +1,5 @@
 /* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -693,6 +694,10 @@ int ais_vfe_stop(void *hw_priv, void *stop_args, uint32_t arg_size)
 		goto EXIT;
 	}
 
+	spin_lock(&rdi_path->buffer_lock);
+	ais_clear_rdi_path(rdi_path);
+	spin_unlock(&rdi_path->buffer_lock);
+
 	core_info->bus_wr_mask1 &= ~(1 << stop_cmd->path);
 	cam_io_w_mb(core_info->bus_wr_mask1,
 		core_info->mem_base + bus_hw_irq_regs[1].mask_reg_offset);
@@ -730,8 +735,6 @@ int ais_vfe_stop(void *hw_priv, void *stop_args, uint32_t arg_size)
 	{
 		ais_vfe_reset_rdi(vfe_hw, stop_cmd->path);
 	}
-
-	ais_clear_rdi_path(rdi_path);
 
 	rdi_path->state = AIS_ISP_RESOURCE_STATE_INIT_HW;
 
@@ -985,6 +988,7 @@ static int ais_vfe_q_sof(struct ais_vfe_hw_core_info *core_info,
 	int rc = 0;
 
 	if (!list_empty(&p_rdi->free_sof_info_list)) {
+		spin_lock_bh(&p_rdi->buffer_lock);
 		p_sof_info = list_first_entry(&p_rdi->free_sof_info_list,
 			struct ais_sof_info_t, list);
 		list_del_init(&p_sof_info->list);
@@ -994,6 +998,7 @@ static int ais_vfe_q_sof(struct ais_vfe_hw_core_info *core_info,
 		p_sof_info->prev_sof_hw_ts = p_sof->prev_sof_hw_ts;
 		list_add_tail(&p_sof_info->list, &p_rdi->sof_info_q);
 		p_rdi->num_sof_info_q++;
+		spin_unlock_bh(&p_rdi->buffer_lock);
 
 		trace_ais_isp_vfe_q_sof(core_info->vfe_idx, path,
 			p_sof->frame_cnt, p_sof->cur_sof_hw_ts);
@@ -1113,6 +1118,7 @@ static void ais_vfe_handle_sof_rdi(struct ais_vfe_hw_core_info *core_info,
 		if (p_rdi->num_sof_info_q) {
 			struct ais_sof_info_t *p_sof_info;
 
+			spin_lock_bh(&p_rdi->buffer_lock);
 			while (!list_empty(&p_rdi->sof_info_q)) {
 				p_sof_info = list_first_entry(
 					&p_rdi->sof_info_q,
@@ -1122,6 +1128,7 @@ static void ais_vfe_handle_sof_rdi(struct ais_vfe_hw_core_info *core_info,
 						&p_rdi->free_sof_info_list);
 			}
 			p_rdi->num_sof_info_q = 0;
+			spin_unlock_bh(&p_rdi->buffer_lock);
 		}
 
 		trace_ais_isp_vfe_error(core_info->vfe_idx,
@@ -1229,12 +1236,6 @@ static int ais_vfe_handle_error(
 			core_info->mem_base +
 			bus_hw_irq_regs[1].mask_reg_offset);
 
-               /* Disable rdi* overflow irq mask*/
-		core_info->irq_mask1 &=
-				~(1 << (AIS_VFE_MASK1_RDI_OVERFLOW_SHT + path));
-		cam_io_w_mb(core_info->irq_mask1,
-				core_info->mem_base + AIS_VFE_IRQ_MASK1);
-
 		/* Disable WM and reg-update */
 		cam_io_w_mb(0x0, core_info->mem_base + client_regs->cfg);
 		cam_io_w_mb(AIS_VFE_REGUP_RDI_ALL, core_info->mem_base +
@@ -1287,9 +1288,11 @@ static void ais_vfe_bus_handle_client_frame_done(
 		struct ais_sof_info_t *p_sof_info = NULL;
 		bool is_sof_match = false;
 
+		spin_lock_bh(&rdi_path->buffer_lock);
 		if (list_empty(&rdi_path->buffer_hw_q)) {
 			CAM_DBG(CAM_ISP, "I%d|R%d: FD while HW Q empty",
 				core_info->vfe_idx, path);
+			spin_unlock_bh(&rdi_path->buffer_lock);
 			break;
 		}
 
@@ -1347,6 +1350,9 @@ static void ais_vfe_bus_handle_client_frame_done(
 			frame_cnt = sof_ts = cur_sof_hw_ts = 0;
 		}
 
+		list_add_tail(&vfe_buf->list, &rdi_path->free_buffer_list);
+		spin_unlock_bh(&rdi_path->buffer_lock);
+
 		trace_ais_isp_vfe_buf_done(core_info->vfe_idx, path,
 				vfe_buf->bufIdx,
 				frame_cnt,
@@ -1377,8 +1383,6 @@ static void ais_vfe_bus_handle_client_frame_done(
 				sof_ts,
 				core_info->event.u.frame_msg.hw_ts[i]);
 		}
-
-		list_add_tail(&vfe_buf->list, &rdi_path->free_buffer_list);
 	}
 
 	if (!last_addr_match) {
@@ -1404,6 +1408,7 @@ static void ais_vfe_bus_handle_client_frame_done(
 			core_info->vfe_idx, path, frame_cnt,
 			rdi_path->num_sof_info_q);
 
+		spin_lock_bh(&rdi_path->buffer_lock);
 		while (!list_empty(&rdi_path->sof_info_q)) {
 			p_sof_info = list_first_entry(&rdi_path->sof_info_q,
 					struct ais_sof_info_t, list);
@@ -1413,6 +1418,7 @@ static void ais_vfe_bus_handle_client_frame_done(
 		}
 
 		rdi_path->num_sof_info_q = 0;
+		spin_unlock_bh(&rdi_path->buffer_lock);
 
 		trace_ais_isp_vfe_error(core_info->vfe_idx, path, 1, 0);
 
@@ -1638,6 +1644,7 @@ irqreturn_t ais_vfe_irq(int irq_num, void *data)
 	struct cam_hw_info            *vfe_hw;
 	struct ais_vfe_hw_core_info   *core_info;
 	uint32_t ife_status[2] = {};
+	int path =  0;
 
 	if (!data)
 		return IRQ_NONE;
@@ -1719,6 +1726,19 @@ irqreturn_t ais_vfe_irq(int irq_num, void *data)
 				work_data.path = (ife_status[1] >>
 				AIS_VFE_STATUS1_RDI_OVERFLOW_IRQ_SHFT) &
 				AIS_VFE_STATUS1_RDI_OVERFLOW_IRQ_MSK;
+
+				for (path = 0; path < AIS_IFE_PATH_MAX; path++) {
+
+					if (!(work_data.path & (1 << path)))
+						continue;
+
+					/* Disable rdi* overflow irq mask*/
+					core_info->irq_mask1 &=
+							~(1 << (AIS_VFE_MASK1_RDI_OVERFLOW_SHT +
+							path));
+					cam_io_w_mb(core_info->irq_mask1,
+							core_info->mem_base + AIS_VFE_IRQ_MASK1);
+				}
 
 				CAM_ERR_RATE_LIMIT(CAM_ISP,
 					"IFE%d Overflow 0x%x",
