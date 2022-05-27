@@ -718,7 +718,6 @@ static int cam_cpas_parse_sys_cache_uids(
 		CAM_DBG(CAM_CPAS, "no cache-names found");
 		return 0;
 	}
-	num_caches = 0;
 
 	if (num_caches > CAM_LLCC_MAX) {
 		CAM_ERR(CAM_CPAS,
