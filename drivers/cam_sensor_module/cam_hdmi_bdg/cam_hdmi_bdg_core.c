@@ -13,7 +13,7 @@
 #include "cam_packet_util.h"
 #include "cam_hdmi_bdg_core.h"
 
-static struct cam_sensor_ctrl_t *cam_hdmi_bdg_cam_ctrl;
+static struct cam_sensor_ctrl_t *cam_hdmi_bdg_cam_ctrl = NULL;
 
 enum lt6911_fw_status {
 	UPDATE_SUCCESS = 0,
@@ -859,6 +859,11 @@ uint32_t cam_hdmi_bdg_get_fw_version(void)
 	m_i2c_write_settings.data_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
 	m_i2c_write_settings.delay = 0;
 
+	if (!cam_hdmi_bdg_cam_ctrl) {
+		CAM_ERR(CAM_SENSOR, "LT6911UXC is not ready.");
+		goto end;
+	}
+
 	rc = camera_io_dev_write(&(s_ctrl->io_master_info), &m_i2c_write_settings);
 	if (rc < 0) {
 		CAM_ERR(CAM_SENSOR,"Failed to write registers rc %d", rc);
@@ -951,12 +956,16 @@ int cam_hdmi_bdg_set_cam_ctrl(struct cam_sensor_ctrl_t *s_ctrl)
 	struct cam_camera_slave_info *slave_info;
 
 	if (s_ctrl == NULL) {
-		CAM_ERR(CAM_SENSOR, " failed: %pK", s_ctrl);
+		CAM_ERR(CAM_SENSOR, " failed s_ctrl: %pK", s_ctrl);
+		return -EINVAL;
+	}
+	if (s_ctrl->sensordata == NULL) {
+		CAM_ERR(CAM_SENSOR, " failed sensordata: %pK", s_ctrl->sensordata);
 		return -EINVAL;
 	}
 	slave_info = &(s_ctrl->sensordata->slave_info);
 	if (!slave_info) {
-		CAM_ERR(CAM_SENSOR, " failed: %pK", slave_info);
+		CAM_ERR(CAM_SENSOR, " failed slave_info: %pK", slave_info);
 		return -EINVAL;
 	}
 	if (slave_info->sensor_id == HDMI_BDG_SENSOR_ID) {
@@ -980,6 +989,12 @@ int cam_hdmi_bdg_upgrade_firmware(void)
 	int32_t rc = 0;
 	struct cam_camera_slave_info *slave_info;
 	struct cam_sensor_ctrl_t *s_ctrl = cam_hdmi_bdg_cam_ctrl;
+
+	if (!cam_hdmi_bdg_cam_ctrl) {
+		CAM_ERR(CAM_SENSOR, "LT6911UXC is not ready.");
+		return -EINVAL;
+	}
+
 	slave_info = &(s_ctrl->sensordata->slave_info);
 
 	if (!slave_info) {
