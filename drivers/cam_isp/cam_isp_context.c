@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -3195,7 +3196,7 @@ static int __cam_isp_ctx_apply_req_in_activated_state(
 		ctx->ctx_id);
 	req_isp = (struct cam_isp_ctx_req *) req->req_priv;
 
-	if (ctx_isp->active_req_cnt >=  2) {
+	if (ctx_isp->active_req_cnt >=  4) {
 		CAM_WARN_RATE_LIMIT(CAM_ISP,
 			"Reject apply request (id %lld) due to congestion(cnt = %d) ctx %u",
 			req->request_id,
@@ -5069,6 +5070,12 @@ static int __cam_isp_ctx_acquire_hw_v1(struct cam_context *ctx,
 	ctx_isp->hw_ctx = param.ctxt_to_hw_map;
 	ctx_isp->hw_acquired = true;
 	ctx->ctxt_to_hw_map = param.ctxt_to_hw_map;
+
+	if (copy_to_user((void __user *)cmd->resource_hdl, acquire_hw_info,
+		cmd->data_size)) {
+		rc = -EFAULT;
+		goto free_res;
+	}
 
 	atomic64_set(&ctx_isp->state_monitor_head, -1);
 

@@ -27,7 +27,6 @@
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
-#define NUM_MAX_OPEN 2
 
 #undef CDBG
 #ifdef CAM_SENSOR_DEBUG
