@@ -8488,9 +8488,8 @@ static uint32_t cam_ife_mgr_calc_bw(struct cam_ife_mgr_bw_data *bw_data)
 	CAM_ERR(CAM_ISP, "BW OFFLINE stream dimensions %dx%d@%d",
 			bw_data->width, bw_data->height, bw_data->framerate);
 	bw = bw_data->width * bw_data->height * bw_data->framerate;
-    /* Add BW for IFE Read as well */
-//	bw = 3 * (bw / 2);
-	bw = 2 * bw;
+	/* Add BW for IFE Read as well */
+	bw = 3 * (bw / 2);
 	switch (bw_data->format) {
 	case CAM_FORMAT_MIPI_RAW_8:
 		break;
@@ -8576,7 +8575,7 @@ static uint32_t cam_ife_mgr_required_offline_hw(void *hw_mgr_priv, bool stop)
 	else if (ife_hw_mgr->offline_clk < ife_hw_mgr->min_clk_threshold)
 		ife_hw_mgr->offline_clk = ife_hw_mgr->min_clk_threshold;
 
-	CAM_ERR(CAM_ISP,
+	CAM_DBG(CAM_ISP,
 			"Offline starting %d, CTXs %d, BW: %u needed %d IFEs @ :clk %d",
 			stop, cnt, total_bw,
 			req_hw, ife_hw_mgr->offline_clk);
