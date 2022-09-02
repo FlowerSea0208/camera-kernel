@@ -286,7 +286,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650x_bus_hw_info = {
 		.debug_status_top                 = 0x000012F4,
 		.test_bus_ctrl                    = 0x000012FC,
 		.irq_reg_info = {
-			.num_registers            = 2,
+			.num_registers            = ARRAY_SIZE(vfe650x_bus_irq_reg),
 			.irq_reg_set              = vfe650x_bus_irq_reg,
 			.global_clear_offset      = 0x00001230,
 			.global_clear_bitmask     = 0x00000001,
@@ -613,6 +613,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650x_bus_hw_info = {
 	.support_tunneling = true,
 	.tunneling_overflow_shift = 0x1A,
 	.no_tunnelingId_shift = 0x1B,
+	.fifo_depth = 2,
 };
 
 static struct cam_vfe_irq_hw_info vfe65x_irq_hw_info = {

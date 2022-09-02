@@ -3,17 +3,17 @@
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
-#ifndef _CAM_VFE650_H_
-#define _CAM_VFE650_H_
+#ifndef _CAM_VFE636_H_
+#define _CAM_VFE636_H_
 #include "cam_vfe_top_ver4.h"
 #include "cam_vfe_core.h"
 #include "cam_vfe_bus_ver3.h"
 #include "cam_irq_controller.h"
 
-#define CAM_VFE_BUS_VER3_650_MAX_CLIENTS     28
-#define CAM_VFE_650_NUM_DBG_REG              17
+#define CAM_VFE_BUS_VER3_636_MAX_CLIENTS     28
+#define CAM_VFE_636_NUM_DBG_REG              17
 
-static struct cam_vfe_top_ver4_module_desc vfe650_ipp_mod_desc[] = {
+static struct cam_vfe_top_ver4_module_desc vfe636_ipp_mod_desc[] = {
 	{
 		.id = 0,
 		.desc = "CLC_DEMUX",
@@ -272,7 +272,7 @@ static struct cam_vfe_top_ver4_module_desc vfe650_ipp_mod_desc[] = {
 	},
 };
 
-static struct cam_vfe_top_ver4_wr_client_desc vfe650_wr_client_desc[] = {
+static struct cam_vfe_top_ver4_wr_client_desc vfe636_wr_client_desc[] = {
 	{
 		.wm_id = 0,
 		.desc = "VIDEO_FULL_Y",
@@ -387,7 +387,7 @@ static struct cam_vfe_top_ver4_wr_client_desc vfe650_wr_client_desc[] = {
 	},
 };
 
-static struct cam_vfe_top_ver4_top_err_irq_desc vfe650_top_irq_err_desc[] = {
+static struct cam_vfe_top_ver4_top_err_irq_desc vfe636_top_irq_err_desc[] = {
 	{
 		.bitmask = BIT(4),
 		.err_name = "PP VIOLATION",
@@ -435,7 +435,7 @@ static struct cam_vfe_top_ver4_top_err_irq_desc vfe650_top_irq_err_desc[] = {
 	},
 };
 
-static struct cam_vfe_top_ver4_pdaf_violation_desc vfe650_pdaf_violation_desc[] = {
+static struct cam_vfe_top_ver4_pdaf_violation_desc vfe636_pdaf_violation_desc[] = {
 	{
 		.bitmask = BIT(0),
 		.desc = "Sim monitor 1 violation - SAD output",
@@ -446,7 +446,7 @@ static struct cam_vfe_top_ver4_pdaf_violation_desc vfe650_pdaf_violation_desc[] 
 	},
 };
 
-static struct cam_irq_register_set vfe650_top_irq_reg_set[2] = {
+static struct cam_irq_register_set vfe636_top_irq_reg_set[2] = {
 	{
 		.mask_reg_offset   = 0x00000034,
 		.clear_reg_offset  = 0x0000003c,
@@ -459,15 +459,15 @@ static struct cam_irq_register_set vfe650_top_irq_reg_set[2] = {
 	},
 };
 
-static struct cam_irq_controller_reg_info vfe650_top_irq_reg_info = {
+static struct cam_irq_controller_reg_info vfe636_top_irq_reg_info = {
 	.num_registers = 2,
-	.irq_reg_set = vfe650_top_irq_reg_set,
+	.irq_reg_set = vfe636_top_irq_reg_set,
 	.global_clear_offset  = 0x00000030,
 	.global_clear_bitmask = 0x00000001,
 	.clear_all_bitmask    = 0xFFFFFFFF,
 };
 
-static struct cam_vfe_top_ver4_reg_offset_common vfe650_top_common_reg = {
+static struct cam_vfe_top_ver4_reg_offset_common vfe636_top_common_reg = {
 	.hw_version               = 0x00000000,
 	.hw_capability            = 0x00000004,
 	.lens_feature             = 0x00000008,
@@ -504,7 +504,7 @@ static struct cam_vfe_top_ver4_reg_offset_common vfe650_top_common_reg = {
 	.bus_violation_status     = 0x00000C64,
 	.bus_overflow_status      = 0x00000C68,
 	.top_debug_cfg            = 0x000000FC,
-	.num_top_debug_reg        = CAM_VFE_650_NUM_DBG_REG,
+	.num_top_debug_reg        = CAM_VFE_636_NUM_DBG_REG,
 	.top_debug = {
 		0x000000A0,
 		0x000000A4,
@@ -526,7 +526,7 @@ static struct cam_vfe_top_ver4_reg_offset_common vfe650_top_common_reg = {
 	},
 };
 
-static struct cam_vfe_ver4_path_reg_data vfe650_pp_common_reg_data = {
+static struct cam_vfe_ver4_path_reg_data vfe636_pp_common_reg_data = {
 	.sof_irq_mask                    = 0x00000001,
 	.epoch0_irq_mask                 = 0x10000,
 	.epoch1_irq_mask                 = 0x20000,
@@ -538,7 +538,7 @@ static struct cam_vfe_ver4_path_reg_data vfe650_pp_common_reg_data = {
 	.pdaf_violation_mask             = 0x40,
 };
 
-static struct cam_vfe_ver4_path_reg_data vfe650_vfe_full_rdi_reg_data[3] = {
+static struct cam_vfe_ver4_path_reg_data vfe636_vfe_full_rdi_reg_data[3] = {
 	{
 		.sof_irq_mask                    = 0x100,
 		.eof_irq_mask                    = 0x200,
@@ -562,7 +562,7 @@ static struct cam_vfe_ver4_path_reg_data vfe650_vfe_full_rdi_reg_data[3] = {
 	},
 };
 
-static struct cam_vfe_ver4_path_reg_data vfe650_pdlib_reg_data = {
+static struct cam_vfe_ver4_path_reg_data vfe636_pdlib_reg_data = {
 	.sof_irq_mask                    = 0x4,
 	.eof_irq_mask                    = 0x8,
 	.error_irq_mask                  = 0x0,
@@ -571,22 +571,22 @@ static struct cam_vfe_ver4_path_reg_data vfe650_pdlib_reg_data = {
 };
 
 struct cam_vfe_ver4_path_hw_info
-	vfe650_rdi_hw_info_arr[CAM_VFE_RDI_VER2_MAX] = {
+	vfe636_rdi_hw_info_arr[CAM_VFE_RDI_VER2_MAX] = {
 	{
-		.common_reg     = &vfe650_top_common_reg,
-		.reg_data       = &vfe650_vfe_full_rdi_reg_data[0],
+		.common_reg     = &vfe636_top_common_reg,
+		.reg_data       = &vfe636_vfe_full_rdi_reg_data[0],
 	},
 	{
-		.common_reg     = &vfe650_top_common_reg,
-		.reg_data       = &vfe650_vfe_full_rdi_reg_data[1],
+		.common_reg     = &vfe636_top_common_reg,
+		.reg_data       = &vfe636_vfe_full_rdi_reg_data[1],
 	},
 	{
-		.common_reg     = &vfe650_top_common_reg,
-		.reg_data       = &vfe650_vfe_full_rdi_reg_data[2],
+		.common_reg     = &vfe636_top_common_reg,
+		.reg_data       = &vfe636_vfe_full_rdi_reg_data[2],
 	},
 };
 
-static struct cam_vfe_top_ver4_debug_reg_info vfe650_dbg_reg_info[CAM_VFE_650_NUM_DBG_REG][8] = {
+static struct cam_vfe_top_ver4_debug_reg_info vfe636_dbg_reg_info[CAM_VFE_636_NUM_DBG_REG][8] = {
 	VFE_DBG_INFO_ARRAY_4bit("test_bus_reserved",
 		"test_bus_reserved",
 		"test_bus_reserved",
@@ -758,21 +758,21 @@ static struct cam_vfe_top_ver4_debug_reg_info vfe650_dbg_reg_info[CAM_VFE_650_NU
 	),
 };
 
-static struct cam_vfe_top_ver4_hw_info vfe650_top_hw_info = {
-	.common_reg = &vfe650_top_common_reg,
+static struct cam_vfe_top_ver4_hw_info vfe636_top_hw_info = {
+	.common_reg = &vfe636_top_common_reg,
 	.vfe_full_hw_info = {
-		.common_reg     = &vfe650_top_common_reg,
-		.reg_data       = &vfe650_pp_common_reg_data,
+		.common_reg     = &vfe636_top_common_reg,
+		.reg_data       = &vfe636_pp_common_reg_data,
 	},
 	.pdlib_hw_info = {
-		.common_reg     = &vfe650_top_common_reg,
-		.reg_data       = &vfe650_pdlib_reg_data,
+		.common_reg     = &vfe636_top_common_reg,
+		.reg_data       = &vfe636_pdlib_reg_data,
 	},
-	.rdi_hw_info[0] = &vfe650_rdi_hw_info_arr[0],
-	.rdi_hw_info[1] = &vfe650_rdi_hw_info_arr[1],
-	.rdi_hw_info[2] = &vfe650_rdi_hw_info_arr[2],
-	.wr_client_desc         = vfe650_wr_client_desc,
-	.ipp_module_desc        = vfe650_ipp_mod_desc,
+	.rdi_hw_info[0] = &vfe636_rdi_hw_info_arr[0],
+	.rdi_hw_info[1] = &vfe636_rdi_hw_info_arr[1],
+	.rdi_hw_info[2] = &vfe636_rdi_hw_info_arr[2],
+	.wr_client_desc         = vfe636_wr_client_desc,
+	.ipp_module_desc        = vfe636_ipp_mod_desc,
 	.num_mux = 5,
 	.mux_type = {
 		CAM_VFE_CAMIF_VER_4_0,
@@ -786,14 +786,14 @@ static struct cam_vfe_top_ver4_hw_info vfe650_top_hw_info = {
 		{CAM_ISP_HW_VFE_IN_PDLIB, CAM_ISP_IFE_OUT_RES_2PD},
 		{CAM_ISP_HW_VFE_IN_PDLIB, CAM_ISP_IFE_OUT_RES_PREPROCESS_2PD}
 	},
-	.num_top_errors                  = ARRAY_SIZE(vfe650_top_irq_err_desc),
-	.top_err_desc                    = vfe650_top_irq_err_desc,
-	.num_pdaf_violation_errors       = ARRAY_SIZE(vfe650_pdaf_violation_desc),
-	.pdaf_violation_desc             = vfe650_pdaf_violation_desc,
-	.debug_reg_info                  = &vfe650_dbg_reg_info,
+	.num_top_errors                  = ARRAY_SIZE(vfe636_top_irq_err_desc),
+	.top_err_desc                    = vfe636_top_irq_err_desc,
+	.num_pdaf_violation_errors       = ARRAY_SIZE(vfe636_pdaf_violation_desc),
+	.pdaf_violation_desc             = vfe636_pdaf_violation_desc,
+	.debug_reg_info                  = &vfe636_dbg_reg_info,
 };
 
-static struct cam_irq_register_set vfe650_bus_irq_reg[2] = {
+static struct cam_irq_register_set vfe636_bus_irq_reg[2] = {
 	{
 		.mask_reg_offset   = 0x00000C18,
 		.clear_reg_offset  = 0x00000C20,
@@ -807,7 +807,7 @@ static struct cam_irq_register_set vfe650_bus_irq_reg[2] = {
 };
 
 static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
-	vfe650_ubwc_regs_client_0 = {
+	vfe636_ubwc_regs_client_0 = {
 	.meta_addr        = 0x00000E40,
 	.meta_cfg         = 0x00000E44,
 	.mode_cfg         = 0x00000E48,
@@ -821,7 +821,7 @@ static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
 };
 
 static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
-	vfe650_ubwc_regs_client_1 = {
+	vfe636_ubwc_regs_client_1 = {
 	.meta_addr        = 0x00000F40,
 	.meta_cfg         = 0x00000F44,
 	.mode_cfg         = 0x00000F48,
@@ -835,7 +835,7 @@ static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
 };
 
 static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
-	vfe650_ubwc_regs_client_4 = {
+	vfe636_ubwc_regs_client_4 = {
 	.meta_addr        = 0x00001240,
 	.meta_cfg         = 0x00001244,
 	.mode_cfg         = 0x00001248,
@@ -849,7 +849,7 @@ static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
 };
 
 static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
-	vfe650_ubwc_regs_client_5 = {
+	vfe636_ubwc_regs_client_5 = {
 	.meta_addr        = 0x00001340,
 	.meta_cfg         = 0x00001344,
 	.mode_cfg         = 0x00001348,
@@ -862,7 +862,7 @@ static struct cam_vfe_bus_ver3_reg_offset_ubwc_client
 	.ubwc_comp_en_bit = BIT(1),
 };
 
-static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
+static struct cam_vfe_bus_ver3_hw_info vfe636_bus_hw_info = {
 	.common_reg = {
 		.hw_version                       = 0x00000C00,
 		.cgc_ovd                          = 0x00000C08,
@@ -884,12 +884,12 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 		.test_bus_ctrl                    = 0x00000CDC,
 		.irq_reg_info = {
 			.num_registers            = 2,
-			.irq_reg_set              = vfe650_bus_irq_reg,
+			.irq_reg_set              = vfe636_bus_irq_reg,
 			.global_clear_offset      = 0x00000C30,
 			.global_clear_bitmask     = 0x00000001,
 		},
 	},
-	.num_client = CAM_VFE_BUS_VER3_650_MAX_CLIENTS,
+	.num_client = CAM_VFE_BUS_VER3_636_MAX_CLIENTS,
 	.bus_client_reg = {
 		/* BUS Client 0 FULL Y */
 		{
@@ -919,7 +919,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 			.debug_status_1           = 0x00000E88,
 			.bw_limiter_addr          = 0x00000E1C,
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
-			.ubwc_regs                = &vfe650_ubwc_regs_client_0,
+			.ubwc_regs                = &vfe636_ubwc_regs_client_0,
 		},
 		/* BUS Client 1 FULL C */
 		{
@@ -949,7 +949,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 			.debug_status_1           = 0x00000F88,
 			.bw_limiter_addr          = 0x00000F1C,
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_0,
-			.ubwc_regs                = &vfe650_ubwc_regs_client_1,
+			.ubwc_regs                = &vfe636_ubwc_regs_client_1,
 		},
 		/* BUS Client 2 DS4 */
 		{
@@ -1033,7 +1033,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 			.debug_status_1           = 0x00001288,
 			.bw_limiter_addr          = 0x0000121C,
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.ubwc_regs                = &vfe650_ubwc_regs_client_4,
+			.ubwc_regs                = &vfe636_ubwc_regs_client_4,
 		},
 		/* BUS Client 5 DISP C */
 		{
@@ -1063,7 +1063,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 			.debug_status_1           = 0x00001388,
 			.bw_limiter_addr          = 0x0000131C,
 			.comp_group               = CAM_VFE_BUS_VER3_COMP_GRP_1,
-			.ubwc_regs                = &vfe650_ubwc_regs_client_5,
+			.ubwc_regs                = &vfe636_ubwc_regs_client_5,
 		},
 		/* BUS Client 6 DISP DS4 */
 		{
@@ -2219,27 +2219,27 @@ static struct cam_vfe_bus_ver3_hw_info vfe650_bus_hw_info = {
 	.support_consumed_addr = true,
 	.comp_done_shift       = 0,
 	.top_irq_shift         = 0,
-	.max_out_res           = CAM_ISP_IFE_OUT_RES_BASE + 37,
+	.max_out_res           = CAM_ISP_IFE_OUT_RES_BASE + 39,
 	.pack_align_shift      = 5,
 	.max_bw_counter_limit  = 0xFF,
 	.support_tunneling = false,
 	.fifo_depth = 2,
 };
 
-static struct cam_vfe_irq_hw_info vfe650_irq_hw_info = {
+static struct cam_vfe_irq_hw_info vfe636_irq_hw_info = {
 	.reset_mask    = 0,
 	.supported_irq = CAM_VFE_HW_IRQ_CAP_EXT_CSID,
-	.top_irq_reg   = &vfe650_top_irq_reg_info,
+	.top_irq_reg   = &vfe636_top_irq_reg_info,
 };
 
-static struct cam_vfe_hw_info cam_vfe650_hw_info = {
-	.irq_hw_info                   = &vfe650_irq_hw_info,
+static struct cam_vfe_hw_info cam_vfe636_hw_info = {
+	.irq_hw_info                   = &vfe636_irq_hw_info,
 
 	.bus_version                   = CAM_VFE_BUS_VER_3_0,
-	.bus_hw_info                   = &vfe650_bus_hw_info,
+	.bus_hw_info                   = &vfe636_bus_hw_info,
 
 	.top_version                   = CAM_VFE_TOP_VER_4_0,
-	.top_hw_info                   = &vfe650_top_hw_info,
+	.top_hw_info                   = &vfe636_top_hw_info,
 };
 
-#endif /* _CAM_VFE650_H_ */
+#endif /* _CAM_VFE636_H_ */
