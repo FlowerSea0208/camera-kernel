@@ -1541,6 +1541,8 @@ static int cam_ife_csid_ver2_ipp_bottom_half(
 	uint32_t                                      err_type = 0;
 	int                                           i, rc = 0;
 
+	payload = evt_payload_priv;
+	res   =  handler_priv;
 	if (!handler_priv || !evt_payload_priv) {
 		CAM_ERR(CAM_ISP, "Invalid params. evt_payload_priv: %s, handler_priv: %s",
 			CAM_IS_NULL_TO_STR(evt_payload_priv),
@@ -1549,8 +1551,6 @@ static int cam_ife_csid_ver2_ipp_bottom_half(
 		goto end;
 	}
 
-	payload = evt_payload_priv;
-	res   =  handler_priv;
 	hw_info = (struct cam_hw_info *)res->hw_intf->hw_priv;
 	csid_hw = (struct cam_ife_csid_ver2_hw *)hw_info->core_info;
 	csid_reg = csid_hw->core_info->csid_reg;
