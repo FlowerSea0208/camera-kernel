@@ -13,7 +13,7 @@
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
 
-#define WITH_CRM_MASK  0x1
+#define WITH_NO_CRM_MASK  0x1
 
 
 static int cam_sensor_update_req_mgr(
@@ -667,6 +667,7 @@ void cam_sensor_query_cap_v2(struct cam_sensor_ctrl_t *s_ctrl,
 	query_cap->pos_pitch = s_ctrl->sensordata->pos_pitch;
 	query_cap->pos_yaw = s_ctrl->sensordata->pos_yaw;
 	query_cap->secure_camera = 0;
+	query_cap->reserved = 0;
 	query_cap->actuator_slot_id =
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_ACTUATOR];
 	query_cap->csiphy_slot_id =
@@ -955,10 +956,10 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		bridge_params.media_entity_flag = 0;
 		bridge_params.priv = s_ctrl;
 		bridge_params.dev_id = CAM_SENSOR;
-		s_ctrl->bridge_intf.enable_crm = 0;
+		s_ctrl->bridge_intf.enable_crm = 1;
 		/* add crm callbacks only in case of with crm is enabled */
-		if (sensor_acq_dev.info_handle & WITH_CRM_MASK)
-			s_ctrl->bridge_intf.enable_crm = 1;
+		if (sensor_acq_dev.info_handle & WITH_NO_CRM_MASK)
+			s_ctrl->bridge_intf.enable_crm = 0;
 
 		sensor_acq_dev.device_handle =
 			cam_create_device_hdl(&bridge_params);
