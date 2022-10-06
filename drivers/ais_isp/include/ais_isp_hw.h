@@ -272,6 +272,14 @@ struct ais_ife_rdi_in_cfg {
 	uint32_t crop_right;
 	uint32_t init_frame_drop;
 	uint32_t reserved;
+	uint32_t vdrop_en;
+	uint32_t vdrop_pattern;
+	uint32_t vdrop_period;
+	uint32_t hdrop_en;
+	uint32_t hdrop_pattern;
+	uint32_t hdrop_period;
+	uint32_t chromasub_en;
+	uint32_t chromaswap_en;
 };
 
 enum ais_ife_batch_mode_type {
@@ -348,12 +356,13 @@ struct ais_ife_csid_csi_info {
 	uint32_t lane_assign;
 	uint8_t is_3Phase;
 	uint8_t vcx_mode;
+	uint64_t mipi_rate;
 };
 
 /**
  * struct ais_ife_rdi_init_args
  *
- * @brief Iniit RDI path
+ * @brief Init RDI path
  *
  * @path : output path
  * @csi_cfg : CSI configuration
@@ -379,7 +388,18 @@ struct ais_ife_rdi_deinit_args {
 };
 
 /**
- * struct ais_ife_rdi_stop_args
+ * struct ais_ife_addr_sync_args
+ *
+ * @brief Configure IFE paths with address sync
+ *
+ * @paths : bitmask of paths to be address synced
+ */
+struct ais_ife_addr_sync_args {
+	uint32_t paths;
+};
+
+/**
+ * struct ais_ife_rdi_start_args
  *
  * @brief Start RDI path
  *
@@ -462,11 +482,9 @@ struct ais_ife_rdi_get_timestamp_args {
  * @brief SOF event message
  *
  * @hw_ts :   HW timestamp
- * @frame_id : frame count
  */
 struct ais_ife_sof_msg {
 	uint64_t  hw_ts;
-	uint32_t  frame_id;
 };
 
 /**
@@ -487,14 +505,12 @@ struct ais_ife_error_msg {
  *
  * @hw_ts : SOF HW timestamp per batch
  * @ts :    SOF timestamp
- * @frame_id : frame count per batch
  * @buf_idx : buffer index
  * @num_batch_frames : number of batched frames
  */
 struct ais_ife_frame_msg {
 	uint64_t  hw_ts[4];
 	uint64_t  ts;
-	uint32_t  frame_id[4];
 	uint32_t  buf_idx;
 	uint32_t  num_batch_frames;
 };
@@ -513,25 +529,36 @@ enum ais_ife_msg_type {
 	AIS_IFE_MSG_CSID_ERROR
 };
 
+/**
+ * struct ais_ife_event_common_data
+ *
+ * @brief IFE events common fields
+ *
+ * @boot_ts :  event timestamp
+ * @frame_id : frame count
+ * @type     : message type
+ * @idx      : IFE idx
+ * @path     : input/output path
+ * @reserved : reserved for alignment; currently used to store size of
+ *             ais_ife_event_data just to check compatibility in userspace
+ */
+
 struct ais_ife_event_common_data {
 	uint64_t  boot_ts;
+	uint32_t  frame_id;
 	uint8_t   type;
 	uint8_t   idx;
 	uint8_t   path;
+	uint8_t   reserved;
 };
 
 /**
- * struct ais_ife_frame_msg
+ * struct ais_ife_event_data
  *
- * @brief Frame done event message
+ * @brief IFE events message
  *
- * @type :   message type
- * @idx :    IFE idx
- * @path :   input/output path
- * @reserved: reserved for alignment
- * @reserved1: reserved for alignment
- * @boot_ts : event timestamp
- * @u       : event message
+ * @msg : event common fields struct
+ * @u   : union for event message
  */
 struct ais_ife_event_data {
 	struct ais_ife_event_common_data msg;
