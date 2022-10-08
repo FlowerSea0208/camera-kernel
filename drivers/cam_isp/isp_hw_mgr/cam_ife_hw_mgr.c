@@ -1276,11 +1276,6 @@ static int cam_ife_mgr_csid_start_hw(
 	struct cam_hw_intf             *hw_intf;
 	uint32_t  cnt;
 	int j;
-	bool enable_rdi;
-
-	enable_rdi = ctx->flags.is_independent_crm_mode &&
-			ctx->flags.is_trigger_type &&
-			ctx->flags.is_rdi_only_context;
 
 	CAM_DBG(CAM_ISP, "primary_rdi_csid_res :%d", primary_rdi_csid_res);
 	for (j = ctx->num_base - 1 ; j >= 0; j--) {
@@ -1295,7 +1290,7 @@ static int cam_ife_mgr_csid_start_hw(
 			if (!isp_res || ctx->base[j].idx != isp_res->hw_intf->hw_idx)
 				continue;
 
-			if (enable_rdi || primary_rdi_csid_res == hw_mgr_res->res_id) {
+			if (primary_rdi_csid_res == hw_mgr_res->res_id) {
 				hw_mgr_res->hw_res[0]->rdi_only_ctx =
 				ctx->flags.is_rdi_only_context;
 			}
@@ -7719,7 +7714,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	uint32_t                           total_rdi_port = 0;
 	uint32_t                           total_pd_port = 0;
 	uint32_t                           total_lite_port = 0;
-	uint32_t                           total_port = 0;
 	struct cam_isp_acquire_hw_info    *acquire_hw_info = NULL;
 	uint32_t                           input_size = 0;
 	bool                               free_in_port = true;
@@ -7791,7 +7785,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		total_rdi_port += in_port[i].rdi_count;
 		total_pd_port += in_port[i].ppp_count;
 		total_lite_port += in_port[i].lite_path_count;
-		total_port += in_port[i].num_out_res;
 		ife_ctx->acquire_type = in_port[i].acquire_type;
 		free_in_port &= (ife_ctx->acquire_type != CAM_ISP_ACQUIRE_TYPE_VIRTUAL &&
 				ife_ctx->acquire_type != CAM_ISP_ACQUIRE_TYPE_HYBRID);
@@ -7837,9 +7830,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	/* Check if all output ports are of lite  */
 	if (total_lite_port == total_pix_port + total_rdi_port)
 		ife_ctx->flags.is_lite_context = true;
-
-	if (ife_ctx->flags.is_lite_context && total_port > total_rdi_port)
-		ife_ctx->flags.is_rdi_and_stats_context = true;
 
 	/* acquire HW resources */
 	for (i = 0; i < acquire_hw_info->num_inputs; i++) {
@@ -10137,8 +10127,6 @@ static int cam_ife_mgr_start_hw(void *hw_mgr_priv, void *start_hw_args)
 			ctx->flags.init_done, start_isp->start_only);
 		return -EINVAL;
 	}
-
-	ctx->flags.is_trigger_type = start_isp->is_trigger_type;
 
 	CAM_DBG(CAM_ISP, "Enter... ctx id:%d",
 		ctx->ctx_index);
@@ -15555,8 +15543,6 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			else if (ctx->flags.is_fe_enabled && !ctx->flags.is_offline &&
 				ctx->ctx_type != CAM_IFE_CTX_TYPE_SFE)
 				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_FS2;
-			else if (ctx->flags.is_rdi_and_stats_context)
-				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_RDI_AND_STATS;
 			else if (ctx->flags.is_rdi_only_context || ctx->flags.is_lite_context)
 				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_RDI;
 			else
@@ -16324,7 +16310,6 @@ static int cam_ife_hw_mgr_handle_csid_rup(
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
 
 	ife_hwr_irq_rup_cb = ife_hw_mgr_ctx->common.event_cb;
-	rup_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16359,7 +16344,6 @@ static int cam_ife_hw_mgr_handle_csid_eof(
 	struct cam_isp_hw_eof_event_data         eof_done_event_data;
 
 	ife_hwr_irq_eof_cb = ctx->common.event_cb;
-	eof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16474,8 +16458,6 @@ static int cam_ife_hw_mgr_handle_csid_camif_epoch(
 			CAM_ISP_HW_SECONDARY_EVENT, (void *)&sec_evt_data);
 		goto end;
 	}
-
-	epoch_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16748,7 +16730,6 @@ static int cam_ife_hw_mgr_handle_hw_rup(
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
 
 	ife_hwr_irq_rup_cb = ife_hw_mgr_ctx->common.event_cb;
-	rup_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16799,7 +16780,6 @@ static int cam_ife_hw_mgr_handle_hw_epoch(
 	struct cam_isp_hw_epoch_event_data    epoch_done_event_data;
 
 	ife_hw_irq_epoch_cb = ife_hw_mgr_ctx->common.event_cb;
-	epoch_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16843,7 +16823,6 @@ static int cam_ife_hw_mgr_handle_hw_sof(
 	memset(&sof_done_event_data, 0, sizeof(sof_done_event_data));
 
 	ife_hw_irq_sof_cb = ife_hw_mgr_ctx->common.event_cb;
-	sof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16917,7 +16896,6 @@ static int cam_ife_hw_mgr_handle_hw_eof(
 	struct cam_isp_hw_eof_event_data      eof_done_event_data;
 
 	ife_hw_irq_eof_cb = ife_hw_mgr_ctx->common.event_cb;
-	eof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
