@@ -1943,8 +1943,12 @@ static int cam_soc_util_get_dt_regulator_info
 			return -EINVAL;
 		}
 
-		soc_info->num_rgltr = count;
-
+		if (count > CAM_SOC_MAX_REGULATOR) {
+			CAM_WARN(CAM_UTIL, "Too many regulators found: %d Max supported %d",
+					count, CAM_SOC_MAX_REGULATOR);
+			soc_info->num_rgltr = CAM_SOC_MAX_REGULATOR;
+		} else
+			soc_info->num_rgltr = count;
 	} else {
 		CAM_DBG(CAM_UTIL, "No regulators node found");
 		return 0;
@@ -2405,7 +2409,15 @@ static int cam_soc_util_regulator_enable_default(
 	struct cam_hw_soc_info *soc_info)
 {
 	int j = 0, rc = 0;
-	uint32_t num_rgltr = soc_info->num_rgltr;
+	uint32_t num_rgltr;
+
+	if (soc_info->num_rgltr > CAM_SOC_MAX_REGULATOR) {
+		CAM_WARN(CAM_UTIL, "Too many regulators found: %d Max supported %d",
+				soc_info->num_rgltr, CAM_SOC_MAX_REGULATOR);
+		soc_info->num_rgltr = CAM_SOC_MAX_REGULATOR;
+	}
+
+	num_rgltr = soc_info->num_rgltr;
 
 	for (j = 0; j < num_rgltr; j++) {
 		if (soc_info->rgltr_ctrl_support == true) {
