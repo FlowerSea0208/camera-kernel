@@ -462,12 +462,12 @@ static long cam_private_ioctl(struct file *file, void *fh,
 		struct cam_req_mgr_sched_request_v2 sched_req;
 
 		if (k_ioctl->size != sizeof(sched_req))
-				return -EINVAL;
+			return -EINVAL;
 
 		if (copy_from_user(&sched_req,
-				u64_to_user_ptr(k_ioctl->handle),
-				sizeof(struct cam_req_mgr_sched_request_v2))) {
-				return -EFAULT;
+			u64_to_user_ptr(k_ioctl->handle),
+			sizeof(struct cam_req_mgr_sched_request_v2))) {
+			return -EFAULT;
 		}
 
 		rc = cam_req_mgr_schedule_request_v2(&sched_req);

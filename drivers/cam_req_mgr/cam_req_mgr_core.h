@@ -521,7 +521,7 @@ int cam_req_mgr_schedule_request(struct cam_req_mgr_sched_request *sched_req);
  * reserved field
  */
 int cam_req_mgr_schedule_request_v2(
-       struct cam_req_mgr_sched_request_v2 *sched_req);
+	struct cam_req_mgr_sched_request_v2 *sched_req);
 
 /**
  * cam_req_mgr_sync_mode_setup()
