@@ -1276,6 +1276,11 @@ static int cam_ife_mgr_csid_start_hw(
 	struct cam_hw_intf             *hw_intf;
 	uint32_t  cnt;
 	int j;
+	bool enable_rdi;
+
+	enable_rdi = ctx->flags.is_independent_crm_mode &&
+			ctx->flags.is_trigger_type &&
+			ctx->flags.is_rdi_only_context;
 
 	CAM_DBG(CAM_ISP, "primary_rdi_csid_res :%d", primary_rdi_csid_res);
 	for (j = ctx->num_base - 1 ; j >= 0; j--) {
@@ -1290,7 +1295,7 @@ static int cam_ife_mgr_csid_start_hw(
 			if (!isp_res || ctx->base[j].idx != isp_res->hw_intf->hw_idx)
 				continue;
 
-			if (primary_rdi_csid_res == hw_mgr_res->res_id) {
+			if (enable_rdi || primary_rdi_csid_res == hw_mgr_res->res_id) {
 				hw_mgr_res->hw_res[0]->rdi_only_ctx =
 				ctx->flags.is_rdi_only_context;
 			}
@@ -2046,10 +2051,13 @@ static int cam_ife_hw_mgr_release_hw_for_ctx(
 	int index)
 {
 	uint32_t                          i;
+	int                               rc;
 	struct cam_isp_hw_mgr_res        *hw_mgr_res;
 	struct cam_isp_hw_mgr_res        *hw_mgr_res_temp;
 	struct list_head                 *ife_src_list_head;
 	struct list_head                 *csid_res_list_head;
+	struct list_head                 *vcsid_res_list_head;
+	struct list_head                 *vife_res_list_head;
 	struct list_head                 *free_res_list_head;
 
 	if (ife_ctx->flags.per_port_en && (index != CAM_IFE_STREAM_GRP_INDEX_NONE)) {
@@ -2063,6 +2071,8 @@ static int cam_ife_hw_mgr_release_hw_for_ctx(
 	} else {
 		ife_src_list_head = &ife_ctx->res_list_ife_src;
 		csid_res_list_head = &ife_ctx->res_list_ife_csid;
+		vcsid_res_list_head = &ife_ctx->res_list_ife_vcsid;
+		vife_res_list_head = &ife_ctx->res_list_vife_src;
 		free_res_list_head = &ife_ctx->free_res_list;
 		CAM_DBG(CAM_ISP, "entered per_port disable CTX:%d", ife_ctx->ctx_index);
 	}
@@ -2116,6 +2126,20 @@ static int cam_ife_hw_mgr_release_hw_for_ctx(
 		cam_ife_hw_mgr_put_res(free_res_list_head, &hw_mgr_res);
 	}
 
+	/* ife vcsid resource */
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		vcsid_res_list_head, list) {
+		cam_ife_hw_mgr_free_hw_res(hw_mgr_res);
+		CAM_DBG(CAM_ISP, "Releasing Virtual csid");
+		cam_ife_hw_mgr_put_res(free_res_list_head, &hw_mgr_res);
+	}
+
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		vife_res_list_head, list) {
+		cam_ife_hw_mgr_free_hw_res(hw_mgr_res);
+		cam_ife_hw_mgr_put_res(free_res_list_head, &hw_mgr_res);
+	}
+
 	if (ife_ctx->flags.per_port_en && (index != CAM_IFE_STREAM_GRP_INDEX_NONE)) {
 		g_ife_sns_grp_cfg.grp_cfg[index].acquire_cnt = 0;
 		g_ife_sns_grp_cfg.grp_cfg[index].acquired_hw_idx = 0;
@@ -2131,10 +2155,18 @@ static int cam_ife_hw_mgr_release_hw_for_ctx(
 		ife_ctx->flags.need_csid_top_cfg = false;
 
 		if (ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL ||
-				ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID)
-			cam_rpmsg_isp_send_rel(ife_ctx->sensor_id);
+			ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID) {
+			if (ife_ctx->is_slave_down) {
+				CAM_WARN(CAM_ISP, "slave not Up skip to send release");
+			} else {
+				rc = cam_rpmsg_isp_send_rel(ife_ctx->sensor_id);
+				if (rc) {
+					CAM_ERR(CAM_ISP, "fail to send release, rc=%d", rc);
+					return rc;
+				}
+			}
+		}
 	}
-
 	CAM_DBG(CAM_ISP, "release context completed ctx id:%d",
 		ife_ctx->ctx_index);
 
@@ -6664,7 +6696,7 @@ static int cam_ife_mgr_acquire_virt_hw_for_ctx(
 {
 	int acq_csid = 0;
 	int acq_vfe = 0;
-	int rc = 0, acquired_hw_path, acquired_hw_id;
+	int rc = -EINVAL, acquired_hw_path, acquired_hw_id;
 
 	if (ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID ||
 			ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL)
@@ -6723,7 +6755,7 @@ static int cam_ife_mgr_acquire_virt_hw_for_ctx(
 				in_port, false, false,
 				&acquired_hw_id, &acquired_hw_path);
 		if (rc) {
-			CAM_ERR(CAM_ISP, "Acquire VIFE IPP SRC failed");
+			CAM_ERR(CAM_ISP, "Acquire VIFE RDI SRC failed");
 			goto err;
 		}
 	}
@@ -7714,6 +7746,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	uint32_t                           total_rdi_port = 0;
 	uint32_t                           total_pd_port = 0;
 	uint32_t                           total_lite_port = 0;
+	uint32_t                           total_port = 0;
 	struct cam_isp_acquire_hw_info    *acquire_hw_info = NULL;
 	uint32_t                           input_size = 0;
 	bool                               free_in_port = true;
@@ -7785,6 +7818,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		total_rdi_port += in_port[i].rdi_count;
 		total_pd_port += in_port[i].ppp_count;
 		total_lite_port += in_port[i].lite_path_count;
+		total_port += in_port[i].num_out_res;
 		ife_ctx->acquire_type = in_port[i].acquire_type;
 		free_in_port &= (ife_ctx->acquire_type != CAM_ISP_ACQUIRE_TYPE_VIRTUAL &&
 				ife_ctx->acquire_type != CAM_ISP_ACQUIRE_TYPE_HYBRID);
@@ -7830,6 +7864,9 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	/* Check if all output ports are of lite  */
 	if (total_lite_port == total_pix_port + total_rdi_port)
 		ife_ctx->flags.is_lite_context = true;
+
+	if (ife_ctx->flags.is_lite_context && total_port > total_rdi_port)
+		ife_ctx->flags.is_rdi_and_stats_context = true;
 
 	/* acquire HW resources */
 	for (i = 0; i < acquire_hw_info->num_inputs; i++) {
@@ -8016,8 +8053,14 @@ out:
 		total_pd_port, total_rdi_port, rc);
 
 	if (ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL ||
-			ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID)
-		cam_rpmsg_isp_send_acq(ife_ctx->sensor_id);
+		ife_ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID) {
+		rc = cam_rpmsg_isp_send_acq(ife_ctx->sensor_id);
+		if (rc) {
+			CAM_ERR(CAM_ISP, "rpmsg send acquire failed, rc= %d", rc);
+			goto free_ctx;
+		}
+	}
+	ife_ctx->is_slave_down = false;
 
 	cam_ife_hw_mgr_put_ctx(&ife_hw_mgr->used_ctx_list, &ife_ctx);
 
@@ -9548,8 +9591,15 @@ reset_scratch_buffers:
 
 notify_slave:
 	if (ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL ||
-			ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID)
-		cam_rpmsg_isp_send_stop(ctx->sensor_id);
+			ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID) {
+		if (ctx->is_slave_down)
+			CAM_WARN(CAM_ISP, "slave is not up, skip to send stop");
+		else
+			rc = cam_rpmsg_isp_send_stop(ctx->sensor_id);
+
+		if (rc)
+			CAM_ERR(CAM_ISP, "failed to send stop to slave %d", rc);
+	}
 
 end:
 	ctx->flags.dump_on_error = false;
@@ -9977,6 +10027,11 @@ static int cam_ife_mgr_enable_irq(
 	uint32_t                             primary_rdi_csid_res = 0;
 	uint32_t                             primary_rdi_src_res = 0;
 	uint32_t i;
+	bool enable_rdi;
+
+	enable_rdi = ctx->flags.is_independent_crm_mode &&
+				ctx->flags.is_trigger_type &&
+				ctx->flags.is_rdi_only_context;
 
 	/*enable ife_out irqs*/
 	for (i = 0; i < max_ife_out_res; i++) {
@@ -10014,7 +10069,7 @@ static int cam_ife_mgr_enable_irq(
 
 	/*enable ife_src irqs*/
 	list_for_each_entry(hw_mgr_res, &ctx->res_list_ife_src, list) {
-		if (primary_rdi_src_res == hw_mgr_res->res_id) {
+		if (enable_rdi || primary_rdi_src_res == hw_mgr_res->res_id) {
 			hw_mgr_res->hw_res[0]->rdi_only_ctx = ctx->flags.is_rdi_only_context;
 			break;
 		}
@@ -10127,6 +10182,8 @@ static int cam_ife_mgr_start_hw(void *hw_mgr_priv, void *start_hw_args)
 			ctx->flags.init_done, start_isp->start_only);
 		return -EINVAL;
 	}
+
+	ctx->flags.is_trigger_type = start_isp->is_trigger_type;
 
 	CAM_DBG(CAM_ISP, "Enter... ctx id:%d",
 		ctx->ctx_index);
@@ -10405,8 +10462,18 @@ start_only:
 notify_slave:
 	/* Start IFE root node: do nothing */
 	if (ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL ||
-			ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID)
-		cam_rpmsg_isp_send_start(ctx->sensor_id);
+		ctx->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID) {
+		if (ctx->is_slave_down)
+			CAM_WARN(CAM_ISP, "Slave is Not Up, fail to send start");
+		else
+			rc = cam_rpmsg_isp_send_start(ctx->sensor_id);
+
+		if (rc) {
+			CAM_ERR(CAM_ISP, "Start failed ctx id:%d, rc = %d",
+				ctx->ctx_index, rc);
+			return rc;
+		}
+	}
 	CAM_DBG(CAM_ISP, "Start success for ctx id:%d", ctx->ctx_index);
 
 	return 0;
@@ -10540,6 +10607,28 @@ static int cam_ife_hw_mgr_free_hw_ctx(
 	/* ife csid resource */
 	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
 		&ife_ctx->res_list_ife_csid, list) {
+		hw_mgr_res->linked = false;
+		list_del_init(&hw_mgr_res->list);
+		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
+		INIT_LIST_HEAD(&hw_mgr_res->list);
+
+		cam_ife_hw_mgr_put_res(&ife_ctx->free_res_list, &hw_mgr_res);
+	}
+
+	/* ife vcsid resource */
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		&ife_ctx->res_list_ife_vcsid, list) {
+		hw_mgr_res->linked = false;
+		list_del_init(&hw_mgr_res->list);
+		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
+		INIT_LIST_HEAD(&hw_mgr_res->list);
+
+		cam_ife_hw_mgr_put_res(&ife_ctx->free_res_list, &hw_mgr_res);
+	}
+
+	/* ife vife resource */
+	list_for_each_entry_safe(hw_mgr_res, hw_mgr_res_temp,
+		&ife_ctx->res_list_vife_src, list) {
 		hw_mgr_res->linked = false;
 		list_del_init(&hw_mgr_res->list);
 		memset(hw_mgr_res, 0, sizeof(*hw_mgr_res));
@@ -15543,6 +15632,8 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			else if (ctx->flags.is_fe_enabled && !ctx->flags.is_offline &&
 				ctx->ctx_type != CAM_IFE_CTX_TYPE_SFE)
 				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_FS2;
+			else if (ctx->flags.is_rdi_and_stats_context)
+				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_RDI_AND_STATS;
 			else if (ctx->flags.is_rdi_only_context || ctx->flags.is_lite_context)
 				isp_hw_cmd_args->u.ctx_type = CAM_ISP_CTX_RDI;
 			else
@@ -15600,6 +15691,11 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			break;
 		case CAM_ISP_HW_MGR_GET_HW_CTX:
 			rc = cam_ife_mgr_get_active_hw_ctx(ctx, isp_hw_cmd_args);
+		case CAM_ISP_HW_MGR_CMD_GET_SLAVE_STATE:
+			isp_hw_cmd_args->cmd_data = &ctx->is_slave_down;
+			break;
+		case CAM_ISP_HW_MGR_CMD_SET_SLAVE_STATE:
+			ctx->is_slave_down = *(bool *)isp_hw_cmd_args->cmd_data;
 			break;
 		default:
 			CAM_ERR(CAM_ISP, "Invalid HW mgr command:0x%x",
@@ -16310,6 +16406,7 @@ static int cam_ife_hw_mgr_handle_csid_rup(
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
 
 	ife_hwr_irq_rup_cb = ife_hw_mgr_ctx->common.event_cb;
+	rup_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16344,6 +16441,7 @@ static int cam_ife_hw_mgr_handle_csid_eof(
 	struct cam_isp_hw_eof_event_data         eof_done_event_data;
 
 	ife_hwr_irq_eof_cb = ctx->common.event_cb;
+	eof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16458,6 +16556,8 @@ static int cam_ife_hw_mgr_handle_csid_camif_epoch(
 			CAM_ISP_HW_SECONDARY_EVENT, (void *)&sec_evt_data);
 		goto end;
 	}
+
+	epoch_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_IFE_PIX_PATH_RES_IPP:
@@ -16730,6 +16830,7 @@ static int cam_ife_hw_mgr_handle_hw_rup(
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
 
 	ife_hwr_irq_rup_cb = ife_hw_mgr_ctx->common.event_cb;
+	rup_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16780,6 +16881,7 @@ static int cam_ife_hw_mgr_handle_hw_epoch(
 	struct cam_isp_hw_epoch_event_data    epoch_done_event_data;
 
 	ife_hw_irq_epoch_cb = ife_hw_mgr_ctx->common.event_cb;
+	epoch_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16823,6 +16925,7 @@ static int cam_ife_hw_mgr_handle_hw_sof(
 	memset(&sof_done_event_data, 0, sizeof(sof_done_event_data));
 
 	ife_hw_irq_sof_cb = ife_hw_mgr_ctx->common.event_cb;
+	sof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:
@@ -16896,6 +16999,7 @@ static int cam_ife_hw_mgr_handle_hw_eof(
 	struct cam_isp_hw_eof_event_data      eof_done_event_data;
 
 	ife_hw_irq_eof_cb = ife_hw_mgr_ctx->common.event_cb;
+	eof_done_event_data.res_id = event_info->res_id;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_VFE_IN_CAMIF:

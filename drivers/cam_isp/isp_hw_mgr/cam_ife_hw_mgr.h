@@ -153,32 +153,35 @@ struct cam_ife_hw_mgr_sfe_info {
 /**
  * struct cam_ife_hw_mgr_ctx_flags - IFE HW mgr ctx flags
  *
- * @ctx_in_use:              flag to tell whether context is active
- * @init_done:               indicate whether init hw is done
- * @is_fe_enabled:           indicate whether fetch engine\read path is enabled
- * @is_dual:                 indicate whether context is in dual VFE mode
- * @is_offline:              indicate whether context is for offline IFE
- * @dsp_enabled:             indicate whether dsp is enabled in this context
- * @internal_cdm:            indicate whether context uses internal CDM
- * @pf_mid_found:            in page fault, mid found for this ctx.
- * @need_csid_top_cfg:       Flag to indicate if CSID top cfg is needed.
- * @is_rdi_only_context:     flag to specify the context has only rdi resource
- * @is_lite_context:         flag to specify the context has only uses lite
- *                           resources
- * @is_sfe_shdr:             indicate if stream is for SFE sHDR
- * @is_sfe_fs:               indicate if stream is for inline SFE FS
- * @dump_on_flush:           Set if reg dump triggered on flush
- * @dump_on_error:           Set if reg dump triggered on error
- * @custom_aeb_mode:         Set if custom AEB stream
- * @rdi_lcr_en:              To indicate if RDI LCR is enabled
- * @sys_cache_usage:         Per context sys cache usage
- *                           The corresponding index will be set
- *                           for the cache type
- * @hybrid_acquire:          Bool for categorising acquire type.
- * @secure_mode:             Flag to check if any out resource is secure
- * @is_independent_crm_mode: Flag to check if isp ctx is working in independent crm mode
- * @slave_metadata_en:       Flag to indicate if metadata is enabled in RDI path
- * @per_port_en              Indicates if per port feature is enabled or not
+ * @ctx_in_use:               flag to tell whether context is active
+ * @init_done:                indicate whether init hw is done
+ * @is_fe_enabled:            indicate whether fetch engine\read path is enabled
+ * @is_dual:                  indicate whether context is in dual VFE mode
+ * @is_offline:               indicate whether context is for offline IFE
+ * @dsp_enabled:              indicate whether dsp is enabled in this context
+ * @internal_cdm:             indicate whether context uses internal CDM
+ * @pf_mid_found:             in page fault, mid found for this ctx.
+ * @need_csid_top_cfg:        Flag to indicate if CSID top cfg is needed.
+ * @is_rdi_only_context:      flag to specify the context has only rdi resource
+ * @is_lite_context:          flag to specify the context has only uses lite
+ *                            resources
+ * @is_rdi_and_stats_context: flag to specify the context has only uses lite with
+ *                            stats and rdi resource
+ * @is_sfe_shdr:              indicate if stream is for SFE sHDR
+ * @is_sfe_fs:                indicate if stream is for inline SFE FS
+ * @dump_on_flush:            Set if reg dump triggered on flush
+ * @dump_on_error:            Set if reg dump triggered on error
+ * @custom_aeb_mode:          Set if custom AEB stream
+ * @rdi_lcr_en:               To indicate if RDI LCR is enabled
+ * @sys_cache_usage:          Per context sys cache usage
+ *                            The corresponding index will be set
+ *                            for the cache type
+ * @hybrid_acquire:           Bool for categorising acquire type.
+ * @secure_mode:              Flag to check if any out resource is secure
+ * @is_independent_crm_mode:  Flag to check if isp ctx is working in independent crm mode
+ * @slave_metadata_en:        Flag to indicate if metadata is enabled in RDI path
+ * @per_port_en               Indicates if per port feature is enabled or not
+ * @is_trigger_type           Context type trigger
  */
 struct cam_ife_hw_mgr_ctx_flags {
 	bool   ctx_in_use;
@@ -192,6 +195,7 @@ struct cam_ife_hw_mgr_ctx_flags {
 	bool   need_csid_top_cfg;
 	bool   is_rdi_only_context;
 	bool   is_lite_context;
+	bool   is_rdi_and_stats_context;
 	bool   is_sfe_shdr;
 	bool   is_sfe_fs;
 	bool   dump_on_flush;
@@ -204,6 +208,7 @@ struct cam_ife_hw_mgr_ctx_flags {
 	bool   is_independent_crm_mode;
 	bool   slave_metadata_en;
 	bool   per_port_en;
+	bool   is_trigger_type;
 };
 
 /**
@@ -293,6 +298,7 @@ struct cam_ife_virtual_rdi_mapping {
  * @sensor_id:              Sensor id for context
  * @num_processed:          number of config_dev processed in virtual acquire
  * @mapping_table:          mapping between virtual rdi and acquired rdi
+ * @slave_status:           slave status indicating if it is in running state
  */
 struct cam_ife_hw_mgr_ctx {
 	struct list_head                     list;
@@ -358,6 +364,7 @@ struct cam_ife_hw_mgr_ctx {
 	uint32_t                             sensor_id;
 	uint32_t                             num_processed;
 	struct cam_ife_virtual_rdi_mapping   mapping_table;
+	bool                                 is_slave_down;
 };
 
 /**
@@ -451,11 +458,17 @@ struct cam_ife_hw_mgr {
  * @num_valid_vc_dt_rdi         : valid vc and dt in array for rdi path
  * @pxl_vc                      : input virtual channel number for pxl path
  * @pxl_dt                      : input data type number for pxl path
- * @rdi_vc                      : input virtual channel number for pxl path
- * @rdi_dt                      : input data type number for pxl path
+ * @ppp_vc                      : input virtual channel number for ppp path
+ * @ppp_dt                      : input data type number for ppp path
+ * @lcr_vc                      : input virtual channel number for lcr path
+ * @lcr_dt                      : input data type number for lcr path
+ * @rdi_vc                      : input virtual channel number for rdi path
+ * @rdi_dt                      : input data type number for rdi path
  * @decode_format               : input data format
  * @rdi_vc_dt_updated           : Indicates count of rdi vc-dt associated to any hw res
  * @pxl_vc_dt_updated           : Indicates if pxl vc-dt is associated to any hw res
+ * @lcr_vc_dt_updated           : Indicates if lcr vc-dt associated to any hw res
+ * @ppp_vc_dt_updated           : Indicates if ppp vc-dt is associated to any hw res
  * @acquired                    : indicates whether acquire is done for this sensor id
  * @is_streamon                 : indicates whether streamon is done for this sensor id
  */
