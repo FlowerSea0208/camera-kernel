@@ -6186,7 +6186,8 @@ done:
 		__cam_isp_ctx_schedule_apply_req_offline(ctx_isp);
 	}
 
-	if ((ctx_isp->independent_crm_en)) {
+	if (ctx_isp->independent_crm_en &&
+		(ctx_isp->stream_type == CAM_REQ_MGR_LINK_TRIGGER_TYPE)) {
 		if (ctx->state == CAM_CTX_ACTIVATED && ctx_isp->rdi_only_context) {
 			CAM_DBG(CAM_ISP, "independent CRM apply from config_dev");
 			mutex_lock(&ctx_isp->no_crm_mutex);
