@@ -10027,11 +10027,6 @@ static int cam_ife_mgr_enable_irq(
 	uint32_t                             primary_rdi_csid_res = 0;
 	uint32_t                             primary_rdi_src_res = 0;
 	uint32_t i;
-	bool enable_rdi;
-
-	enable_rdi = ctx->flags.is_independent_crm_mode &&
-				ctx->flags.is_trigger_type &&
-				ctx->flags.is_rdi_only_context;
 
 	/*enable ife_out irqs*/
 	for (i = 0; i < max_ife_out_res; i++) {
@@ -10069,7 +10064,7 @@ static int cam_ife_mgr_enable_irq(
 
 	/*enable ife_src irqs*/
 	list_for_each_entry(hw_mgr_res, &ctx->res_list_ife_src, list) {
-		if (enable_rdi || primary_rdi_src_res == hw_mgr_res->res_id) {
+		if (primary_rdi_src_res == hw_mgr_res->res_id) {
 			hw_mgr_res->hw_res[0]->rdi_only_ctx = ctx->flags.is_rdi_only_context;
 			break;
 		}
