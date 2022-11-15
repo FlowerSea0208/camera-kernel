@@ -1401,6 +1401,11 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		CAM_ERR(CAM_V4L2, "dev is null");
 		return -EINVAL;
 	}
+
+	if (dev->state < V4L2L_READY_FOR_CAPTURE) {
+		CAM_ERR(CAM_V4L2, "proxy alread exit, need return");
+		return 0;
+	}
 	opener = fh_to_opener(fh);
 	data = opener->data;
 
@@ -1961,8 +1966,14 @@ static int vidioc_streamoff(struct file *file,
 		rc = 0;
 		break;
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
-		CAM_INFO(CAM_V4L2, "streamoff");
+		CAM_WARN(CAM_V4L2, "streamoff");
+
 		set_allbufs_state(data, V4L2L_BUF_PENDING);
+
+		if (dev->state < V4L2L_READY_FOR_CAPTURE) {
+			CAM_WARN(CAM_V4L2, "proxy already exit, need return");
+			return 0;
+		}
 
 		if (opener->connected_opener) {
 			send_v4l2_event(opener->connected_opener, AIS_V4L2_CLIENT_OUTPUT,
@@ -2025,6 +2036,9 @@ static int process_capture_set_param(struct ais_v4l2_control_t *kcmd,
 	} else if (u64_to_user_ptr(kcmd->payload) == NULL) {
 		rc = -EINVAL;
 		CAM_ERR(CAM_V4L2, "payload is NULL on set param");
+	} else if (!opener->data) {
+		CAM_ERR(CAM_V4L2, "data is null");
+		return -EINVAL;
 	} else if (copy_from_user(opener->data->qcarcam_param,
 			u64_to_user_ptr(kcmd->payload),
 			kcmd->size)) {
@@ -2133,6 +2147,11 @@ static int process_capture_cmd(struct v4l2_loopback_device *dev,
 	if (!opener || !opener->connected_opener) {
 		CAM_ERR(CAM_V4L2, "opener is null");
 		return -EINVAL;
+	}
+
+	if (dev->state < V4L2L_READY_FOR_CAPTURE) {
+		CAM_WARN(CAM_V4L2, "proxy alread exit when process capture cmd, need return");
+		return 0;
 	}
 
 	CAM_DBG(CAM_V4L2, "opener: %p cmd %d",
@@ -2352,16 +2371,12 @@ static int process_output_cmd(struct v4l2_loopback_device *dev,
 	struct v4l2_streamdata *data;
 
 	opener = fh_to_opener(fh);
-	if (!opener || !opener->connected_opener) {
+	if (!opener) {
 		CAM_ERR(CAM_V4L2, "opener is null");
 		return -EINVAL;
 	}
 
 	data = opener->data;
-	if (!data) {
-		CAM_ERR(CAM_V4L2, "data is null");
-		return -EINVAL;
-	}
 
 	CAM_DBG(CAM_V4L2, "opener: %p data: %p cmd %d",
 		opener, data, kcmd->cmd);
@@ -2694,15 +2709,20 @@ static int v4l2_loopback_close(struct file *file)
 			dev->state = V4L2L_READY_FOR_OUTPUT;
 			atomic_set(&dev->open_count, 0);
 			dev->main_opener = NULL;
-			CAM_WARN(CAM_V4L2, "v4l2 open_count is 0");
+			CAM_WARN(CAM_V4L2, "main opener is closed");
 		} else
 			CAM_WARN(CAM_V4L2, "invalid proxy close, state %d", dev->state);
 	} else if (is_writer) {
 		// todo: refine the close flow
+		if (opener->connected_opener) {
+			CAM_WARN(CAM_V4L2, "proxy close");
+			opener->connected_opener->connected_opener = NULL;
+			opener->connected_opener = NULL;
+		}
 	} else {
 		/* notify ais_v4l2_proxy to close the input */
 		mutex_lock(&dev->dev_mutex);
-		CAM_WARN(CAM_V4L2, "v4l2 open_count is %d when close", dev->open_count.counter);
+		CAM_WARN(CAM_V4L2, "v4l2 open_count is %d when app close", dev->open_count.counter);
 		if (dev->state >= V4L2L_READY_FOR_CAPTURE) {
 			if (opener->connected_opener) {
 
@@ -2737,7 +2757,7 @@ static int v4l2_loopback_close(struct file *file)
 		mutex_unlock(&dev->dev_mutex);
 	}
 
-	CAM_WARN(CAM_V4L2, "v4l2 del v4l2 fh open_count is %d when close",
+	CAM_WARN(CAM_V4L2, "X v4l2 del v4l2 fh open_count is %d when close",
 		dev->open_count.counter);
 
 	v4l2_fh_del(file->private_data);
