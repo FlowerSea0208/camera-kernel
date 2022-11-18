@@ -302,6 +302,12 @@ struct cam_cmd_i2c_info {
 } __attribute__((packed));
 
 /**
+ * Below macro definition is the param mask for
+ * cam_cmd_sensor_res_info.
+ */
+#define CAM_SENSOR_NUM_BATCHED_FRAMES              BIT(1)
+
+/**
  * struct cam_cmd_sensor_res_info - Contains sensor res info
  *
  * res_index is the key property, it specifies the
