@@ -353,18 +353,18 @@ static struct cam_camnoc_specific
 		.port_name = "IPE_WR",
 		.enable = true,
 		.priority_lut_low = {
-			.enable = false,
+			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0x5c30, /* IPE_WR_PRIORITYLUT_LOW */
-			.value = 0x0,
+			.value = 0x33333333,
 		},
 		.priority_lut_high = {
-			.enable = false,
+			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0x5c34, /* IPE_WR_PRIORITYLUT_HIGH */
-			.value = 0x0,
+			.value = 0x33333333,
 		},
 		.urgency = {
 			.enable = true,
@@ -420,22 +420,164 @@ static struct cam_camnoc_specific
 		},
 	},
 	{
+		.port_type = CAM_CAMNOC_JPEG,
+		.port_name = "JPEG",
+		.enable = true,
+		.priority_lut_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x6030, /* JPEG_RD_NIU_PRIORITYLUT_LOW */
+			.value = 0x22222222,
+		},
+		.priority_lut_high = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x6034, /* JPEG_RD_NIU_PRIORITYLUT_HIGH */
+			.value = 0x22222222,
+		},
+		.urgency = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x6038, /* JPEG_RD_NIU_URGENCY_LOW */
+			.value = 0x2,
+		},
+		.danger_lut = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x6040, /* JPEG_RD_NIU_DANGERLUT_LOW */
+			.value = 0x0,
+		},
+		.safe_lut = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x6048, /* JPEG_RD_NIU_SAFELUT_LOW */
+			.value = 0xffff,
+		},
+		.ubwc_ctl = {
+			.enable = false,
+		},
+		.qosgen_mainctl = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x4488, /* JPEG_RD_QOSGEN_MAINCTL */
+			.value = 0x2
+		},
+		.qosgen_shaping_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x44A0, /* JPEG_RD_QOSGEN_SHAPING_LOW */
+			.value = 0x10101010,
+		},
+		.qosgen_shaping_high = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x44A4, /* JPEG_RD_QOSGEN_SHAPING_HIGH */
+			.value = 0x10101010,
+		},
+		.maxwr_low = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x6010, /* JPEG_RD_NIU_MAXRD_LOW */
+			.value = 0x0,
+		},
+	},
+	{
+		.port_type = CAM_CAMNOC_JPEG,
+		.port_name = "JPEG",
+		.enable = true,
+		.priority_lut_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x5e30, /* JPEG_WR_NIU_PRIORITYLUT_LOW */
+			.value = 0x22222222,
+		},
+		.priority_lut_high = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x5e34, /* JPEG_WR_NIU_PRIORITYLUT_HIGH */
+			.value = 0x22222222,
+		},
+		.urgency = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x5e38, /* JPEG_WR_NIU_URGENCY_LOW */
+			.value = 0x20,
+		},
+		.danger_lut = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x5e40, /* JPEG_WR_NIU_DANGERLUT_LOW */
+			.value = 0x0,
+		},
+		.safe_lut = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x5e48, /* JPEG_WR_NIU_SAFELUT_LOW */
+			.value = 0xffff,
+		},
+		.ubwc_ctl = {
+			.enable = false,
+		},
+		.qosgen_mainctl = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x4408, /* JPEG_WR_QOSGEN_MAINCTL */
+			.value = 0x2
+		},
+		.qosgen_shaping_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x4420, /* JPEG_WR_QOSGEN_SHAPING_LOW */
+			.value = 0x10101010,
+		},
+		.qosgen_shaping_high = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ_WRITE,
+			.masked_value = 0,
+			.offset = 0x4424, /* JPEG_WR_QOSGEN_SHAPING_HIGH */
+			.value = 0x10101010,
+		},
+		.maxwr_low = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x5E20, /* JPEG_WR_NIU_MAXWR_LOW */
+			.value = 0x0,
+		},
+	},
+	{
 		.port_type = CAM_CAMNOC_IPE0_RD,
 		.port_name = "IPE_RD",
 		.enable = true,
 		.priority_lut_low = {
-			.enable = false,
+			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0x5A30, /* IPE0_RD_PRIORITYLUT_LOW */
-			.value = 0x0,
+			.value = 0x33333333,
 		},
 		.priority_lut_high = {
-			.enable = false,
+			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0x5A34, /* IPE0_RD_PRIORITYLUT_HIGH */
-			.value = 0x0,
+			.value = 0x33333333,
 		},
 		.urgency = {
 			.enable = true,
