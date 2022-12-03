@@ -320,6 +320,7 @@ struct cam_ife_csid_hw_flags {
 	bool                  rdi_lcr_en;
 	bool                  sfe_en;
 	bool                  metadata_en;
+	bool                  per_port_en;
 };
 
 /*
