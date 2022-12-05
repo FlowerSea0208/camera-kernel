@@ -181,6 +181,7 @@ struct cam_ife_hw_mgr_sfe_info {
  * @is_independent_crm_mode:  Flag to check if isp ctx is working in independent crm mode
  * @slave_metadata_en:        Flag to indicate if metadata is enabled in RDI path
  * @per_port_en               Indicates if per port feature is enabled or not
+ * @is_trigger_type           Context type trigger
  */
 struct cam_ife_hw_mgr_ctx_flags {
 	bool   ctx_in_use;
@@ -194,6 +195,7 @@ struct cam_ife_hw_mgr_ctx_flags {
 	bool   need_csid_top_cfg;
 	bool   is_rdi_only_context;
 	bool   is_lite_context;
+	bool   is_rdi_and_stats_context;
 	bool   is_sfe_shdr;
 	bool   is_sfe_fs;
 	bool   dump_on_flush;
@@ -206,6 +208,7 @@ struct cam_ife_hw_mgr_ctx_flags {
 	bool   is_independent_crm_mode;
 	bool   slave_metadata_en;
 	bool   per_port_en;
+	bool   is_trigger_type;
 };
 
 /**
