@@ -20,6 +20,7 @@
 #define AIS_SENSOR_I2C_READ_BURST       (AIS_SENSOR_OPCODE_START + 14)
 #define AIS_SENSOR_I2C_WRITE_BURST      (AIS_SENSOR_OPCODE_START + 15)
 #define AIS_SENSOR_EXEC_POWER_SEQ       (AIS_SENSOR_OPCODE_START + 16)
+#define AIS_SERDES_INIT_STATUS          (AIS_SENSOR_OPCODE_START + 17)
 #define AIS_SENSOR_EVENT_BASE      (V4L2_EVENT_PRIVATE_START)
 #define AIS_SENSOR_EVENT_TYPE      (AIS_SENSOR_EVENT_BASE + 1)
 
@@ -239,5 +240,8 @@ struct ais_cci_cmd_t {
 	} cmd;
 };
 
+struct ais_serdes_cfg_status {
+	uint32_t serdes_init_status;
+};
 
 #endif
