@@ -2195,6 +2195,7 @@ static int cam_ife_hw_mgr_acquire_res_ife_csid_rdi(
 		csid_res->res_id = csid_acquire.res_id;
 		*acq_res_id |= ((uint32_t)csid_acquire.res_id) <<
 						(16 + org_path_res_id*2);
+
 		csid_res->is_dual_vfe = 0;
 		csid_res->hw_res[0] = csid_acquire.node_res;
 		csid_res->hw_res[1] = NULL;
@@ -8406,6 +8407,8 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			if (ife_ctx->waiting_start &&
 				c_elem->ctx_idx != ife_ctx->start_ctx_idx)
 				continue;
+			if (!c_elem->ready)
+				continue;
 			if (ife_hw_mgr->starting_offline_cnt == 0 &&
 				c_elem->request_id == 0) {
 				c_elem->hw_id = ife_ctx->acquired_hw_id;
@@ -8420,24 +8423,31 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 				c_elem->prepare.packet->header.request_id)
 				CAM_ERR(CAM_ISP,
 					"Request id mismatch. Packet recycled before use!");
-			if (c_elem->ready) {
-				run_hw_mgr_ctx =
-				    &ife_hw_mgr->virt_ctx_pool[c_elem->ctx_idx];
-				if (!run_hw_mgr_ctx->ctx_in_use)
-					CAM_ERR(CAM_ISP, "UNUSED CONTEXT %d",
-							c_elem->ctx_idx);
-				run_hw_mgr_ctx->concr_ctx = ife_ctx;
-				c_elem->prepare.ctxt_to_hw_map = run_hw_mgr_ctx;
-				c_elem->cfg.ctxt_to_hw_map = run_hw_mgr_ctx;
-				found = true;
-				list_del_init(&c_elem->list);
-				c_elem->hw_id = ife_ctx->acquired_hw_id;
-				list_add_tail(&c_elem->list,
-					&ife_hw_mgr->in_proc_queue.list);
-				break;
-			}
+			run_hw_mgr_ctx =
+			    &ife_hw_mgr->virt_ctx_pool[c_elem->ctx_idx];
+			if (!run_hw_mgr_ctx->ctx_in_use)
+				CAM_ERR(CAM_ISP, "UNUSED CONTEXT %d",
+						c_elem->ctx_idx);
+			run_hw_mgr_ctx->concr_ctx = ife_ctx;
+			c_elem->prepare.ctxt_to_hw_map = run_hw_mgr_ctx;
+			c_elem->cfg.ctxt_to_hw_map = run_hw_mgr_ctx;
+			found = true;
+			list_del_init(&c_elem->list);
+			c_elem->hw_id = ife_ctx->acquired_hw_id;
+			list_add_tail(&c_elem->list,
+				&ife_hw_mgr->in_proc_queue.list);
+			break;
 		}
 		if (found) {
+
+			if (c_elem->cfg.request_id != 0) {
+				ife_ctx->waiting_start = false;
+				atomic_set(&ife_ctx->ctx_state,
+						CAM_IFE_HW_STATE_BUSY);
+			} else {
+				ife_ctx->waiting_start = true;
+				ife_ctx->start_ctx_idx = c_elem->ctx_idx;
+			}
 			ife_ctx->served_ctx_w = 1 - ife_ctx->served_ctx_w;
 			ife_ctx->served_ctx_id[ife_ctx->served_ctx_w] =
 							run_hw_mgr_ctx->ctx_idx;
@@ -8447,17 +8457,6 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			c_elem->cfg.num_hw_update_entries =
 				c_elem->prepare.num_hw_update_entries;
 			rc = cam_ife_mgr_config_hw(hw_mgr_priv, &c_elem->cfg);
-			/* For the zero request we do not get event,
-			 * so restore state
-			 */
-			if (c_elem->cfg.request_id != 0) {
-				ife_ctx->waiting_start = false;
-				atomic_set(&ife_ctx->ctx_state,
-						CAM_IFE_HW_STATE_BUSY);
-			} else {
-				ife_ctx->waiting_start = true;
-				ife_ctx->start_ctx_idx = c_elem->ctx_idx;
-			}
 		}
 	}
 
@@ -8604,6 +8603,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 			ife_mgr_ctx = &ife_hw_mgr->virt_ctx_pool[i];
 			ife_mgr_ctx->ctx_in_use = true;
 			ife_mgr_ctx->ctx_idx = i;
+			ife_mgr_ctx->is_offline = false;
 			break;
 		}
 	}
@@ -8824,9 +8824,8 @@ static int cam_ife_mgr_v_release_hw(void *hw_mgr_priv, void *release_hw_args)
 			hw_mgr_ctx->concr_ctx =
 				ife_hw_mgr->acquired_hw_pool[ife_idx].ife_ctx;
 		} else {
-			/* No hw is stopped - just release context */
-			hw_mgr_ctx->ctx_in_use = false;
-			return 0;
+			/* No hw is stopped - just release sw context */
+			hw_mgr_ctx->concr_ctx = NULL;
 		}
 	}
 	rc = cam_ife_mgr_release_hw(hw_mgr_priv, release_hw_args);
