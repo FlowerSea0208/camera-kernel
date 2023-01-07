@@ -111,6 +111,7 @@ struct cam_ife_hw_mgr_ctx {
 	uint32_t                              unpacker_fmt;
 	bool                                  dynamic_rdi_alloc;
 	uint32_t                              dynamic_rdi_mask;
+	spinlock_t                            mgr_ctx_lock;
 };
 
 /**
