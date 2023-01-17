@@ -535,8 +535,8 @@ static int __cam_isp_ctx_no_crm_apply_trigger_util(void *priv, void *data)
 	struct cam_req_mgr_no_crm_trigger_notify *sof_notify = NULL;
 	int                                               rc = 0, req_id = 0;
 
-	if (!priv || !data) {
-		CAM_ERR(CAM_CRM, "input args NULL %pK %pK", data, priv);
+	if (!priv) {
+		CAM_ERR(CAM_CRM, "input args NULL %pK", priv);
 		rc = -EINVAL;
 		return rc;
 	}
@@ -547,10 +547,10 @@ static int __cam_isp_ctx_no_crm_apply_trigger_util(void *priv, void *data)
 
 	CAM_DBG(CAM_ISP, "no_crm apply from trigger_util");
 	mutex_lock(&ctx_isp->no_crm_mutex);
-	rc = __cam_isp_ctx_no_crm_apply(ctx_isp, false, &req_id);
+	rc = __cam_isp_ctx_no_crm_apply(ctx_isp, true, &req_id);
 	mutex_unlock(&ctx_isp->no_crm_mutex);
 
-	if (!rc && req_id && (ctx_isp->stream_type == CAM_REQ_MGR_LINK_STREAMING_TYPE)) {
+	if (sof_notify && !rc && (ctx_isp->stream_type == CAM_REQ_MGR_LINK_STREAMING_TYPE)) {
 		sof_notify->request_id = req_id;
 		CAM_DBG(CAM_ISP,
 			"Notify sensor %s on frame: %llu ctx: %u link: 0x%x is_sensorlite:%d",
@@ -563,9 +563,9 @@ static int __cam_isp_ctx_no_crm_apply_trigger_util(void *priv, void *data)
 		else
 			cam_subdev_notify_message(CAM_SENSOR_DEVICE_TYPE,
 				CAM_SUBDEV_MESSAGE_SENSOR_SOF_NOTIFY, (void *)sof_notify);
+		kfree(sof_notify);
 	}
 
-	kfree(sof_notify);
 	CAM_DBG(CAM_ISP, "no_crm exit from trigger_util");
 
 	return rc;
@@ -5833,18 +5833,16 @@ static struct cam_ctx_ops
 static int __cam_isp_ctx_flush_dev_in_top_state(struct cam_context *ctx,
 	struct cam_flush_dev_cmd *cmd)
 {
+	int rc = 0;
 	struct cam_isp_context *ctx_isp = ctx->ctx_priv;
 	struct cam_req_mgr_flush_request flush_req;
 
-	if (!ctx_isp->offline_context && !ctx_isp->independent_crm_en) {
+	if (!(ctx_isp->offline_context || ctx_isp->independent_crm_en)) {
 		CAM_ERR(CAM_ISP,
 			"flush dev only supported in offline ctx or no CRM mode ctx:%d",
 			ctx->ctx_id);
 		return -EINVAL;
 	}
-
-	if (ctx_isp->independent_crm_en)
-		crm_timer_exit(&ctx_isp->independent_crm_sof_timer);
 
 	flush_req.type = (cmd->flush_type == CAM_FLUSH_TYPE_ALL) ? CAM_REQ_MGR_FLUSH_TYPE_ALL :
 			CAM_REQ_MGR_FLUSH_TYPE_CANCEL_REQ;
@@ -5855,16 +5853,22 @@ static int __cam_isp_ctx_flush_dev_in_top_state(struct cam_context *ctx,
 	switch (ctx->state) {
 	case CAM_CTX_ACQUIRED:
 	case CAM_CTX_ACTIVATED:
-		return __cam_isp_ctx_flush_req_in_top_state(ctx, &flush_req);
+		rc = __cam_isp_ctx_flush_req_in_top_state(ctx, &flush_req);
+		break;
 	case CAM_CTX_READY:
-		return __cam_isp_ctx_flush_req_in_ready(ctx, &flush_req);
+		rc = __cam_isp_ctx_flush_req_in_ready(ctx, &flush_req);
+		break;
 	default:
 		CAM_ERR(CAM_ISP, "flush dev in wrong state: %d ctx:%d", ctx->state, ctx->ctx_id);
-		return -EINVAL;
+		rc = -EINVAL;
 	}
 
-	if (cmd->flush_type == CAM_FLUSH_TYPE_ALL)
+	if (cmd->flush_type == CAM_FLUSH_TYPE_ALL && ctx_isp->workq)
 		cam_req_mgr_workq_flush(ctx_isp->workq);
+
+	if (ctx_isp->independent_crm_en)
+		crm_timer_exit(&ctx_isp->independent_crm_sof_timer);
+	return rc;
 }
 
 static void __cam_isp_ctx_free_mem_hw_entries(struct cam_context *ctx)
@@ -6148,7 +6152,7 @@ err_out:
 static int __cam_isp_ctx_config_dev_in_top_state(
 	struct cam_context *ctx, struct cam_config_dev_cmd *cmd)
 {
-	int rc = 0, i, req_id = 0;
+	int rc = 0, i;
 	struct cam_ctx_request           *req = NULL;
 	struct cam_isp_ctx_req           *req_isp;
 	struct cam_packet                *packet;
@@ -6159,6 +6163,7 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 		(struct cam_isp_context *) ctx->ctx_priv;
 	struct cam_hw_cmd_args            hw_cmd_args;
 	struct cam_isp_hw_cmd_args        isp_hw_cmd_args;
+	struct crm_workq_task            *task = NULL;
 	uint32_t                          packet_opcode = 0;
 	uint32_t                          shndl;
 	uint32_t                         *slave_pkt, *pkt_offset;
@@ -6347,8 +6352,7 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 		is_slave_down = *(bool *)isp_hw_cmd_args.cmd_data;
 		CAM_ERR(CAM_ISP, "acq type: %d, is_slave_down: %d", ctx_isp->acquire_type,
 			is_slave_down);
-		if ((ctx_isp->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID ||
-			ctx_isp->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL) &&
+		if (ctx_isp->acquire_type == CAM_ISP_ACQUIRE_TYPE_HYBRID &&
 			!is_slave_down) {
 			shndl = cam_rpmsg_get_handle("helios");
 			CAM_RPMSG_SLAVE_SET_PAYLOAD_TYPE(
@@ -6462,9 +6466,18 @@ done:
 	if (ctx_isp->independent_crm_en && ctx_isp->stream_type == CAM_REQ_MGR_LINK_TRIGGER_TYPE) {
 		if (ctx->state == CAM_CTX_ACTIVATED && ctx_isp->rdi_only_context) {
 			CAM_DBG(CAM_ISP, "independent CRM apply from config_dev");
-			mutex_lock(&ctx_isp->no_crm_mutex);
-			__cam_isp_ctx_no_crm_apply(ctx_isp, true, &req_id);
-			mutex_unlock(&ctx_isp->no_crm_mutex);
+			task = cam_req_mgr_workq_get_task(ctx_isp->hw_mgr_workq);
+			if (!task) {
+				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task");
+				return -EBUSY;
+			}
+
+			task->process_cb = __cam_isp_ctx_no_crm_apply_trigger_util;
+			task->payload = NULL;
+
+			rc = cam_req_mgr_workq_enqueue_task(task, ctx_isp, CRM_TASK_PRIORITY_0);
+			if (rc)
+				CAM_ERR(CAM_REQ, "Pending request processing failed:%d", rc);
 		}
 	}
 
