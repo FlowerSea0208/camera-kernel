@@ -165,7 +165,8 @@ static int cam_vfe_camif_ver3_err_irq_top_half(
 	return rc;
 }
 
-static int cam_vfe_camif_ver3_validate_pix_pattern(uint32_t pattern)
+static int cam_vfe_camif_ver3_validate_pix_pattern(uint32_t pattern,
+	uint32_t *input_pp_fmt)
 {
 	int rc;
 
@@ -174,11 +175,15 @@ static int cam_vfe_camif_ver3_validate_pix_pattern(uint32_t pattern)
 	case CAM_ISP_PATTERN_BAYER_GRGRGR:
 	case CAM_ISP_PATTERN_BAYER_BGBGBG:
 	case CAM_ISP_PATTERN_BAYER_GBGBGB:
+		rc = 0;
+		*input_pp_fmt = CAM_ISP_PP_INPUT_BAYER_FMT;
+		break;
 	case CAM_ISP_PATTERN_YUV_YCBYCR:
 	case CAM_ISP_PATTERN_YUV_YCRYCB:
 	case CAM_ISP_PATTERN_YUV_CBYCRY:
 	case CAM_ISP_PATTERN_YUV_CRYCBY:
 		rc = 0;
+		*input_pp_fmt = CAM_ISP_PP_INPUT_YUV_FMT;
 		break;
 	default:
 		CAM_ERR(CAM_ISP, "Error, Invalid pix pattern:%d", pattern);
@@ -252,7 +257,8 @@ int cam_vfe_camif_ver3_acquire_resource(
 	acquire_data = (struct cam_vfe_acquire_args *)acquire_param;
 
 	rc = cam_vfe_camif_ver3_validate_pix_pattern(
-		acquire_data->vfe_in.in_port->test_pattern);
+		acquire_data->vfe_in.in_port->test_pattern,
+		&camif_data->cam_common_cfg.input_pp_fmt);
 
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Validate pix pattern failed, rc = %d", rc);
@@ -274,9 +280,12 @@ int cam_vfe_camif_ver3_acquire_resource(
 	camif_data->horizontal_bin =
 		acquire_data->vfe_in.in_port->horizontal_bin;
 
-	CAM_DBG(CAM_ISP, "VFE:%d CAMIF pix_pattern:%d dsp_mode=%d",
+	CAM_DBG(CAM_ISP,
+		"VFE:%d CAMIF pix_pattern:%d dsp_mode=%d format=%d",
 		camif_res->hw_intf->hw_idx,
-		camif_data->pix_pattern, camif_data->dsp_mode);
+		camif_data->pix_pattern, camif_data->dsp_mode,
+		acquire_data->vfe_in.in_port->format);
+
 
 	return rc;
 }
@@ -436,6 +445,11 @@ static int cam_vfe_camif_ver3_resource_start(
 	CAM_DBG(CAM_ISP, "VFE:%d TOP core_cfg: 0x%X",
 		camif_res->hw_intf->hw_idx, val);
 
+	val |= (rsrc_data->cam_common_cfg.input_pp_fmt & 0x3) <<
+		CAM_SHIFT_TOP_CORE_CFG_INPUT_PP_FMT;
+
+	CAM_DBG(CAM_ISP, "VFE:%d TOP core_cfg: 0x%X", camif_res->hw_intf->hw_idx, val);
+
 	cam_io_w_mb(val, rsrc_data->mem_base +
 		rsrc_data->common_reg->core_cfg_0);
 
@@ -588,6 +602,24 @@ static int cam_vfe_camif_ver3_reg_dump(
 		if (offset == 0x1C || offset == 0x34 ||
 			offset == 0x38 || offset == 0x90)
 			continue;
+		val = cam_soc_util_r(camif_priv->soc_info, 0, offset);
+		CAM_INFO(CAM_ISP, "offset 0x%X value 0x%X", offset, val);
+	}
+
+	CAM_INFO(CAM_ISP, "IFE:%d Chroma", camif_res->hw_intf->hw_idx);
+	for (offset = 0x2a00; offset <= 0x2a74; offset += 0x4) {
+		if (offset == 0x2a08)
+			offset = 0x2a60;
+
+		val = cam_soc_util_r(camif_priv->soc_info, 0, offset);
+		CAM_INFO(CAM_ISP, "offset 0x%X value 0x%X", offset, val);
+	}
+
+	CAM_INFO(CAM_ISP, "IFE:%d demux", camif_res->hw_intf->hw_idx);
+	for (offset = 0x2800; offset <= 0x286c; offset += 0x4) {
+		if (offset == 0x2808)
+			offset = 0x2860;
+
 		val = cam_soc_util_r(camif_priv->soc_info, 0, offset);
 		CAM_INFO(CAM_ISP, "offset 0x%X value 0x%X", offset, val);
 	}
