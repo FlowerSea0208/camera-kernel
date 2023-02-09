@@ -3646,6 +3646,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	if (cdm_acquire.id == CAM_CDM_IFE)
 		ife_ctx->internal_cdm = true;
 	atomic_set(&ife_ctx->cdm_done, 1);
+	atomic_set(&ife_ctx->cdm_power_on, CAM_CDM_POWER_STATE_OFF);
 	atomic_set(&ife_ctx->ctx_state, CAM_IFE_HW_STATE_STOPPED);
 	ife_ctx->last_cdm_done_req = 0;
 
@@ -3936,6 +3937,7 @@ static int cam_ife_mgr_acquire_dev(void *hw_mgr_priv, void *acquire_hw_args)
 	ife_ctx->cdm_handle = cdm_acquire.handle;
 	ife_ctx->cdm_id = cdm_acquire.id;
 	atomic_set(&ife_ctx->cdm_done, 1);
+	atomic_set(&ife_ctx->cdm_power_on, CAM_CDM_POWER_STATE_OFF);
 	atomic_set(&ife_ctx->ctx_state, CAM_IFE_HW_STATE_STOPPED);
 	ife_ctx->last_cdm_done_req = 0;
 
@@ -4741,6 +4743,8 @@ static int cam_ife_mgr_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 
 	if (cam_cdm_stream_off(ctx->cdm_handle))
 		CAM_ERR(CAM_ISP, "CDM stream off failed %d", ctx->cdm_handle);
+	else
+		atomic_set(&ctx->cdm_power_on, CAM_CDM_POWER_STATE_OFF);
 
 	if (ctx->is_tpg)
 		cam_ife_hw_mgr_stop_hw_res(&ctx->res_list_tpg);
@@ -5014,6 +5018,8 @@ static int cam_ife_mgr_start_hw(void *hw_mgr_priv, void *start_hw_args)
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Can not start cdm (%d)", ctx->cdm_handle);
 		//goto safe_disable;
+	} else {
+		atomic_set(&ctx->cdm_power_on, CAM_CDM_POWER_STATE_ON);
 	}
 
 start_only:
@@ -5143,6 +5149,7 @@ err:
 
 cdm_streamoff:
 	cam_cdm_stream_off(ctx->cdm_handle);
+	atomic_set(&ctx->cdm_power_on, CAM_CDM_POWER_STATE_OFF);
 
 //safe_disable:
 	cam_ife_notify_safe_lut_scm(CAM_IFE_SAFE_DISABLE);
@@ -5224,14 +5231,6 @@ static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 		return -EINVAL;
 	}
 	hw_mgr_ctx = (struct cam_ife_hw_mgr_ctx *)release_args->ctxt_to_hw_map;
-	ctx = hw_mgr_ctx->concr_ctx;
-	if (!ctx || !ctx->ctx_in_use) {
-		CAM_ERR(CAM_ISP, "Invalid context is used");
-		return -EPERM;
-	}
-
-	CAM_DBG(CAM_ISP, "Enter...ctx id:%d",
-		ctx->ctx_index);
 
 	ctx = hw_mgr_ctx->concr_ctx;
 	if (!ctx || !ctx->ctx_in_use) {
@@ -8918,7 +8917,7 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 	struct cam_ife_hw_mgr *ife_hw_mgr        = hw_mgr_priv;
 	struct cam_ife_hw_concrete_ctx            *ife_ctx = NULL;
 	int rc = 0;
-	uint32_t state;
+	uint32_t state, cdm_state;
 	bool found = false;
 	bool is_init_pkt;
 
@@ -8929,6 +8928,10 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 		if (!ife_ctx->is_offline ||
 			(state != CAM_IFE_HW_STATE_STARTED &&
 			state != CAM_IFE_HW_STATE_STARTING))
+			continue;
+
+		cdm_state = atomic_read(&ife_ctx->cdm_power_on);
+		if (cdm_state != CAM_CDM_POWER_STATE_ON)
 			continue;
 
 		cam_ife_mgr_free_in_proc_req(ife_hw_mgr,
@@ -8949,6 +8952,8 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			if (ife_ctx->waiting_start &&
 				c_elem->ctx_idx != ife_ctx->start_ctx_idx)
 				continue;
+			if (!c_elem->ready)
+				continue;
 			if (ife_hw_mgr->starting_offline_cnt == 0 &&
 				c_elem->request_id == 0) {
 				c_elem->hw_id = ife_ctx->acquired_hw_id;
@@ -8963,22 +8968,20 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 				c_elem->prepare.packet->header.request_id)
 				CAM_ERR(CAM_ISP,
 					"Request id mismatch. Packet recycled before use!");
-			if (c_elem->ready) {
-				run_hw_mgr_ctx =
-				    &ife_hw_mgr->virt_ctx_pool[c_elem->ctx_idx];
-				if (!run_hw_mgr_ctx->ctx_in_use)
-					CAM_ERR(CAM_ISP, "UNUSED CONTEXT %d",
-							c_elem->ctx_idx);
-				run_hw_mgr_ctx->concr_ctx = ife_ctx;
-				c_elem->prepare.ctxt_to_hw_map = run_hw_mgr_ctx;
-				c_elem->cfg.ctxt_to_hw_map = run_hw_mgr_ctx;
-				found = true;
-				list_del_init(&c_elem->list);
-				c_elem->hw_id = ife_ctx->acquired_hw_id;
-				list_add_tail(&c_elem->list,
-					&ife_hw_mgr->in_proc_queue.list);
-				break;
-			}
+			run_hw_mgr_ctx =
+			    &ife_hw_mgr->virt_ctx_pool[c_elem->ctx_idx];
+			if (!run_hw_mgr_ctx->ctx_in_use)
+				CAM_ERR(CAM_ISP, "UNUSED CONTEXT %d",
+						c_elem->ctx_idx);
+			run_hw_mgr_ctx->concr_ctx = ife_ctx;
+			c_elem->prepare.ctxt_to_hw_map = run_hw_mgr_ctx;
+			c_elem->cfg.ctxt_to_hw_map = run_hw_mgr_ctx;
+			found = true;
+			list_del_init(&c_elem->list);
+			c_elem->hw_id = ife_ctx->acquired_hw_id;
+			list_add_tail(&c_elem->list,
+				&ife_hw_mgr->in_proc_queue.list);
+			break;
 		}
 		if (found) {
 
