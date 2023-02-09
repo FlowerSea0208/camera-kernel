@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <soc/qcom/of_common.h>
 #include <linux/platform_device.h>
 #include "cam_a5_hw_intf.h"
 

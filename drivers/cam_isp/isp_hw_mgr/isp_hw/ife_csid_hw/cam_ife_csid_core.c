@@ -8,7 +8,7 @@
 #include <media/cam_isp.h>
 #include <media/cam_defs.h>
 #include <media/cam_req_mgr.h>
-#include <dt-bindings/msm/msm-camera.h>
+#include <dt-bindings/msm-camera.h>
 
 #include "cam_isp_hw_mgr_intf.h"
 #include "cam_ife_csid_core.h"

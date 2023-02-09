@@ -7,6 +7,7 @@
 #define _CAM_ISP_HW_MGR_INTF_H_
 
 #include <linux/of.h>
+#include <soc/qcom/of_common.h>
 #include <linux/time.h>
 #include <linux/list.h>
 #include <media/cam_isp.h>
