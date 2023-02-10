@@ -23,7 +23,7 @@
 #include "cam_csiphy_dev.h"
 #include "cam_eeprom_dev.h"
 #include "cam_ois_dev.h"
-#include "cam_flash_dev.h"
+//#include "cam_flash_dev.h"
 #include "a5_core.h"
 #include "ipe_core.h"
 #include "bps_core.h"
@@ -81,6 +81,9 @@ static const struct camera_submodule_component camera_tfe[] = {
 static const struct camera_submodule_component camera_isp[] = {
 #ifdef CONFIG_SPECTRA_ISP
 	{&cam_top_tpg_v1_init_module, &cam_top_tpg_v1_exit_module},
+	{&cam_ife_csid17x_init_module, &cam_ife_csid17x_exit_module},
+	{&cam_ife_csid_lite_init_module, &cam_ife_csid_lite_exit_module},
+	{&cam_vfe_init_module, &cam_vfe_exit_module},
 	{&cam_isp_dev_init_module, &cam_isp_dev_exit_module},
 #endif
 };
@@ -94,7 +97,7 @@ static const struct camera_submodule_component camera_sensor[] = {
 	{&cam_sensor_driver_init, &cam_sensor_driver_exit},
 	{&cam_eeprom_driver_init, &cam_eeprom_driver_exit},
 	{&cam_ois_driver_init, &cam_ois_driver_exit},
-	{&cam_flash_init_module, &cam_flash_exit_module},
+//	{&cam_flash_init_module, &cam_flash_exit_module},
 #endif
 };
 

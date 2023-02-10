@@ -69,5 +69,7 @@ void cam_vfe_exit_module(void)
 	platform_driver_unregister(&cam_vfe_driver);
 }
 
+EXPORT_SYMBOL(cam_vfe_init_module);
+EXPORT_SYMBOL(cam_vfe_exit_module);
 MODULE_DESCRIPTION("CAM VFE driver");
 MODULE_LICENSE("GPL v2");

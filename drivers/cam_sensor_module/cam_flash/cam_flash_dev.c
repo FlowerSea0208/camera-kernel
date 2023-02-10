@@ -716,5 +716,8 @@ void cam_flash_exit_module(void)
 	i2c_del_driver(&cam_flash_i2c_driver);
 }
 
+EXPORT_SYMBOL(cam_flash_init_module);
+EXPORT_SYMBOL(cam_flash_exit_module);
+
 MODULE_DESCRIPTION("CAM FLASH");
 MODULE_LICENSE("GPL v2");
