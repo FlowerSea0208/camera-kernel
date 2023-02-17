@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _CAM_REQ_MGR_CORE_H_
 #define _CAM_REQ_MGR_CORE_H_
@@ -674,4 +674,25 @@ int cam_req_mgr_link_control(struct cam_req_mgr_link_control *control);
  * @dump_req: Dump request
  */
 int cam_req_mgr_dump_request(struct cam_dump_req_cmd *dump_req);
+
+/**
+ * cam_req_mgr_link_dec_open_cnt()
+ * @brief:   Decrease open cnt by 1
+ * @link_hdl: handle of link
+ */
+int cam_req_mgr_link_dec_open_cnt(int32_t link_hdl);
+
+/**
+ * cam_req_mgr_link_reset_open_cnt()
+ * @brief:   Set open cnt to 0
+ * @link_hdl: handle of link
+ */
+void cam_req_mgr_link_reset_open_cnt(int32_t link_hdl);
+
+/**
+ * cam_req_mgr_link_get_additional_timeout()
+ * @brief:   Return additional timeout of request at rd_idx
+ * @link_hdl: handle of link
+ */
+int32_t cam_req_mgr_link_get_additional_timeout(int32_t link_hdl);
 #endif
