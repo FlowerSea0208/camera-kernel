@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_PARSER_H_
@@ -195,4 +196,5 @@ int cam_isp_add_go_cmd(
 	struct cam_kmd_buf_info              *kmd_buf_info);
 
 
+int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare);
 #endif /*_CAM_ISP_HW_PARSER_H */
