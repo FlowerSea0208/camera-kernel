@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -6349,12 +6349,15 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 	/* add go_cmd for offline context */
 	if (prepare->num_out_map_entries && prepare->num_in_map_entries &&
 		ctx->is_offline) {
-		rc = cam_isp_add_go_cmd(prepare, &ctx->res_list_ife_in_rd,
-			ctx->base[i].idx, &kmd_buf);
-		if (rc)
-			CAM_ERR(CAM_ISP,
-				"Add GO_CMD faled i: %d, idx: %d, rc: %d",
-				i, ctx->base[i].idx, rc);
+		for (i = 0; i < ctx->num_base; i++) {
+			rc = cam_isp_add_go_cmd(prepare,
+				&ctx->res_list_ife_in_rd, ctx->base[i].idx,
+				&kmd_buf);
+			if (rc)
+				CAM_ERR(CAM_ISP,
+					"Add GO_CMD faled i: %d, idx: %d, rc: %d",
+					i, ctx->base[i].idx, rc);
+		}
 	}
 
 	/*
