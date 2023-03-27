@@ -115,6 +115,7 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP,
 	CAM_ISP_HW_CMD_CSID_CLOCK_DUMP,
 	CAM_ISP_HW_CMD_WM_UPDATE,
+	CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS,
 	CAM_ISP_HW_CMD_SET_NUM_OF_ACQUIRED_RESOURCE,
 	CAM_ISP_HW_CMD_GET_NUM_OF_ACQUIRED_RESOURCE,
 	CAM_ISP_HW_CMD_MAX,
@@ -266,6 +267,24 @@ struct cam_isp_hw_get_cmd_update {
 		struct cam_vfe_generic_ubwc_config   *ubwc_config;
 		struct cam_isp_vfe_wm_config         *wm_config;
 	};
+};
+
+/*
+ * struct cam_isp_hw_get_off_clk_thr:
+ *
+ * @Brief:         Get thresholds for offline HW
+ *
+ * @max_clk_threshold:      min clock threshold
+ * @nom_clk_threshold:      nom clock threshold
+ * @min_clk_threshold:      max clock threshold
+ * @bytes_per_clk:          bytes per clock processed
+ *
+ */
+struct cam_isp_hw_get_off_clk_thr {
+	uint32_t   max_clk_threshold;
+	uint32_t   nom_clk_threshold;
+	uint32_t   min_clk_threshold;
+	uint32_t   bytes_per_clk;
 };
 
 /*
