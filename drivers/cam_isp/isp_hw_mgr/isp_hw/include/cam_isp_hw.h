@@ -239,6 +239,7 @@ struct cam_isp_hw_get_wm_update {
 	uint64_t                        frame_header;
 	uint32_t                        local_id;
 	struct cam_buf_io_cfg          *io_cfg;
+	uint32_t                        unpacker_fmt;
 };
 
 /*
