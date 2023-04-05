@@ -205,6 +205,8 @@ camera-$(CONFIG_SPECTRA_SENSOR) += \
 	drivers/cam_sensor_module/cam_sensor_io/cam_sensor_qup_i2c.o \
 	drivers/cam_sensor_module/cam_sensor_io/cam_sensor_spi.o \
 	drivers/cam_sensor_module/cam_sensor_utils/cam_sensor_util.o \
+	drivers/cam_sensor_module/cam_hdmi_bdg/cam_hdmi_bdg_core.o \
+	drivers/cam_sensor_module/cam_hdmi_bdg/cam_hdmi_bdg_dev.o \
 	drivers/cam_sensor_module/cam_res_mgr/cam_res_mgr.o
 
 #camera-$(CONFIG_LEDS_QPNP_FLASH_V2) += \
