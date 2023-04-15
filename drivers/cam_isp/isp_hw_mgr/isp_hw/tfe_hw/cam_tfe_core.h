@@ -135,6 +135,7 @@ struct cam_tfe_top_reg_offset_common {
 	uint32_t rdi1_overflow_bit;
 	uint32_t rdi2_overflow_bit;
 	uint32_t out_of_sync_frame_drop_bit;
+	uint32_t lcr_pd_timing_protocol_violation_bit;
 	uint32_t height_shift;
 	uint32_t epoch_shift_val;
 
@@ -201,6 +202,9 @@ struct cam_tfe_camif_reg_data {
 	uint32_t     ai_c_srl_en_shift;
 	uint32_t     ds16_c_srl_en_shift;
 	uint32_t     ds4_c_srl_en_shift;
+
+	uint32_t     shdr_mode_shift;
+	uint32_t     extern_mup_shift;
 };
 
 struct cam_tfe_camif_hw_info {

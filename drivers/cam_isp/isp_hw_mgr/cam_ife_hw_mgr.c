@@ -5399,10 +5399,13 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	if (ife_ctx->ctx_type == CAM_IFE_CTX_TYPE_CUSTOM)
 		acquire_args->op_flags |= CAM_IFE_CTX_CUSTOM_EN;
 
-	if (ife_ctx->ctx_config &
-		CAM_IFE_CTX_CFG_FRAME_HEADER_TS)
+	if (ife_ctx->ctx_config & CAM_IFE_CTX_CFG_FRAME_HEADER_TS)
 		acquire_args->op_flags |=
 			CAM_IFE_CTX_FRAME_HEADER_EN;
+
+	if (ife_ctx->ctx_config & CAM_IFE_CTX_CFG_DYNAMIC_SWITCH_ON)
+		acquire_args->op_flags |=
+			CAM_IFE_CTX_DYNAMIC_SWITCH_EN;
 
 	if (ife_ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE)
 		acquire_args->op_flags |=
@@ -12451,9 +12454,19 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			isp_hw_cmd_args->u.last_cdm_done =
 				ctx->last_cdm_done_req;
 			break;
-		case CAM_ISP_HW_MGR_CMD_PROG_DEFAULT_CFG:
-			rc = cam_ife_mgr_prog_default_settings(false, ctx);
-			break;
+		case CAM_ISP_HW_MGR_CMD_PROG_DEFAULT_CFG: {
+			bool skip_rup_aup = false;
+
+			if (!isp_hw_cmd_args->cmd_data) {
+				CAM_ERR(CAM_ISP, "Invalid cmd data");
+				rc = -EINVAL;
+				break;
+			}
+
+			skip_rup_aup = *((bool *)isp_hw_cmd_args->cmd_data);
+			rc = cam_ife_mgr_prog_default_settings((false || skip_rup_aup), ctx);
+		}
+		break;
 		case CAM_ISP_HW_MGR_GET_SOF_TS:
 			rc = cam_ife_mgr_cmd_get_sof_timestamp(ctx,
 				&isp_hw_cmd_args->u.sof_ts.curr,
@@ -14296,15 +14309,17 @@ static ssize_t cam_ife_hw_mgr_perfcnt_write(
 	size_t size, loff_t *loff_t)
 {
 	char *delimiter1, *delimiter2;
-	char input_buf[16];
+	char input_buf[16] = {'\0'};
 	uint32_t counter_idx = 0, counter_val = 0;
 	struct cam_ife_hw_mgr_debug *debug_cfg = &g_ife_hw_mgr.debug_cfg;
 
 	if (size >= 16)
 		return -EINVAL;
 
-	if (copy_from_user(input_buf, ubuf, sizeof(input_buf)))
+	if (copy_from_user(input_buf, ubuf, size))
 		return -EFAULT;
+
+	input_buf[size] = '\0';
 
 	if ((!g_ife_hw_mgr.isp_caps.num_ife_perf_counters) &&
 		(!g_ife_hw_mgr.isp_caps.num_sfe_perf_counters))
