@@ -327,6 +327,7 @@ struct cam_ife_mgr_offline_in_queue {
  * @ife_devices:               IFE device instances array. This will be filled
  *                             by HW layer during initialization
  * @ctx_mutex:                 mutex for the hw context pool
+ * @wm_cfg_mutex:              mutex for updating the wm configuration in CDtM
  * @active_ctx_cnt:            number of active contexts
  * @free_ctx_list:             free hw context list
  * @used_ctx_list:             used hw context list
@@ -354,6 +355,7 @@ struct cam_ife_hw_mgr {
 	struct cam_hw_intf            *ife_devices[CAM_IFE_HW_NUM_MAX];
 	struct cam_soc_reg_map        *cdm_reg_map[CAM_IFE_HW_NUM_MAX];
 	struct mutex                   ctx_mutex;
+	struct mutex                   wm_cfg_mutex[CAM_IFE_HW_NUM_MAX];
 	atomic_t                       active_ctx_cnt;
 	struct list_head               free_ctx_list;
 	struct list_head               used_ctx_list;
