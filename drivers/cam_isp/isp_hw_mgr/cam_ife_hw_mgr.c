@@ -8256,17 +8256,16 @@ static int cam_ife_mgr_free_in_proc_req(struct cam_ife_hw_mgr *ife_hw_mgr,
 	return 0;
 }
 
-
 static int cam_ife_mgr_flush_in_queue(struct cam_ife_hw_mgr *ife_hw_mgr,
-					uint32_t ctx_idx)
+					uint32_t ctx_idx, bool just_incomplete)
 {
 	struct cam_ife_mgr_offline_in_queue *c_elem;
 	struct cam_ife_mgr_offline_in_queue *c_elem_temp;
 
 	list_for_each_entry_safe(c_elem, c_elem_temp,
-				&ife_hw_mgr->input_queue.list, list) {
+			&ife_hw_mgr->input_queue.list, list) {
 		if (c_elem->ctx_idx == ctx_idx &&
-				!c_elem->ready) {
+					!(c_elem->ready && just_incomplete)) {
 			CAM_DBG(CAM_ISP, "flush req %llu", c_elem->request_id);
 			list_del_init(&c_elem->list);
 			kfree(c_elem);
@@ -8274,7 +8273,6 @@ static int cam_ife_mgr_flush_in_queue(struct cam_ife_hw_mgr *ife_hw_mgr,
 	}
 	return 0;
 }
-
 
 static int cam_ife_mgr_enqueue_offline_update(void *hw_mgr_priv,
 	void *prepare_hw_update_args)
@@ -8670,7 +8668,8 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 		 * complex HW allocation.
 		 */
 		mutex_lock(&ife_hw_mgr->ctx_mutex);
-		cam_ife_mgr_flush_in_queue(ife_hw_mgr, hw_mgr_ctx->ctx_idx);
+		cam_ife_mgr_flush_in_queue(ife_hw_mgr, hw_mgr_ctx->ctx_idx,
+			true);
 		num_ctx = atomic_read(&ife_hw_mgr->num_acquired_offline_ctx);
 		if (num_ctx <=
 			cam_ife_mgr_required_offline_hw(hw_mgr_priv, true))
@@ -8691,17 +8690,28 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 			if (rem_jiffies == 0) {
 				hw_mgr_ctx->is_stopping = false;
 				CAM_ERR(CAM_ISP,
-				    "Offline IFE drain during stop timeout");
+					"Offline IFE ctx %d drain timed out",
+					hw_mgr_ctx->ctx_idx);
+				/* forcefully flush all requests from queue */
+				mutex_lock(&ife_hw_mgr->ctx_mutex);
+				cam_ife_mgr_flush_in_queue(ife_hw_mgr,
+					hw_mgr_ctx->ctx_idx,
+					false);
+				mutex_unlock(&ife_hw_mgr->ctx_mutex);
 			}
 			if (ife_ctx)
 				atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_STOPPING);
 			else
 				return 0;
-		} else {
+		} else if (ife_ctx) {
 			atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_STOPPING);
 			mutex_unlock(&ife_hw_mgr->ctx_mutex);
+		} else {
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
+			CAM_ERR(CAM_ISP, "Invalid IFE HW context");
+			return -EINVAL;
 		}
 		atomic_dec(&ife_hw_mgr->num_acquired_offline_ctx);
 	}
