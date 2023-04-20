@@ -9,15 +9,16 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
+#if IS_REACHABLE(CONFIG_MSM_GLOBAL_SYNX)
+#include <synx_api.h>
+#endif
+
 #include "cam_sync_util.h"
 #include "cam_debug_util.h"
 #include "cam_common_util.h"
 #include "cam_compat.h"
 #include "cam_req_mgr_workq.h"
 
-#ifdef CONFIG_MSM_GLOBAL_SYNX
-#include <synx_api.h>
-#endif
 struct sync_device *sync_dev;
 
 /*
@@ -951,7 +952,7 @@ static struct v4l2_file_operations cam_sync_v4l2_fops = {
 #endif
 };
 
-#if defined(CONFIG_MEDIA_CONTROLLER)
+#if IS_REACHABLE(CONFIG_MEDIA_CONTROLLER)
 static int cam_sync_media_controller_init(struct sync_device *sync_dev,
 	struct platform_device *pdev)
 {
@@ -1035,8 +1036,8 @@ end:
 	return rc;
 }
 
-#ifdef CONFIG_MSM_GLOBAL_SYNX
-static void cam_sync_register_synx_bind_ops(void)
+#if IS_REACHABLE(CONFIG_MSM_GLOBAL_SYNX)
+static int cam_sync_register_synx_bind_ops(void)
 {
 	int rc = 0;
 	struct synx_register_params params;
@@ -1050,7 +1051,9 @@ static void cam_sync_register_synx_bind_ops(void)
 
 	rc = synx_register_ops(&params);
 	if (rc)
-		CAM_ERR(CAM_SYNC, "synx registration fail with %d", rc);
+		CAM_ERR(CAM_SYNC, "synx registration fail with rc=%d", rc);
+
+	return rc;
 }
 #endif
 
@@ -1126,8 +1129,11 @@ static int cam_sync_probe(struct platform_device *pdev)
 
 	trigger_cb_without_switch = false;
 	cam_sync_create_debugfs();
-#ifdef CONFIG_MSM_GLOBAL_SYNX
-	cam_sync_register_synx_bind_ops();
+#if IS_REACHABLE(CONFIG_MSM_GLOBAL_SYNX)
+	CAM_INFO(CAM_SYNC, "Registering with synx driver");
+	rc = cam_sync_register_synx_bind_ops();
+	if (rc)
+		goto v4l2_fail;
 #endif
 	return rc;
 
