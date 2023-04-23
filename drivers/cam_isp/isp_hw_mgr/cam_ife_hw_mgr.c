@@ -37,8 +37,6 @@
 #define CAM_ISP_GENERIC_BLOB_TYPE_MAX               \
 	(CAM_ISP_GENERIC_BLOB_TYPE_CSID_QCFA_CONFIG + 1)
 
-static struct cam_ife_hw_mgr_ctx g_ife_hw_mgr_ctx;
-
 static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 		struct cam_ife_hw_mgr_ctx *hw_mgr_ctx);
 static int cam_ife_mgr_v_config_hw(void *hw_mgr_priv, void *config_hw_args);
@@ -8347,12 +8345,6 @@ static int cam_ife_hw_mgr_handle_hw_rup(
 {
 	struct cam_isp_hw_event_info            *event_info = evt_info;
 	struct cam_ife_hw_mgr_ctx               *hw_mgr_ctx = ctx;
-
-	if (!hw_mgr_ctx->concr_ctx) {
-		CAM_ERR(CAM_ISP, "hw_rup ctx_id:%u", hw_mgr_ctx->ctx_idx);
-		return 0;
-	}
-
 	struct cam_ife_hw_concrete_ctx         *ife_ctx = hw_mgr_ctx->concr_ctx;
 	cam_hw_event_cb_func                     ife_hwr_irq_rup_cb;
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
@@ -8406,12 +8398,6 @@ static int cam_ife_hw_mgr_handle_hw_epoch(
 {
 	struct cam_isp_hw_event_info         *event_info = evt_info;
 	struct cam_ife_hw_mgr_ctx            *hw_mgr_ctx = ctx;
-
-	if (!hw_mgr_ctx->concr_ctx) {
-		CAM_ERR(CAM_ISP, "hw_epoch ctx_id:%u", hw_mgr_ctx->ctx_idx);
-		return 0;
-	}
-
 	struct cam_ife_hw_concrete_ctx       *ife_ctx = hw_mgr_ctx->concr_ctx;
 	cam_hw_event_cb_func                  ife_hw_irq_epoch_cb;
 	struct cam_isp_hw_epoch_event_data    epoch_done_event_data;
@@ -8456,12 +8442,6 @@ static int cam_ife_hw_mgr_handle_hw_sof(
 {
 	struct cam_isp_hw_event_info         *event_info = evt_info;
 	struct cam_ife_hw_mgr_ctx            *hw_mgr_ctx = ctx;
-
-	if (!hw_mgr_ctx->concr_ctx) {
-		CAM_ERR(CAM_ISP, "buf_done ctx_id:%u", hw_mgr_ctx->ctx_idx);
-		return 0;
-	}
-
 	struct cam_ife_hw_concrete_ctx       *ife_ctx = hw_mgr_ctx->concr_ctx;
 	cam_hw_event_cb_func                  ife_hw_irq_sof_cb;
 	struct cam_isp_hw_sof_event_data      sof_done_event_data;
@@ -8542,12 +8522,6 @@ static int cam_ife_hw_mgr_handle_hw_eof(
 {
 	struct cam_isp_hw_event_info         *event_info = evt_info;
 	struct cam_ife_hw_mgr_ctx            *hw_mgr_ctx = ctx;
-
-	if (!hw_mgr_ctx->concr_ctx) {
-		CAM_ERR(CAM_ISP, "hw_eof ctx_id:%u", hw_mgr_ctx->ctx_idx);
-		return 0;
-	}
-
 	struct cam_ife_hw_concrete_ctx       *ife_ctx = hw_mgr_ctx->concr_ctx;
 	cam_hw_event_cb_func                  ife_hw_irq_eof_cb;
 	struct cam_isp_hw_eof_event_data      eof_done_event_data;
@@ -8595,12 +8569,6 @@ static int cam_ife_hw_mgr_handle_hw_buf_done(
 {
 	cam_hw_event_cb_func                 ife_hwr_irq_wm_done_cb;
 	struct cam_ife_hw_mgr_ctx            *hw_mgr_ctx = ctx;
-
-	if (!hw_mgr_ctx->concr_ctx) {
-		CAM_ERR(CAM_ISP, "concr_ctx NULL buf_done ctx_id:%u", hw_mgr_ctx->ctx_idx);
-		return 0;
-	}
-
 	struct cam_ife_hw_concrete_ctx       *ife_ctx = hw_mgr_ctx->concr_ctx;
 	struct cam_isp_hw_done_event_data    buf_done_event_data = {0};
 	struct cam_isp_hw_event_info        *event_info = evt_info;
@@ -8646,7 +8614,6 @@ static int cam_ife_hw_mgr_event_handler(
 
 	CAM_DBG(CAM_ISP, "Event ID 0x%x", evt_id);
 
-	spin_lock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 	switch (evt_id) {
 	case CAM_ISP_HW_EVENT_SOF:
 		rc = cam_ife_hw_mgr_handle_hw_sof(priv, evt_info);
@@ -8678,7 +8645,6 @@ static int cam_ife_hw_mgr_event_handler(
 		break;
 	}
 
-	spin_unlock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 	return rc;
 }
 
@@ -9377,9 +9343,7 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 						CAM_IFE_HW_STATE_BUSY)
 				CAM_ERR(CAM_ISP, "Offline IFE busy on stop!");
 		}
-		spin_lock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 		hw_mgr_ctx->concr_ctx = ife_ctx;
-		spin_unlock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 		if (ife_ctx) {
 			atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_STOPPING);
@@ -9411,10 +9375,7 @@ static int cam_ife_mgr_v_release_hw(void *hw_mgr_priv, void *release_hw_args)
 				ife_hw_mgr->acquired_hw_pool[ife_idx].ife_ctx;
 		} else {
 			/* No hw is stopped - just release sw context */
-
-			spin_lock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 			hw_mgr_ctx->concr_ctx = NULL;
-			spin_unlock(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 		}
 	}
 	rc = cam_ife_mgr_release_hw(hw_mgr_priv, release_hw_args);
@@ -9495,7 +9456,6 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 		mutex_init(&g_ife_hw_mgr.wm_cfg_mutex[i]);
 	}
 	spin_lock_init(&g_ife_hw_mgr.ctx_lock);
-	spin_lock_init(&g_ife_hw_mgr_ctx.mgr_ctx_lock);
 
 	if (CAM_IFE_HW_NUM_MAX != CAM_IFE_CSID_HW_NUM_MAX) {
 		CAM_ERR(CAM_ISP, "CSID num is different then IFE num");
