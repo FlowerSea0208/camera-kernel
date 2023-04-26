@@ -135,7 +135,6 @@ struct cam_context_bank_info {
 	bool is_fw_allocated;
 	bool is_secheap_allocated;
 	bool is_qdss_allocated;
-	bool stall_disable;
 
 	struct scratch_mapping scratch_map;
 	struct gen_pool *shared_mem_pool;
@@ -3635,8 +3634,6 @@ static int cam_smmu_setup_cb(struct cam_context_bank_info *cb,
 	struct device *dev)
 {
 	int rc = 0;
-	int32_t stall_disable = 1;
-	int32_t hupcf = 1;
 
 	if (!cb || !dev) {
 		CAM_ERR(CAM_SMMU, "Error: invalid input params");
@@ -3704,24 +3701,6 @@ static int cam_smmu_setup_cb(struct cam_context_bank_info *cb,
 				cb->discard_iova_len);
 
 		cb->state = CAM_SMMU_ATTACH;
-
-		if (cb->stall_disable) {
-			if (iommu_domain_set_attr(cb->domain,
-				DOMAIN_ATTR_FAULT_MODEL_NO_STALL,
-				&stall_disable) < 0) {
-				CAM_ERR(CAM_SMMU,
-					"Error: failed to set cb stall disable for node: %s",
-					cb->name[0]);
-			}
-
-			if (iommu_domain_set_attr(cb->domain,
-				DOMAIN_ATTR_FAULT_MODEL_HUPCF,
-				&hupcf) < 0) {
-				CAM_ERR(CAM_SMMU,
-					"Error: failed to set attribute HUPCF for node: %s",
-					cb->name[0]);
-			}
-		}
 	} else {
 		CAM_ERR(CAM_SMMU, "Context bank does not have IO region");
 		rc = -ENODEV;
@@ -4059,9 +4038,6 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 
 	cb->num_shared_hdl = of_property_count_strings(dev->of_node,
 		"cam-smmu-label");
-
-	cb->stall_disable =
-		of_property_read_bool(dev->of_node, "stall-disable");
 
 	if (cb->num_shared_hdl >
 		CAM_SMMU_SHARED_HDL_MAX) {
