@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
+#include <linux/module.h>
+#include <linux/version.h>
 
 #include "cam_compat.h"
 #include "cam_debug_util.h"
@@ -283,7 +285,12 @@ end:
 #if KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE
 int cam_compat_util_get_dmabuf_va(struct dma_buf *dmabuf, uintptr_t *vaddr)
 {
-	struct dma_buf_map mapping;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0))
+	struct iosys_map mapping = {0};
+#else
+	struct dma_buf_map mapping = {0};
+#endif
 	int error_code = dma_buf_vmap(dmabuf, &mapping);
 
 	if (error_code)
@@ -297,8 +304,12 @@ int cam_compat_util_get_dmabuf_va(struct dma_buf *dmabuf, uintptr_t *vaddr)
 
 void cam_compat_util_put_dmabuf_va(struct dma_buf *dmabuf, void *vaddr)
 {
-	struct dma_buf_map mapping = DMA_BUF_MAP_INIT_VADDR(vaddr);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,19,0))
+	struct iosys_map mapping = IOSYS_MAP_INIT_VADDR(vaddr);
+#else
+	struct dma_buf_map mapping = DMA_BUF_MAP_INIT_VADDR(vaddr);
+#endif
 	dma_buf_vunmap(dmabuf, &mapping);
 }
 
