@@ -451,3 +451,93 @@ int cam_compat_util_get_irq(struct cam_hw_soc_info *soc_info)
 	return rc;
 }
 #endif
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+void cam_actuator_driver_i2c_remove(struct i2c_client *client)
+{
+	cam_actuator_driver_i2c_remove_common(client);
+
+	return;
+}
+#else
+static int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client)
+{
+	int rc = 0;
+
+	rc = cam_actuator_driver_i2c_remove_common(client);
+
+	return rc;
+}
+#endif
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+void cam_sensor_driver_i2c_remove(struct i2c_client *client)
+{
+	cam_sensor_driver_i2c_remove_common(client);
+
+	return;
+}
+#else
+static int cam_sensor_driver_i2c_remove(struct i2c_client *client)
+{
+	int rc = 0;
+
+	rc = cam_sensor_driver_i2c_remove_common(client);
+
+	return rc;
+}
+#endif
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+void cam_flash_i2c_driver_remove(struct i2c_client *client)
+{
+	cam_flash_i2c_driver_remove_common(client);
+
+	return;
+}
+#else
+static int32_t cam_flash_i2c_driver_remove(struct i2c_client *client)
+{
+	int rc = 0;
+
+	rc = cam_flash_i2c_driver_remove_common(client);
+
+	return rc;
+}
+#endif
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+void cam_eeprom_i2c_driver_remove(struct i2c_client *client)
+{
+	cam_eeprom_i2c_driver_remove_common(client);
+
+	return;
+}
+#else
+static int cam_eeprom_i2c_driver_remove(struct i2c_client *client)
+{
+	int rc = 0;
+
+	rc = cam_eeprom_i2c_driver_remove_common(client);
+
+	return rc;
+}
+#endif
+
+#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
+void cam_ois_i2c_driver_remove(struct i2c_client *client)
+{
+	cam_ois_i2c_driver_remove_common(client);
+
+	return;
+}
+#else
+static int cam_ois_i2c_driver_remove(struct i2c_client *client)
+{
+	int rc = 0;
+
+	rc = cam_ois_i2c_driver_remove_common(client);
+
+	return rc;
+}
+#endif
