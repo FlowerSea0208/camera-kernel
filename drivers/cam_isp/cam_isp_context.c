@@ -808,6 +808,7 @@ static int cam_isp_ctx_dump_req(
 				CAM_ERR(CAM_ISP,
 					"Invalid offset exp %u actual %u",
 					req_isp->cfg[i].offset, (uint32_t)len);
+				cam_mem_put_cpu_buf(req_isp->cfg[i].handle);
 				return -EINVAL;
 			}
 			remain_len = len - req_isp->cfg[i].offset;
@@ -818,6 +819,7 @@ static int cam_isp_ctx_dump_req(
 					"Invalid len exp %u remain_len %u",
 					req_isp->cfg[i].len,
 					(uint32_t)remain_len);
+				cam_mem_put_cpu_buf(req_isp->cfg[i].handle);
 				return -EINVAL;
 			}
 
@@ -843,6 +845,7 @@ static int cam_isp_ctx_dump_req(
 					return rc;
 			} else
 				cam_cdm_util_dump_cmd_buf(buf_start, buf_end);
+			cam_mem_put_cpu_buf(req_isp->cfg[i].handle);
 		}
 	}
 	return rc;
@@ -4442,6 +4445,7 @@ hw_dump:
 		spin_unlock_bh(&ctx->lock);
 		CAM_WARN(CAM_ISP, "Dump buffer overshoot len %zu offset %zu",
 			buf_len, dump_info->offset);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
 		return -ENOSPC;
 	}
 
@@ -4450,9 +4454,10 @@ hw_dump:
 		(CAM_ISP_CTX_DUMP_NUM_WORDS * sizeof(uint64_t));
 
 	if (remain_len < min_len) {
-		spin_unlock_bh(&ctx->lock);
 		CAM_WARN(CAM_ISP, "Dump buffer exhaust remain %zu min %u",
 			remain_len, min_len);
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
 		return -ENOSPC;
 	}
 
@@ -4480,7 +4485,9 @@ hw_dump:
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Time dump fail %lld, rc: %d",
 			req->request_id, rc);
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return -ENOSPC;
 	}
 	dump_info->offset = dump_args.offset;
 
@@ -4491,7 +4498,9 @@ hw_dump:
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Stream info dump fail %lld, rc: %d",
 			req->request_id, rc);
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return rc;
 	}
 	dump_info->offset = dump_args.offset;
 
@@ -4500,11 +4509,15 @@ hw_dump:
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Event record dump fail %lld, rc: %d",
 			req->request_id, rc);
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return rc;
 	}
 	dump_info->offset = dump_args.offset;
 	if (dump_only_event_record) {
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return rc;
 	}
 
 	/* Dump state monitor array */
@@ -4512,7 +4525,9 @@ hw_dump:
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Dump event fail %lld, rc: %d",
 			req->request_id, rc);
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return rc;
 	}
 
 	/* Dump request info */
@@ -4520,7 +4535,9 @@ hw_dump:
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Dump Req info fail %lld, rc: %d",
 			req->request_id, rc);
-		goto end;
+		spin_unlock_bh(&ctx->lock);
+		cam_mem_put_cpu_buf(dump_info->buf_handle);
+		return rc;
 	}
 	spin_unlock_bh(&ctx->lock);
 
@@ -4536,6 +4553,7 @@ hw_dump:
 			&ife_dump_args);
 		dump_info->offset = ife_dump_args.offset;
 	}
+	cam_mem_put_cpu_buf(dump_info->buf_handle);
 	return rc;
 
 end:
