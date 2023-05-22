@@ -314,7 +314,6 @@ static void cam_isp_dev_component_unbind(struct device *dev,
 	vfree(g_isp_dev.ctx_isp);
 	g_isp_dev.ctx_isp = NULL;
 
-	CAM_ERR(CAM_ISP, "Unbinding the ISP component");
 	rc = cam_subdev_remove(&g_isp_dev.sd);
 	if (rc)
 		CAM_ERR(CAM_ISP, "Unregister failed rc: %d", rc);
