@@ -15,8 +15,9 @@
 #include <linux/ktime.h>
 #include <linux/mutex.h>
 #include <soc/qcom/camera2.h>
-#include <soc/qcom/scm.h>
-#include "qseecom_kernel.h"
+#include <linux/qcom_scm.h>
+#include <soc/qcom/qseecom_scm.h>
+#include <linux/qseecom_kernel.h>
 #include "msm_camera_io_util.h"
 #include "msm_camera_tz_util.h"
 
@@ -186,25 +187,19 @@ uint32_t msm_camera_tz_region_to_hw_block(
 
 static uint32_t msm_camera_tz_get_tzbsp_status(uint32_t status_mask)
 {
+	uint32_t result, rc;
 	if (msm_camera_tz_ctrl.tzbsp_status == 0) {
-		struct scm_desc desc = {
-			.arginfo = SCM_ARGS(0),
-		};
 		ktime_t startTime = ktime_get();
-
-		int32_t scmcall_status = scm_call2(
-			SCM_SIP_FNID(
-				MSM_CAMERA_TZ_SVC_CAMERASS_CALL_ID,
-				MSM_CAMERA_TZ_SVC_CAMERASS_SECURITY_STATUS),
-			&desc);
-		if (scmcall_status) {
+		rc = qcom_scm_camera_tz_get_status(status_mask,
+			&result);
+		if (rc) {
 			CDBG("SCM call %s failed - %d\n",
 				msm_camera_tz_scm_call_name(
 				MSM_CAMERA_TZ_SVC_CAMERASS_SECURITY_STATUS),
-				scmcall_status);
+				rc);
 			msm_camera_tz_ctrl.tzbsp_status = 0xFFFFFFFF;
 		} else {
-			msm_camera_tz_ctrl.tzbsp_status = desc.ret[0];
+			msm_camera_tz_ctrl.tzbsp_status = result;
 		}
 		CDBG("Done: status=0x%08X, - %lluus\n",
 		msm_camera_tz_ctrl.tzbsp_status,
@@ -525,12 +520,12 @@ static int32_t msm_camera_tz_tzbsp_reg_write_bulk(
 	enum msm_camera_tz_io_region_t region)
 {
 	int32_t rc = 0;
-	struct scm_desc desc = {0};
 	uint32_t *offsets = NULL;
 	uint32_t *data = NULL;
 	uint32_t index;
 	uint32_t buffer_size = 0;
 	ktime_t startTime = ktime_get();
+
 
 	if (msm_camera_tz_reg_ctrl.num_of_deffered_registers == 0 ||
 		msm_camera_tz_reg_ctrl.num_of_deffered_registers >
@@ -561,24 +556,9 @@ static int32_t msm_camera_tz_tzbsp_reg_write_bulk(
 			msm_camera_tz_reg_ctrl.deferred_registers[index].data;
 	}
 
-	desc.arginfo = SCM_ARGS(6,
-		SCM_VAL, SCM_VAL, SCM_RO, SCM_VAL, SCM_RO, SCM_VAL);
-	desc.args[0] = region;
-	desc.args[1] = msm_camera_tz_reg_ctrl.num_of_deffered_registers;
-	desc.args[2] = SCM_BUFFER_PHYS(offsets);
-	desc.args[3] = buffer_size;
-	desc.args[4] = SCM_BUFFER_PHYS(data);
-	desc.args[5] = buffer_size;
-
-	dmac_flush_range(offsets, offsets +
-		msm_camera_tz_reg_ctrl.num_of_deffered_registers);
-	dmac_flush_range(data, data +
-		msm_camera_tz_reg_ctrl.num_of_deffered_registers);
-	rc = scm_call2(
-		SCM_SIP_FNID(
-			MSM_CAMERA_TZ_SVC_CAMERASS_CALL_ID,
-			MSM_CAMERA_TZ_SVC_CAMERASS_REG_WRITE_BULK),
-		&desc);
+	rc = qcom_scm_camera_tz_reg_write_bulk(region,
+			msm_camera_tz_reg_ctrl.num_of_deffered_registers,
+			offsets, data, buffer_size);
 	kfree(offsets);
 	kfree(data);
 	if (rc) {
@@ -643,29 +623,19 @@ static int32_t msm_camera_tz_tzbsp_reg_read(uint32_t offset, uint32_t *data,
 	enum msm_camera_tz_io_region_t region)
 {
 	ktime_t startTime = ktime_get();
-	struct scm_desc desc = {
-			.args[0] = region,
-			.args[1] = offset,
-			.arginfo = SCM_ARGS(2),
-	};
+	unsigned int rc;
 
-	int32_t rc = scm_call2(
-		SCM_SIP_FNID(
-			MSM_CAMERA_TZ_SVC_CAMERASS_CALL_ID,
-			MSM_CAMERA_TZ_SVC_CAMERASS_REG_READ),
-		&desc);
+	rc = qcom_scm_camera_tz_reg_read(region, offset, data);
 	if (rc)
 		CDBG("SCM call %s failed - %d\n",
 			msm_camera_tz_scm_call_name(
 				MSM_CAMERA_TZ_SVC_CAMERASS_REG_READ),
 			rc);
 	else
-		*data = desc.ret[0];
-
-	CDBG("Done: rc=%d, region=%s, offset=0x%08X, data=0x%08X - %lluus\n",
-		rc, msm_camera_tz_region_name(region),
-		offset, *data,
-		ktime_us_delta(ktime_get(), startTime));
+		CDBG("Done: rc=%d, region=%s, offset=0x%08X, data=0x%08X - %lluus\n",
+			rc, msm_camera_tz_region_name(region),
+			offset, *data,
+			ktime_us_delta(ktime_get(), startTime));
 
 	return rc;
 }
@@ -695,28 +665,19 @@ static int32_t msm_camera_tz_tzbsp_reg_write(uint32_t data, uint32_t offset,
 	enum msm_camera_tz_io_region_t region)
 {
 	ktime_t startTime = ktime_get();
-	struct scm_desc desc = {
-			.args[0] = region,
-			.args[1] = offset,
-			.args[2] = data,
-			.arginfo = SCM_ARGS(3),
-	};
+	unsigned int rc;
 
-	int32_t rc = scm_call2(
-		SCM_SIP_FNID(
-			MSM_CAMERA_TZ_SVC_CAMERASS_CALL_ID,
-			MSM_CAMERA_TZ_SVC_CAMERASS_REG_WRITE),
-		&desc);
+	rc = qcom_scm_camera_tz_reg_write(region, offset, data);
 	if (rc)
 		CDBG("SCM call %s failed - %d\n",
 			msm_camera_tz_scm_call_name(
 			MSM_CAMERA_TZ_SVC_CAMERASS_REG_WRITE),
 			rc);
-
-	CDBG("Done: rc=%d, region=%s, offset=0x%08X, data=0x%08X - %lluus\n",
-		rc, msm_camera_tz_region_name(region),
-		offset, data,
-		ktime_us_delta(ktime_get(), startTime));
+	else
+		CDBG("Done: rc=%d, region=%s, offset=0x%08X, data=0x%08X - %lluus\n",
+			rc, msm_camera_tz_region_name(region),
+			offset, data,
+			ktime_us_delta(ktime_get(), startTime));
 
 	return rc;
 }
@@ -816,17 +777,10 @@ static int32_t msm_camera_tz_tzbsp_reset_hw_block(uint32_t mask,
 {
 	uint32_t status = -1;
 	ktime_t startTime = ktime_get();
-	struct scm_desc desc = {
-			.args[0] = region,
-			.args[1] = mask,
-			.arginfo = SCM_ARGS(2),
-	};
+	unsigned int rc;
 
-	int32_t rc = scm_call2(
-		SCM_SIP_FNID(
-			MSM_CAMERA_TZ_SVC_CAMERASS_CALL_ID,
-			MSM_CAMERA_TZ_SVC_CAMERASS_RESET_HW_BLOCK),
-		&desc);
+	rc = qcom_scm_camera_tz_reset_hw_block(mask, region,
+			&status);
 	if (rc) {
 		CDBG("SCM call %s failed - %d\n",
 			msm_camera_tz_scm_call_name(
@@ -834,7 +788,6 @@ static int32_t msm_camera_tz_tzbsp_reset_hw_block(uint32_t mask,
 			rc);
 		status = rc;
 	} else {
-		status = desc.ret[0];
 		CDBG("SCM call returned: %d\n", status);
 		if (!status) {
 			/* To emulate success by wait_for_completion_timeout

@@ -14,7 +14,8 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/irqreturn.h>
-#include <soc/qcom/scm.h>
+#include <soc/qcom/qseecom_scm.h>
+#include <linux/qcom_scm.h>
 #include "msm_csid.h"
 #include "msm_sd.h"
 #include "msm_camera_io_util.h"
@@ -32,6 +33,7 @@
 #include "include/msm_csid_3_6_0_hwreg.h"
 #include "include/msm_csid_3_5_1_hwreg.h"
 #include "cam_hw_ops.h"
+#include "msm_cam_sensor_compat.h"
 
 #define V4L2_IDENT_CSID                            50002
 #define CSID_VERSION_V20                      0x02000011
@@ -70,9 +72,6 @@
 #define CSIPHY_1_LANES_MASK                  0x00f0
 #define CSIPHY_2_LANES_MASK                  0x0f00
 #define CSIPHY_3_LANES_MASK                  0xf000
-
-#define TRUE   1
-#define FALSE  0
 
 #define MAX_LANE_COUNT 4
 #define CSID_TIMEOUT msecs_to_jiffies(100)
@@ -359,7 +358,7 @@ static int msm_csid_seccam_send_topology(struct csid_device *csid_dev,
 	struct msm_camera_csid_params *csid_params)
 {
 	void __iomem *csidbase;
-	struct scm_desc desc = {0};
+	int rc = 0;
 
 	csidbase = csid_dev->base;
 	if (!csidbase || !csid_params) {
@@ -368,14 +367,11 @@ static int msm_csid_seccam_send_topology(struct csid_device *csid_dev,
 		return -EINVAL;
 	}
 
-	desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
-	desc.args[0] = csid_params->phy_sel;
-	desc.args[1] = csid_params->topology;
-
 	CDBG("phy_sel %d, topology %d\n",
 		csid_params->phy_sel, csid_params->topology);
-	if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS,
-		TOPOLOGY_SYSCALL_ID), &desc)) {
+	rc = qcom_scm_camera_send_topology(csid_params->phy_sel,
+			csid_params->topology);
+	if (rc) {
 		pr_err("%s:%d scm call to hypervisor failed\n",
 			__func__, __LINE__);
 		return -EINVAL;
@@ -387,7 +383,7 @@ static int msm_csid_seccam_reset_pipeline(struct csid_device *csid_dev,
 	struct msm_camera_csid_params *csid_params)
 {
 	void __iomem *csidbase;
-	struct scm_desc desc = {0};
+	int rc = 0;
 
 	csidbase = csid_dev->base;
 	if (!csidbase || !csid_params) {
@@ -396,14 +392,11 @@ static int msm_csid_seccam_reset_pipeline(struct csid_device *csid_dev,
 		return -EINVAL;
 	}
 
-	desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
-	desc.args[0] = csid_params->phy_sel;
-	desc.args[1] = csid_params->is_streamon;
-
 	CDBG("phy_sel %d, is_streamon %d\n",
 		csid_params->phy_sel, csid_params->is_streamon);
-	if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS,
-		STREAM_NOTIF_SYSCALL_ID), &desc)) {
+	rc = qcom_scm_camera_reset_pipeLine(csid_params->phy_sel,
+			csid_params->is_streamon);
+	if (rc) {
 		pr_err("%s:%d scm call to hypervisor failed\n",
 			__func__, __LINE__);
 		return -EINVAL;
@@ -444,19 +437,15 @@ static int msm_csid_config(struct csid_device *csid_dev,
 	}
 
 	if (csid_params->is_secure == 1) {
-		struct scm_desc desc = {0};
-
-		desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
-		desc.args[0] = csid_params->is_secure;
-		desc.args[1] = CSIPHY_LANES_MASKS[csid_params->phy_sel];
 
 		CDBG("phy_sel : %d, secure : %d\n",
 			csid_params->phy_sel, csid_params->is_secure);
 
 		msm_camera_tz_clear_tzbsp_status();
 
-		if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS,
-			SECURE_SYSCALL_ID), &desc)) {
+		rc = qcom_scm_camera_protect_phy_lanes(csid_params->is_secure,
+			CSIPHY_LANES_MASKS[csid_params->phy_sel]);
+		if (rc) {
 			pr_err("%s:%d scm call to hypervisor failed\n",
 				__func__, __LINE__);
 			return -EINVAL;
@@ -814,7 +803,7 @@ top_vreg_config_failed:
 
 static int msm_csid_release(struct csid_device *csid_dev)
 {
-	uint32_t irq;
+	uint32_t rc, irq;
 
 	if (csid_dev->csid_state != CSID_POWER_UP) {
 		pr_err("%s: csid invalid state %d\n", __func__,
@@ -826,15 +815,11 @@ static int msm_csid_release(struct csid_device *csid_dev)
 		csid_dev->hw_version);
 
 	if (csid_dev->current_csid_params.is_secure == 1) {
-		struct scm_desc desc = {0};
 
-		desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
-		desc.args[0] = 0;
-		desc.args[1] = CSIPHY_LANES_MASKS[
-				csid_dev->current_csid_params.phy_sel];
-
-		if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS,
-			SECURE_SYSCALL_ID), &desc)) {
+		rc = qcom_scm_camera_protect_phy_lanes(0,
+			CSIPHY_LANES_MASKS[
+				csid_dev->current_csid_params.phy_sel]);
+		if (rc) {
 			pr_err("%s:%d scm call to hyp with protect 0 failed\n",
 				__func__, __LINE__);
 			return -EINVAL;
@@ -1524,17 +1509,12 @@ static struct platform_driver csid_driver = {
 	},
 };
 
-static int __init msm_csid_init_module(void)
+int msm_csid_init_module(void)
 {
 	return platform_driver_register(&csid_driver);
 }
 
-static void __exit msm_csid_exit_module(void)
+void msm_csid_exit_module(void)
 {
 	platform_driver_unregister(&csid_driver);
 }
-
-module_init(msm_csid_init_module);
-module_exit(msm_csid_exit_module);
-MODULE_DESCRIPTION("MSM CSID driver");
-MODULE_LICENSE("GPL v2");
