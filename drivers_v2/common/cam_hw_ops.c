@@ -13,18 +13,28 @@
 #define pr_fmt(fmt) "CAM-AHB %s:%d " fmt, __func__, __LINE__
 #define TRUE   1
 #include <linux/module.h>
-#include <linux/msm-bus.h>
-#include <linux/msm-bus-board.h>
+#include <linux/interconnect.h>
 #include <linux/of_platform.h>
 #include <linux/pm_opp.h>
-#include <linux/regulator/rpm-smd-regulator.h>
 #include "cam_hw_ops.h"
+#include "cam_soc_bus.h"
 
 #ifdef CONFIG_CAM_AHB_DBG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
 #else
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
+
+//TODO: Remove this after solving issue with .h file
+enum rpm_regulator_voltage_corner {
+	RPM_REGULATOR_CORNER_NONE = 1,
+	RPM_REGULATOR_CORNER_RETENTION,
+	RPM_REGULATOR_CORNER_SVS_KRAIT,
+	RPM_REGULATOR_CORNER_SVS_SOC,
+	RPM_REGULATOR_CORNER_NORMAL,
+	RPM_REGULATOR_CORNER_TURBO,
+	RPM_REGULATOR_CORNER_SUPER_TURBO,
+};
 
 struct cam_ahb_client {
 	enum cam_ahb_clk_vote vote;
@@ -35,11 +45,9 @@ struct cam_bus_vector {
 };
 
 struct cam_ahb_client_data {
-	struct msm_bus_scale_pdata *pbus_data;
-	u32 ahb_client;
+	struct cam_soc_bus_client_common_data common_data;
+	void *soc_bus_client;
 	u32 ahb_clk_state;
-	struct msm_bus_vectors *paths;
-	struct msm_bus_paths *usecases;
 	struct cam_bus_vector *vectors;
 	u32 *votes;
 	u32 cnt;
@@ -66,6 +74,7 @@ int cam_ahb_clk_init(struct platform_device *pdev)
 {
 	int i = 0, cnt = 0, rc = 0, index = 0;
 	struct device_node *of_node;
+	struct of_phandle_args src_args = {0}, dst_args = {0};
 
 	if (!pdev) {
 		pr_err("invalid pdev argument\n");
@@ -111,78 +120,102 @@ int cam_ahb_clk_init(struct platform_device *pdev)
 		}
 	}
 
-	data.paths = devm_kzalloc(&pdev->dev,
-		sizeof(struct msm_bus_vectors) * cnt,
-		GFP_KERNEL);
-	if (!data.paths) {
-		rc = -ENOMEM;
-		goto err1;
-	}
-
-	data.usecases = devm_kzalloc(&pdev->dev,
-		sizeof(struct msm_bus_paths) * cnt,
-		GFP_KERNEL);
-	if (!data.usecases) {
-		rc = -ENOMEM;
-		goto err2;
-	}
-
-	data.pbus_data = devm_kzalloc(&pdev->dev,
-		sizeof(struct msm_bus_scale_pdata),
-		GFP_KERNEL);
-	if (!data.pbus_data) {
-		rc = -ENOMEM;
-		goto err3;
-	}
-
 	data.votes = devm_kzalloc(&pdev->dev, sizeof(u32) * cnt,
 		GFP_KERNEL);
 	if (!data.votes) {
 		rc = -ENOMEM;
-		goto err4;
+		goto err1;
+	}
+
+	rc = of_property_read_string(of_node, "interconnect-names",
+			&data.common_data.name);
+	if (rc) {
+		pr_err("failed to read interconnect-names rc=%d",
+				rc);
+		rc = -EINVAL;
+		goto err1;
+	}
+
+	rc = of_parse_phandle_with_args(of_node, "interconnects",
+			"#interconnect-cells", 0, &src_args);
+	if (rc) {
+		pr_err("failed to read ahb bus src info rc=%d",
+				rc);
+		rc = -EINVAL;
+		goto err1;
+	}
+
+	of_node_put(src_args.np);
+	if (src_args.args_count != 1) {
+		pr_err("Invalid number of ahb src args: %d",
+				src_args.args_count);
+		rc = -EINVAL;
+		goto err1;
+	}
+
+	data.common_data.src_id = src_args.args[0];
+
+	rc = of_parse_phandle_with_args(of_node, "interconnects",
+			"#interconnect-cells", 1, &dst_args);
+	if (rc) {
+		pr_err("failed to read ahb bus dst info rc=%d",
+			rc);
+		rc = -EINVAL;
+		goto err1;
+	}
+
+	of_node_put(dst_args.np);
+	if (dst_args.args_count != 1) {
+		pr_err("Invalid number of ahb dst args: %d",
+			dst_args.args_count);
+		rc = -EINVAL;
+		goto err1;
+	}
+
+	data.common_data.dst_id = dst_args.args[0];
+	data.common_data.num_usecases = data.cnt;
+
+	if (data.common_data.num_usecases >
+		CAM_SOC_BUS_MAX_NUM_USECASES) {
+		pr_err("Invalid number of usecases: %d",
+			data.common_data.num_usecases);
+		rc = -EINVAL;
+		goto err1;
 	}
 
 	rc = of_property_read_u32_array(of_node, "qcom,bus-votes",
 		data.votes, cnt);
 
 	for (i = 0; i < data.cnt; i++) {
-		data.paths[i] = (struct msm_bus_vectors) {
-			MSM_BUS_MASTER_AMPSS_M0,
-			MSM_BUS_SLAVE_CAMERA_CFG,
-			0,
-			data.votes[i]
-		};
-		data.usecases[i] = (struct msm_bus_paths) {
-			.num_paths = 1,
-			.vectors   = &data.paths[i],
-		};
+		data.common_data.bw_pair[i].ab = 0;
+		data.common_data.bw_pair[i].ib = data.votes[i];
 		CDBG("dbg: votes[%d] = %u\n", i, data.votes[i]);
 	}
 
-	*data.pbus_data = (struct msm_bus_scale_pdata) {
-		.name = "msm_camera_ahb",
-		.num_usecases = data.cnt,
-		.usecase = data.usecases,
-	};
-
-	data.ahb_client =
-		msm_bus_scale_register_client(data.pbus_data);
-	if (!data.ahb_client) {
+	rc = cam_soc_bus_client_register(pdev,
+		&data.soc_bus_client, &data.common_data);
+	if (rc) {
 		pr_err("ahb vote registering failed\n");
 		rc = -EINVAL;
-		goto err5;
+		goto err2;
 	}
 
 	index = get_vector_index("suspend");
 	if (index < 0) {
 		pr_err("svs vector not supported\n");
 		rc = -EINVAL;
-		goto err6;
+		goto err3;
 	}
 
 	/* request for svs in init */
-	msm_bus_scale_client_update_request(data.ahb_client,
-		index);
+	rc = cam_soc_bus_client_update_request(data.soc_bus_client,
+			index);
+	if (rc) {
+		pr_err("ahb vote-update request failed\n");
+		rc = -EINVAL;
+		goto err3;
+	}
+
 	data.ahb_clk_state = CAM_AHB_SUSPEND_VOTE;
 	data.probe_done = TRUE;
 	mutex_init(&data.lock);
@@ -192,20 +225,11 @@ int cam_ahb_clk_init(struct platform_device *pdev)
 		data.ahb_clk_state, data.probe_done);
 	return rc;
 
-err6:
-	msm_bus_scale_unregister_client(data.ahb_client);
-err5:
+err3:
+	cam_soc_bus_client_unregister(&data.soc_bus_client);
+err2:
 	devm_kfree(&pdev->dev, data.votes);
 	data.votes = NULL;
-err4:
-	devm_kfree(&pdev->dev, data.pbus_data);
-	data.pbus_data = NULL;
-err3:
-	devm_kfree(&pdev->dev, data.usecases);
-	data.usecases = NULL;
-err2:
-	devm_kfree(&pdev->dev, data.paths);
-	data.paths = NULL;
 err1:
 	devm_kfree(&pdev->dev, data.vectors);
 	data.vectors = NULL;
@@ -236,8 +260,9 @@ static int cam_consolidate_ahb_vote(enum cam_ahb_clk_client id,
 
 	CDBG("dbg: max vote : %u\n", max);
 	if (max != data.ahb_clk_state) {
-		msm_bus_scale_client_update_request(data.ahb_client,
-			max);
+		cam_soc_bus_client_update_request(
+				data.soc_bus_client,
+				max);
 		data.ahb_clk_state = max;
 		CDBG("dbg: state : %u, vector : %d\n",
 			data.ahb_clk_state, max);

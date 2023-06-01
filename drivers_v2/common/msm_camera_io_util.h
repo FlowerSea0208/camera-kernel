@@ -57,8 +57,9 @@ int msm_camera_enable_vreg(struct device *dev, struct camera_vreg_t *cam_vreg,
 		int num_vreg, enum msm_camera_vreg_name_t *vreg_seq,
 		int num_vreg_seq, struct regulator **reg_ptr, int enable);
 
-void msm_camera_bus_scale_cfg(uint32_t bus_perf_client,
-		enum msm_bus_perf_setting perf_setting);
+//TODO: Unused function
+//void msm_camera_bus_scale_cfg(uint32_t bus_perf_client,
+//		enum msm_bus_perf_setting perf_setting);
 
 int msm_camera_set_gpio_table(struct msm_gpio_set_tbl *gpio_tbl,
 	uint8_t gpio_tbl_size, int gpio_en);

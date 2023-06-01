@@ -20,10 +20,9 @@
 #include <linux/spinlock.h>
 #include <linux/iommu.h>
 #include <linux/msm_ion.h>
-#include <linux/msm-bus.h>
-#include <linux/msm-bus-board.h>
 #include <media/videobuf2-core.h>
 
+#include "cam_soc_bus.h"
 #include "msm_camera_io_util.h"
 #include "cam_smmu_api.h"
 #include "msm_jpeg_dma_dev.h"
@@ -882,10 +881,8 @@ static int msm_jpegdma_hw_set_speed(struct msm_jpegdma_device *dma,
 	}
 	dma->active_clock_rate = speed->core_clock;
 
-	dma->bus_vectors.ab = new_sp.bus_ab;
-	dma->bus_vectors.ib = new_sp.bus_ib;
-
-	ret = msm_bus_scale_client_update_request(dma->bus_client, 0);
+	ret = msm_camera_update_bus_bw(dma->bus_client,
+			new_sp.bus_ab, new_sp.bus_ib);
 	if (ret < 0) {
 		dev_err(dma->dev, "Fail bus scale update %d\n", ret);
 		return -EINVAL;

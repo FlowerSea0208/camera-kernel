@@ -17,7 +17,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <soc/qcom/camera2.h>
-#include <linux/msm-bus.h>
+#include "cam_soc_bus.h"
 #include "msm_camera_io_util.h"
 
 #define BUFF_SIZE_128 128
@@ -589,42 +589,6 @@ disable_vreg:
 				(cam_vreg[j].delay * 1000) + 1000);
 	}
 	return rc;
-}
-
-void msm_camera_bus_scale_cfg(uint32_t bus_perf_client,
-		enum msm_bus_perf_setting perf_setting)
-{
-	int rc = 0;
-
-	if (!bus_perf_client) {
-		pr_err("%s: Bus Client NOT Registered!!!\n", __func__);
-		return;
-	}
-	switch (perf_setting) {
-	case S_EXIT:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 1);
-		msm_bus_scale_unregister_client(bus_perf_client);
-		break;
-	case S_PREVIEW:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 1);
-		break;
-	case S_VIDEO:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 2);
-		break;
-	case S_CAPTURE:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 3);
-		break;
-	case S_ZSL:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 4);
-		break;
-	case S_LIVESHOT:
-		rc = msm_bus_scale_client_update_request(bus_perf_client, 5);
-		break;
-	case S_DEFAULT:
-		break;
-	default:
-		pr_err("%s: INVALID CASE\n", __func__);
-	}
 }
 
 int msm_camera_set_gpio_table(struct msm_gpio_set_tbl *gpio_tbl,

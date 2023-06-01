@@ -23,13 +23,16 @@
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
-#include <linux/msm-bus.h>
 #include <linux/clk.h>
+#include <linux/clk/qcom.h>
 #include "cam_soc_api.h"
+#include "cam_soc_bus.h"
+
+#define KBTOB(a) (a * 1000ULL)
 
 struct msm_cam_bus_pscale_data {
-	struct msm_bus_scale_pdata *pdata;
-	uint32_t bus_client;
+	struct cam_soc_bus_client_common_data common_data;
+	void *soc_bus_client;
 	uint32_t num_usecases;
 	uint32_t num_paths;
 	unsigned int vector_index;
@@ -464,7 +467,7 @@ int msm_camera_set_clk_flags(struct clk *clk, unsigned long flags)
 
 	CDBG("clk : %pK, flags : %ld\n", clk, flags);
 
-	return clk_set_flags(clk, flags);
+	return qcom_clk_set_flags(clk, flags);
 }
 EXPORT_SYMBOL(msm_camera_set_clk_flags);
 
@@ -974,10 +977,10 @@ EXPORT_SYMBOL(msm_camera_put_reg_base);
 uint32_t msm_camera_register_bus_client(struct platform_device *pdev,
 	enum cam_bus_client id)
 {
-	int rc = 0;
-	uint32_t bus_client, num_usecases, num_paths;
-	struct msm_bus_scale_pdata *pdata;
+	int rc = 0, i, len;
+	uint32_t num_usecases, num_paths;
 	struct device_node *of_node;
+	const uint32_t *vec_arr = NULL;
 
 	CDBG("Register client ID: %d\n", id);
 
@@ -988,7 +991,7 @@ uint32_t msm_camera_register_bus_client(struct platform_device *pdev,
 
 	of_node = pdev->dev.of_node;
 
-	if (!g_cv[id].pdata) {
+	if (!g_cv[id].soc_bus_client) {
 		rc = of_property_read_u32(of_node, "qcom,msm-bus,num-cases",
 				&num_usecases);
 		if (rc) {
@@ -1015,14 +1018,49 @@ uint32_t msm_camera_register_bus_client(struct platform_device *pdev,
 			}
 			g_cv[id].dyn_vote = true;
 		}
-
-		pdata = msm_bus_cl_get_pdata(pdev);
-		if (!pdata) {
-			pr_err("failed get_pdata client_id :%d\n", id);
+		rc = of_property_read_string(of_node, "qcom,msm-bus,name",
+			&g_cv[id].common_data.name);
+		if (rc) {
+			pr_err("Error: Client name not found\n");
 			return -EINVAL;
 		}
-		bus_client = msm_bus_scale_register_client(pdata);
-		if (!bus_client) {
+
+		vec_arr = of_get_property(of_node,
+			"qcom,msm-bus,vectors-KBps",
+			&len);
+		if (vec_arr == NULL) {
+			pr_err("Error: Vector array not found\n");
+			return -EINVAL;
+		}
+
+		if (len != num_usecases * num_paths *
+			sizeof(uint32_t) * 4) {
+			pr_err("Error: Len-error on vectors\n");
+			return -EINVAL;
+		}
+
+		for (i = 0; i < num_usecases; i++) {
+			int index = i * 4;
+			// src & dst are same for all usecases
+			g_cv[id].common_data.src_id =
+				be32_to_cpu(vec_arr[index]);
+			g_cv[id].common_data.dst_id =
+				be32_to_cpu(vec_arr[index + 1]);
+			g_cv[id].common_data.bw_pair[i].ab = (uint64_t)
+				KBTOB(be32_to_cpu(vec_arr[index + 2]));
+			g_cv[id].common_data.bw_pair[i].ib = (uint64_t)
+				KBTOB(be32_to_cpu(vec_arr[index + 3]));
+		}
+		g_cv[id].common_data.num_usecases = num_usecases;
+		if (g_cv[id].common_data.num_usecases >
+			CAM_SOC_BUS_MAX_NUM_USECASES) {
+			pr_err("Invalid number of usecases: %d",
+				g_cv[id].common_data.num_usecases);
+			return -EINVAL;
+		}
+		rc = cam_soc_bus_client_register(pdev,
+			&g_cv[id].soc_bus_client, &g_cv[id].common_data);
+		if (rc) {
 			pr_err("Unable to register bus client :%d\n", id);
 			return -EINVAL;
 		}
@@ -1031,8 +1069,6 @@ uint32_t msm_camera_register_bus_client(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-	g_cv[id].pdata = pdata;
-	g_cv[id].bus_client = bus_client;
 	g_cv[id].vector_index = 0;
 	g_cv[id].num_usecases = num_usecases;
 	g_cv[id].num_paths = num_paths;
@@ -1045,10 +1081,6 @@ EXPORT_SYMBOL(msm_camera_register_bus_client);
 /* Update the bus bandwidth */
 uint32_t msm_camera_update_bus_bw(int id, uint64_t ab, uint64_t ib)
 {
-	struct msm_bus_paths *path;
-	struct msm_bus_scale_pdata *pdata;
-	int idx = 0;
-
 	if (id >= CAM_BUS_CLIENT_MAX) {
 		pr_err("Invalid params");
 		return -EINVAL;
@@ -1060,22 +1092,10 @@ uint32_t msm_camera_update_bus_bw(int id, uint64_t ab, uint64_t ib)
 		return -EINVAL;
 	}
 
-	mutex_lock(&g_cv[id].lock);
-	idx = g_cv[id].vector_index;
-	idx = 1 - idx;
-	g_cv[id].vector_index = idx;
-	mutex_unlock(&g_cv[id].lock);
-
-	pdata = g_cv[id].pdata;
-	path = &(pdata->usecase[idx]);
-	path->vectors[0].ab = ab;
-	path->vectors[0].ib = ib;
-
-	CDBG("Register client ID : %d [ab : %llx, ib : %llx], update :%d\n",
-		id, ab, ib, idx);
-	msm_bus_scale_client_update_request(g_cv[id].bus_client, idx);
-
-	return 0;
+	CDBG("Register client ID : %d [ab : %llx, ib : %llx]\n",
+		id, ab, ib);
+	return cam_soc_bus_client_update_bw(g_cv[id].soc_bus_client,
+		ab, ib);
 }
 EXPORT_SYMBOL(msm_camera_update_bus_bw);
 
@@ -1094,10 +1114,8 @@ uint32_t msm_camera_update_bus_vector(enum cam_bus_client id,
 	}
 
 	CDBG("Register client ID : %d vector idx: %d,\n", id, vector_index);
-	msm_bus_scale_client_update_request(g_cv[id].bus_client,
+	return cam_soc_bus_client_update_request(g_cv[id].soc_bus_client,
 		vector_index);
-
-	return 0;
 }
 EXPORT_SYMBOL(msm_camera_update_bus_vector);
 
@@ -1112,8 +1130,7 @@ uint32_t msm_camera_unregister_bus_client(enum cam_bus_client id)
 	CDBG("UnRegister client ID: %d\n", id);
 
 	mutex_destroy(&g_cv[id].lock);
-	msm_bus_scale_unregister_client(g_cv[id].bus_client);
-	g_cv[id].bus_client = 0;
+	cam_soc_bus_client_unregister(&g_cv[id].soc_bus_client);
 	g_cv[id].num_usecases = 0;
 	g_cv[id].num_paths = 0;
 	g_cv[id].vector_index = 0;

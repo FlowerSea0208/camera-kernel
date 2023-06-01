@@ -54,6 +54,9 @@
 
 #define VFE47_VBIF_CLK_OFFSET    0x4
 
+#define	MSM_BUS_MASTER_VFE 29
+#define	MSM_BUS_SLAVE_EBI_CH0 512
+
 static uint32_t stats_base_addr[] = {
 	0x1D4, /* HDR_BE */
 	0x254, /* BG(AWB_BG) */
@@ -97,58 +100,8 @@ static uint8_t stats_irq_map_comp_mask[] = {
 
 #define VFE47_SRC_CLK_DTSI_IDX 5
 
-static struct msm_bus_vectors msm_isp_init_vectors[] = {
-	{
-		.src = MSM_BUS_MASTER_VFE,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = 0,
-		.ib  = 0,
-	},
-};
 
-/* During open node request min ab/ib bus bandwidth which
- * is needed to successfully enable bus clocks
- */
-static struct msm_bus_vectors msm_isp_ping_vectors[] = {
-	{
-		.src = MSM_BUS_MASTER_VFE,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = MSM_ISP_MIN_AB,
-		.ib  = MSM_ISP_MIN_IB,
-	},
-};
-
-static struct msm_bus_vectors msm_isp_pong_vectors[] = {
-	{
-		.src = MSM_BUS_MASTER_VFE,
-		.dst = MSM_BUS_SLAVE_EBI_CH0,
-		.ab  = 0,
-		.ib  = 0,
-	},
-};
-
-static struct msm_bus_paths msm_isp_bus_client_config[] = {
-	{
-		ARRAY_SIZE(msm_isp_init_vectors),
-		msm_isp_init_vectors,
-	},
-	{
-		ARRAY_SIZE(msm_isp_ping_vectors),
-		msm_isp_ping_vectors,
-	},
-	{
-		ARRAY_SIZE(msm_isp_pong_vectors),
-		msm_isp_pong_vectors,
-	},
-};
-
-static struct msm_bus_scale_pdata msm_isp_bus_client_pdata = {
-	msm_isp_bus_client_config,
-	NULL,
-	ARRAY_SIZE(msm_isp_bus_client_config),
-	.name = "msm_camera_isp",
-	0
-};
+static struct cam_soc_bus_client_common_data isp_bus_data;
 
 uint32_t msm_vfe47_ub_reg_offset(struct vfe_device *vfe_dev, int wm_idx)
 {
@@ -2572,10 +2525,10 @@ uint32_t msm_vfe47_stats_get_frame_id(
 void msm_vfe47_deinit_bandwidth_mgr(
 		struct msm_isp_bandwidth_mgr *isp_bandwidth_mgr)
 {
-	msm_bus_scale_client_update_request(
-	   isp_bandwidth_mgr->bus_client, 0);
-	msm_bus_scale_unregister_client(isp_bandwidth_mgr->bus_client);
-	isp_bandwidth_mgr->bus_client = 0;
+	cam_soc_bus_client_update_request(
+		isp_bandwidth_mgr->bus_client, 0);
+	cam_soc_bus_client_unregister(&isp_bandwidth_mgr->bus_client);
+	isp_bandwidth_mgr->bus_client = NULL;
 }
 
 int msm_vfe47_init_bandwidth_mgr(struct vfe_device *vfe_dev,
@@ -2583,14 +2536,32 @@ int msm_vfe47_init_bandwidth_mgr(struct vfe_device *vfe_dev,
 {
 	int rc = 0;
 
-	isp_bandwidth_mgr->bus_client =
-		msm_bus_scale_register_client(&msm_isp_bus_client_pdata);
+	isp_bus_data.name = "msm_camera_isp";
+	isp_bus_data.src_id = MSM_BUS_MASTER_VFE;
+	isp_bus_data.dst_id = MSM_BUS_SLAVE_EBI_CH0;
+	isp_bus_data.num_usecases = 3;
+	// ISP init
+	isp_bus_data.bw_pair[0].ab = 0;
+	isp_bus_data.bw_pair[0].ib = 0;
+
+	/* During open node request min ab/ib bus bandwidth which
+	 * is needed to successfully enable bus clocks
+	 */
+	// ISP Ping
+	isp_bus_data.bw_pair[1].ab = MSM_ISP_MIN_AB;
+	isp_bus_data.bw_pair[1].ib = MSM_ISP_MIN_IB;
+	// ISP Pong
+	isp_bus_data.bw_pair[2].ab = 0;
+	isp_bus_data.bw_pair[2].ib = 0;
+
+	rc = cam_soc_bus_client_register(vfe_dev->pdev,
+		&isp_bandwidth_mgr->bus_client, &isp_bus_data);
 	if (!isp_bandwidth_mgr->bus_client) {
 		pr_err("%s: client register failed\n", __func__);
 		return -EINVAL;
 	}
 	isp_bandwidth_mgr->bus_vector_active_idx = 1;
-	rc = msm_bus_scale_client_update_request(
+	rc = cam_soc_bus_client_update_request(
 		isp_bandwidth_mgr->bus_client,
 		isp_bandwidth_mgr->bus_vector_active_idx);
 	if (rc)
@@ -2601,28 +2572,27 @@ int msm_vfe47_init_bandwidth_mgr(struct vfe_device *vfe_dev,
 int msm_vfe47_update_bandwidth(
 		struct msm_isp_bandwidth_mgr *isp_bandwidth_mgr)
 {
-	int i;
+	int i, idx;
 	uint64_t ab = 0;
 	uint64_t ib = 0;
-	struct msm_bus_paths *path = NULL;
 
 	ALT_VECTOR_IDX(isp_bandwidth_mgr->bus_vector_active_idx);
-	path = &(msm_isp_bus_client_pdata.usecase[
-			isp_bandwidth_mgr->bus_vector_active_idx]);
-	path->vectors[0].ab = 0;
-	path->vectors[0].ib = 0;
+	idx = isp_bandwidth_mgr->bus_vector_active_idx;
+
+	isp_bus_data.bw_pair[idx].ab = 0;
+	isp_bus_data.bw_pair[idx].ib = 0;
+
 	for (i = 0; i < MAX_ISP_CLIENT; i++) {
 		if (isp_bandwidth_mgr->client_info[i].active) {
-			path->vectors[0].ab +=
+			isp_bus_data.bw_pair[idx].ab +=
 				isp_bandwidth_mgr->client_info[i].ab;
-			path->vectors[0].ib +=
+			isp_bus_data.bw_pair[idx].ib +=
 				isp_bandwidth_mgr->client_info[i].ib;
 			ab += isp_bandwidth_mgr->client_info[i].ab;
 			ib += isp_bandwidth_mgr->client_info[i].ib;
 		}
 	}
-	msm_bus_scale_client_update_request(isp_bandwidth_mgr->bus_client,
-		isp_bandwidth_mgr->bus_vector_active_idx);
+	cam_soc_bus_client_update_request(isp_bandwidth_mgr->bus_client, idx);
 	/* Insert into circular buffer */
 	msm_isp_update_req_history(isp_bandwidth_mgr->bus_client,
 		ab, ib,
@@ -3191,17 +3161,12 @@ static struct platform_driver vfe47_driver = {
 	},
 };
 
-static int __init msm_vfe47_init_module(void)
+int msm_vfe47_init_module(void)
 {
 	return platform_driver_register(&vfe47_driver);
 }
 
-static void __exit msm_vfe47_exit_module(void)
+void msm_vfe47_exit_module(void)
 {
 	platform_driver_unregister(&vfe47_driver);
 }
-
-module_init(msm_vfe47_init_module);
-module_exit(msm_vfe47_exit_module);
-MODULE_DESCRIPTION("MSM VFE47 driver");
-MODULE_LICENSE("GPL v2");

@@ -17,7 +17,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-ctrls.h>
-#include <linux/msm-bus.h>
+#include "cam_soc_bus.h"
 #include "cam_soc_api.h"
 
 /* Max number of clocks defined in device tree */
@@ -316,9 +316,6 @@ enum msm_jpegdma_mem_resources {
  * @qos_regs_num: Number of qos regs .
  * @qos_regs: Array of qos regs need to be set.
  * @bus_client: Memory access bus client.
- * @bus_vectors: Bus vector
- * @bus_paths: Bus path.
- * @bus_scale_data: Memory access bus scale data.
  * @iommu_hndl: Dma device iommu handle.
  * @iommu_attached_cnt: Iommu attached devices reference count.
  * @iommu_dev: Pointer to Ion iommu device.
@@ -354,9 +351,6 @@ struct msm_jpegdma_device {
 	struct jpegdma_reg_cfg *prefetch_regs;
 
 	enum cam_bus_client bus_client;
-	struct msm_bus_vectors bus_vectors;
-	struct msm_bus_paths bus_paths;
-	struct msm_bus_scale_pdata bus_scale_data;
 
 	int iommu_hndl;
 	unsigned int iommu_attached_cnt;
@@ -372,8 +366,11 @@ struct msm_jpegdma_device {
 	struct completion hw_halt_completion;
 	u64 active_clock_rate;
 	struct platform_device *pdev;
+	struct vb2_buffer *vb;
 };
 
 void msm_jpegdma_isr_processing_done(struct msm_jpegdma_device *dma);
+int msm_jpegdma_init_module(void);
+void msm_jpegdma_exit_module(void);
 
 #endif /* __MSM_JPEG_DMA_DEV_H__ */
