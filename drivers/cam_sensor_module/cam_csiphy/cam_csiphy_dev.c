@@ -199,6 +199,7 @@ static int32_t cam_csiphy_platform_probe(struct platform_device *pdev)
 	new_csiphy_dev->ops.apply_req = NULL;
 
 	new_csiphy_dev->acquire_count = 0;
+	new_csiphy_dev->share_count = 0;
 	new_csiphy_dev->start_dev_count = 0;
 
 	cpas_parms.cam_cpas_client_cb = NULL;
