@@ -585,7 +585,7 @@ static int camera_v4l2_fh_release(struct file *filep)
 		v4l2_fh_del(&sp->fh);
 		v4l2_fh_exit(&sp->fh);
 		mutex_destroy(&sp->lock);
-		kzfree(sp);
+		kfree_sensitive(sp);
 	}
 
 	return 0;
@@ -607,7 +607,7 @@ static int camera_v4l2_vb2_q_init(struct file *filep)
 	}
 	q->lock = kzalloc(sizeof(struct mutex), GFP_KERNEL);
 	if (!q->lock) {
-		kzfree(q->drv_priv);
+		kfree_sensitive(q->drv_priv);
 		return -ENOMEM;
 	}
 	mutex_init(q->lock);
@@ -627,11 +627,11 @@ static void camera_v4l2_vb2_q_release(struct file *filep)
 {
 	struct camera_v4l2_private *sp = filep->private_data;
 
-	kzfree(sp->vb2_q.drv_priv);
+	kfree_sensitive(sp->vb2_q.drv_priv);
 	mutex_lock(&sp->lock);
 	vb2_queue_release(&sp->vb2_q);
 	mutex_destroy(sp->vb2_q.lock);
-	kzfree(sp->vb2_q.lock);
+	kfree_sensitive(sp->vb2_q.lock);
 	mutex_unlock(&sp->lock);
 }
 
@@ -946,10 +946,10 @@ int camera_init_v4l2(struct device *dev, unsigned int *session)
 	pvdev->vdev->fops     = &camera_v4l2_fops;
 	pvdev->vdev->ioctl_ops = &camera_v4l2_ioctl_ops;
 	pvdev->vdev->minor     = -1;
-	pvdev->vdev->vfl_type  = VFL_TYPE_GRABBER;
+	pvdev->vdev->vfl_type  = VFL_TYPE_VIDEO;
 	pvdev->vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	rc = video_register_device(pvdev->vdev,
-		VFL_TYPE_GRABBER, -1);
+		VFL_TYPE_VIDEO, -1);
 	if (WARN_ON(rc < 0))
 		goto video_register_fail;
 #if defined(CONFIG_MEDIA_CONTROLLER)
@@ -972,7 +972,7 @@ register_fail:
 entity_fail:
 	media_device_unregister(v4l2_dev->mdev);
 media_fail:
-	kzfree(v4l2_dev->mdev);
+	kfree_sensitive(v4l2_dev->mdev);
 mdev_fail:
 #endif
 	kfree(v4l2_dev);

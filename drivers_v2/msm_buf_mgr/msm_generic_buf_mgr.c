@@ -225,7 +225,7 @@ static int32_t msm_generic_buf_mngr_flush(
 	unsigned long flags;
 	struct msm_get_bufs *bufs, *save;
 	int32_t ret = -EINVAL;
-	struct timeval ts;
+	struct timespec64 ts;
 
 	spin_lock_irqsave(&buf_mngr_dev->buf_q_spinlock, flags);
 	/*

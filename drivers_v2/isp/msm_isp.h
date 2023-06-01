@@ -126,11 +126,11 @@ enum msm_isp_camif_update_state {
 
 struct msm_isp_timestamp {
 	/*Monotonic clock for v4l2 buffer*/
-	struct timeval buf_time;
+	struct timespec64 buf_time;
 	/*Monotonic clock for VT */
-	struct timeval vt_time;
+	struct timespec64 vt_time;
 	/*Wall clock for userspace event*/
-	struct timeval event_time;
+	struct timespec64 event_time;
 	/* event time in nanosec*/
 	uint64_t buf_time_ns;
 };
@@ -513,7 +513,7 @@ struct msm_vfe_src_info {
 	uint32_t input_format;/*V4L2 pix format with bayer pattern*/
 	uint32_t last_updt_frm_id;
 	uint32_t sof_counter_step;
-	struct timeval time_stamp;
+	struct timespec64 time_stamp;
 	enum msm_vfe_dual_hw_type dual_hw_type;
 	struct msm_vfe_dual_hw_ms_info dual_hw_ms_info;
 	bool accept_frame;

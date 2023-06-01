@@ -322,7 +322,7 @@ static void msm_fd_put_userptr(void *buf_priv)
 
 	msm_fd_hw_unmap_buffer(buf_priv);
 
-	kzfree(buf_priv);
+	kfree_sensitive(buf_priv);
 }
 
 /* Videobuf2 memory callbacks. */
@@ -1403,10 +1403,10 @@ static int fd_probe(struct platform_device *pdev)
 	fd->video.release  = video_device_release;
 	fd->video.v4l2_dev = &fd->v4l2_dev;
 	fd->video.vfl_dir = VFL_DIR_TX;
-	fd->video.vfl_type = VFL_TYPE_GRABBER;
+	fd->video.vfl_type = VFL_TYPE_VIDEO;
 	strlcpy(fd->video.name, MSM_FD_DRV_NAME, sizeof(fd->video.name));
 
-	ret = video_register_device(&fd->video, VFL_TYPE_GRABBER, -1);
+	ret = video_register_device(&fd->video, VFL_TYPE_VIDEO, -1);
 	if (ret < 0) {
 		v4l2_err(&fd->v4l2_dev, "Failed to register video device\n");
 		goto error_video_register;

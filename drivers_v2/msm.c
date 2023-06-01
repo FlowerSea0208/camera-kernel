@@ -26,6 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/debugfs.h>
 #include <media/v4l2-fh.h>
+#include <media/v4l2-subdev.h>
 #include "msm.h"
 #include "msm_vb2.h"
 #include "msm_sd.h"
@@ -37,8 +38,10 @@ static struct list_head    ordered_sd_list;
 static struct mutex        ordered_sd_mtx;
 static struct mutex        v4l2_event_mtx;
 
+#if 0
 static atomic_t qos_add_request_done = ATOMIC_INIT(0);
 static struct pm_qos_request msm_v4l2_pm_qos_request;
+#endif
 
 static struct msm_queue_head *msm_session_q;
 
@@ -89,7 +92,7 @@ static uint32_t gpu_limit;
 			if (node->sd == q_node) {	\
 				__q->len--;				\
 				list_del_init(&node->member);		\
-				kzfree(node);				\
+				kfree_sensitive(node);				\
 				break;					\
 			}						\
 	}							\
@@ -106,7 +109,7 @@ static uint32_t gpu_limit;
 			if (node == q_node) {				\
 				__q->len--;				\
 				list_del_init(&node->member);		\
-				kzfree(node);				\
+				kfree_sensitive(node);				\
 				break;					\
 			}						\
 	}							\
@@ -125,7 +128,7 @@ static uint32_t gpu_limit;
 		if (node) {					\
 			if (&node->member) \
 				list_del_init(&node->member);		\
-			kzfree(node);	\
+			kfree_sensitive(node);	\
 		}	\
 	}	\
 	spin_unlock_irqrestore(&__q->lock, flags);		\
@@ -190,11 +193,6 @@ static void msm_enqueue(struct msm_queue_head *qhead,
 	spin_unlock_irqrestore(&qhead->lock, flags);
 }
 
-void msm_cam_copy_v4l2_subdev_fops(struct v4l2_file_operations *d1)
-{
-	*d1 = v4l2_subdev_fops;
-}
-EXPORT_SYMBOL(msm_cam_copy_v4l2_subdev_fops);
 
 static const struct v4l2_file_operations *msm_cam_get_v4l2_subdev_fops_ptr(
 	void)
@@ -227,23 +225,29 @@ static inline int __msm_queue_find_command_ack_q(void *d1, void *d2)
 static inline void msm_pm_qos_add_request(void)
 {
 	pr_info("%s: add request", __func__);
+#if 0
 	if (atomic_cmpxchg(&qos_add_request_done, 0, 1))
 		return;
 	pm_qos_add_request(&msm_v4l2_pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
 	PM_QOS_DEFAULT_VALUE);
+#endif
 }
 
 static void msm_pm_qos_remove_request(void)
 {
 	pr_info("%s: remove request", __func__);
+#if 0
 	pm_qos_remove_request(&msm_v4l2_pm_qos_request);
+#endif
 }
 
 void msm_pm_qos_update_request(int val)
 {
 	pr_info("%s: update request %d", __func__, val);
+#if 0
 	msm_pm_qos_add_request();
 	pm_qos_update_request(&msm_v4l2_pm_qos_request, val);
+#endif
 }
 
 struct msm_session *msm_session_find(unsigned int session_id)
@@ -342,7 +346,7 @@ static void msm_sd_unregister_subdev(struct video_device *vdev)
 	struct v4l2_subdev *sd = video_get_drvdata(vdev);
 
 	sd->devnode = NULL;
-	kzfree(vdev);
+	kfree_sensitive(vdev);
 }
 
 static inline int __msm_sd_register_subdev(struct v4l2_subdev *sd)
@@ -380,7 +384,7 @@ static inline int __msm_sd_register_subdev(struct v4l2_subdev *sd)
 	rc = __video_register_device(vdev, VFL_TYPE_SUBDEV, -1, 1,
 		  sd->owner);
 	if (rc < 0) {
-		kzfree(vdev);
+		kfree_sensitive(vdev);
 		goto clean_up;
 	}
 
@@ -493,12 +497,14 @@ int msm_create_session(unsigned int session_id, struct video_device *vdev)
 	mutex_init(&session->close_lock);
 	rwlock_init(&session->stream_rwlock);
 
+#if 0
 	if (gpu_limit) {
 		session->sysfs_pwr_limit = kgsl_pwr_limits_add(KGSL_DEVICE_3D0);
 		if (session->sysfs_pwr_limit)
 			kgsl_pwr_limits_set_freq(session->sysfs_pwr_limit,
 				gpu_limit);
 	}
+#endif
 
 	return 0;
 }
@@ -567,7 +573,7 @@ void msm_delete_command_ack_q(unsigned int session_id, unsigned int stream_id)
 
 	spin_lock_irqsave(&(session->command_ack_q.lock), flags);
 	list_del_init(&cmd_ack->list);
-	kzfree(cmd_ack);
+	kfree_sensitive(cmd_ack);
 	session->command_ack_q.len--;
 	spin_unlock_irqrestore(&(session->command_ack_q.lock), flags);
 	mutex_unlock(&session->lock);
@@ -665,11 +671,12 @@ int msm_destroy_session(unsigned int session_id)
 	if (!session)
 		return -EINVAL;
 
+#if 0
 	if (gpu_limit && session->sysfs_pwr_limit) {
 		kgsl_pwr_limits_set_default(session->sysfs_pwr_limit);
 		kgsl_pwr_limits_del(session->sysfs_pwr_limit);
 	}
-
+#endif
 	msm_destroy_session_streams(session);
 	msm_remove_session_cmd_ack_q(session);
 	mutex_destroy(&session->lock);
@@ -1025,7 +1032,7 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 
 	*event = cmd->event;
 
-	kzfree(cmd);
+	kfree_sensitive(cmd);
 	mutex_unlock(&session->lock);
 	return rc;
 }
@@ -1386,9 +1393,9 @@ static int msm_probe(struct platform_device *pdev)
 	pvdev->vdev->fops     = &msm_fops;
 	pvdev->vdev->ioctl_ops = &g_msm_ioctl_ops;
 	pvdev->vdev->minor     = -1;
-	pvdev->vdev->vfl_type  = VFL_TYPE_GRABBER;
+	pvdev->vdev->vfl_type  = VFL_TYPE_VIDEO;
 	rc = video_register_device(pvdev->vdev,
-		VFL_TYPE_GRABBER, -1);
+		VFL_TYPE_VIDEO, -1);
 	if (WARN_ON(rc < 0))
 		goto v4l2_fail;
 
@@ -1443,14 +1450,14 @@ register_fail:
 entity_fail:
 	media_device_unregister(msm_v4l2_dev->mdev);
 media_fail:
-	kzfree(msm_v4l2_dev->mdev);
+	kfree_sensitive(msm_v4l2_dev->mdev);
 mdev_fail:
 #endif
 	video_device_release(pvdev->vdev);
 video_fail:
 	kfree(pvdev);
 pvdev_fail:
-	kzfree(msm_v4l2_dev);
+	kfree_sensitive(msm_v4l2_dev);
 probe_end:
 	return rc;
 }

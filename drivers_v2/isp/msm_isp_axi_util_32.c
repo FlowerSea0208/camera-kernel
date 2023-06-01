@@ -1039,7 +1039,7 @@ static void msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 {
 	int rc;
 	struct msm_isp32_event_data buf_event;
-	struct timeval *time_stamp;
+	struct timespec64 *time_stamp;
 	uint32_t stream_idx = HANDLE_TO_IDX(stream_info->stream_handle);
 	uint32_t frame_id;
 	uint32_t buf_src;

@@ -34,7 +34,7 @@ static void __msm_isp_axi_stream_update(
 
 static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info, struct msm_isp_buffer *buf,
-	struct timeval *time_stamp, uint32_t frame_id);
+	struct timespec64 *time_stamp, uint32_t frame_id);
 static void msm_isp_free_pending_buffer(
 	struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info,
@@ -1640,7 +1640,7 @@ static void msm_isp_free_pending_buffer(
 			struct msm_vfe_axi_stream *stream_info,
 			struct msm_isp_timestamp *ts)
 {
-	struct timeval *time_stamp;
+	struct timespec64 *time_stamp;
 	struct msm_isp_buffer *done_buf = NULL;
 	uint32_t frame_id;
 	int rc;
@@ -2184,7 +2184,7 @@ static int msm_isp_cfg_ping_pong_address(
 
 static void msm_isp_handle_done_buf_frame_id_mismatch(
 	struct vfe_device *vfe_dev, struct msm_vfe_axi_stream *stream_info,
-	struct msm_isp_buffer *buf, struct timeval *time_stamp,
+	struct msm_isp_buffer *buf, struct timespec64 *time_stamp,
 	uint32_t frame_id)
 {
 	struct msm_isp_event_data error_event;
@@ -2216,7 +2216,7 @@ static void msm_isp_handle_done_buf_frame_id_mismatch(
 
 static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info, struct msm_isp_buffer *buf,
-	struct timeval *time_stamp, uint32_t frame_id)
+	struct timespec64 *time_stamp, uint32_t frame_id)
 {
 	int rc;
 	unsigned long flags;
@@ -2832,7 +2832,7 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 	int vfe_idx;
 	uint32_t pingpong_bit = 0;
 	uint32_t frame_id = 0;
-	struct timeval *time_stamp;
+	struct timespec64 *time_stamp;
 
 	if (!reset_cmd) {
 		pr_err("%s: NULL pointer reset cmd %pK\n", __func__, reset_cmd);
@@ -4418,7 +4418,7 @@ void msm_isp_process_axi_irq_stream(struct vfe_device *vfe_dev,
 	uint32_t pingpong_bit = 0, i;
 	struct msm_isp_buffer *done_buf = NULL;
 	unsigned long flags;
-	struct timeval *time_stamp;
+	struct timespec64 *time_stamp;
 	uint32_t frame_id, buf_index = -1;
 	int vfe_idx;
 	struct vfe_device *temp_dev;

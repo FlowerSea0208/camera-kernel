@@ -455,7 +455,7 @@ static void *msm_jpegdma_get_userptr(struct device *alloc_ctx,
 
 	return buf;
 error:
-	kzfree(buf);
+	kfree_sensitive(buf);
 	return ERR_PTR(-ENOMEM);
 }
 
@@ -470,7 +470,7 @@ static void msm_jpegdma_put_userptr(void *buf_priv)
 
 	msm_jpegdma_hw_unmap_buffer(buf_priv);
 
-	kzfree(buf_priv);
+	kfree_sensitive(buf_priv);
 }
 
 /* Videobuf2 memory callbacks. */
@@ -1407,11 +1407,11 @@ static int jpegdma_probe(struct platform_device *pdev)
 	jpegdma->video.release = video_device_release;
 	jpegdma->video.v4l2_dev = &jpegdma->v4l2_dev;
 	jpegdma->video.vfl_dir = VFL_DIR_M2M;
-	jpegdma->video.vfl_type = VFL_TYPE_GRABBER;
+	jpegdma->video.vfl_type = VFL_TYPE_VIDEO;
 	strlcpy(jpegdma->video.name, MSM_JPEGDMA_DRV_NAME,
 		sizeof(jpegdma->video.name));
 
-	ret = video_register_device(&jpegdma->video, VFL_TYPE_GRABBER, -1);
+	ret = video_register_device(&jpegdma->video, VFL_TYPE_VIDEO, -1);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "Failed to register video device\n");
 		goto error_video_register;

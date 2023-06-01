@@ -221,9 +221,9 @@ struct vb2_ops *msm_vb2_get_q_ops(void)
 	return &msm_vb2_get_q_op;
 }
 
-static void *msm_vb2_dma_contig_get_userptr(struct device *alloc_ctx,
-	unsigned long vaddr, unsigned long size,
-	enum dma_data_direction dma_dir)
+static void *msm_vb2_dma_contig_get_userptr(struct vb2_buffer *vb,
+	struct device *alloc_ctx,
+	unsigned long vaddr, unsigned long size)
 {
 	struct msm_vb2_private_data *priv;
 
@@ -238,7 +238,7 @@ static void *msm_vb2_dma_contig_get_userptr(struct device *alloc_ctx,
 
 static void msm_vb2_dma_contig_put_userptr(void *buf_priv)
 {
-	kzfree(buf_priv);
+	kfree_sensitive(buf_priv);
 }
 
 static struct vb2_mem_ops msm_vb2_get_q_mem_op = {
@@ -407,7 +407,7 @@ static int msm_vb2_put_buf(struct vb2_v4l2_buffer *vb, int session_id,
 
 static int msm_vb2_buf_done(struct vb2_v4l2_buffer *vb, int session_id,
 				unsigned int stream_id, uint32_t sequence,
-				struct timeval *ts, uint32_t buf_type)
+				struct timespec64 *ts, uint32_t buf_type)
 {
 	unsigned long flags, rl_flags;
 	struct msm_vb2_buffer *msm_vb2;
@@ -452,7 +452,7 @@ static int msm_vb2_buf_done(struct vb2_v4l2_buffer *vb, int session_id,
 			vb2_v4l2_buf->timecode.type = buf_type;
 			vb2_v4l2_buf->vb2_buf.timestamp =
 				((u64)ts->tv_sec * 1000000 +
-				ts->tv_usec) * 1000;
+				(ts->tv_nsec/1000)) * 1000;
 			vb2_buffer_done(&vb2_v4l2_buf->vb2_buf,
 				VB2_BUF_STATE_DONE);
 			msm_vb2->in_freeq = 0;
@@ -471,7 +471,7 @@ static int msm_vb2_buf_done(struct vb2_v4l2_buffer *vb, int session_id,
 
 static int msm_vb2_buf_error(struct vb2_v4l2_buffer *vb, int session_id,
 				unsigned int stream_id, uint32_t sequence,
-				struct timeval *ts, uint32_t buf_type)
+				struct timespec64 *ts, uint32_t buf_type)
 {
 	unsigned long flags, rl_flags;
 	struct msm_vb2_buffer *msm_vb2;
@@ -515,7 +515,7 @@ static int msm_vb2_buf_error(struct vb2_v4l2_buffer *vb, int session_id,
 			vb2_v4l2_buf->sequence = sequence;
 			vb2_v4l2_buf->timecode.type = buf_type;
 			vb2_v4l2_buf->vb2_buf.timestamp =
-				(ts->tv_sec * 1000000 + ts->tv_usec) * 1000;
+				(ts->tv_sec * 1000000 + (ts->tv_nsec/1000)) * 1000;
 			vb2_buffer_done(&vb2_v4l2_buf->vb2_buf,
 				VB2_BUF_STATE_ERROR);
 			msm_vb2->in_freeq = 0;
