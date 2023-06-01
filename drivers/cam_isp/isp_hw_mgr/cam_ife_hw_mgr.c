@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -1093,8 +1094,8 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_rdi(
 		CAM_DBG(CAM_ISP, "i = %d, vfe_out_res_id = %d, out_port: %d",
 			i, vfe_out_res_id, out_port->res_type);
 		if ((vfe_out_res_id != out_port->res_type) &&
-		    (out_port->res_type < CAM_ISP_HW_VFE_IN_RDI0 ||
-		     out_port->res_type > CAM_ISP_HW_VFE_IN_RDI3))
+		    (out_port->res_type < CAM_ISP_IFE_OUT_RES_RDI_0 ||
+		     out_port->res_type > CAM_ISP_IFE_OUT_RES_RDI_3))
 			continue;
 		out_port->res_type = vfe_out_res_id;
 		vfe_acquire.vfe_out.cdm_ops = ife_ctx->cdm_ops;
