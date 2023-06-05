@@ -323,10 +323,7 @@ static int32_t cam_sensor_i2c_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 		i2c_reg_settings->request_id = csl_packet->header.request_id;
 		i2c_reg_settings->is_settings_valid = 1;
 
-		rc = cam_sensor_update_req_mgr(s_ctrl, csl_packet);
-		if (rc)
-			CAM_ERR(CAM_SENSOR,
-				"Failed in adding request to req_mgr");
+		cam_sensor_update_req_mgr(s_ctrl, csl_packet);
 		goto end;
 	}
 	default:
@@ -748,6 +745,8 @@ void cam_sensor_query_cap(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_OIS];
 	query_cap->ir_led_slot_id =
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_IR_LED];
+	query_cap->ldm_slot_id =
+		s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER];
 	query_cap->slot_info =
 		s_ctrl->soc_info.index;
 }
