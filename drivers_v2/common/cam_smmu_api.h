@@ -15,15 +15,14 @@
 #include <linux/dma-direction.h>
 #include <linux/module.h>
 #include <linux/dma-buf.h>
-#include <asm/dma-iommu.h>
 #include <linux/dma-direction.h>
 #include <linux/of_platform.h>
-#include <linux/iommu.h>
 #include <linux/random.h>
 #include <linux/spinlock_types.h>
 #include <linux/mutex.h>
 #include <linux/msm_ion.h>
-
+#include <linux/dma-heap.h>
+#include <linux/iommu.h>
 
 /*
  * Enum for possible CAM SMMU operations
@@ -66,15 +65,6 @@ typedef void (*client_reset_handler)(struct iommu_domain *,
  * @return Status of operation. Negative in case of error. Zero otherwise.
  */
 int cam_smmu_get_handle(char *identifier, int *handle_ptr);
-
-
-/**
- * @param handle: Handle to identify the CAM SMMU client (VFE, CPP, FD etc.)
- * @param flags   : SMMU attribute type
- * @data             : Value of attribute
- * @return Status of operation. Negative in case of error. Zero otherwise.
- */
-int cam_smmu_set_attr(int handle, uint32_t flags, int32_t *data);
 
 
 /**
@@ -237,4 +227,6 @@ void cam_smmu_reg_client_page_fault_handler(int handle,
 	client_reset_handler hw_reset_handler,
 	void *token);
 
+int cam_smmu_init_module(void);
+void cam_smmu_exit_module(void);
 #endif /* _CAM_SMMU_API_H_ */
