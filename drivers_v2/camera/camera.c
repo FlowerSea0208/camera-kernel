@@ -86,8 +86,8 @@ static int camera_check_event_status(struct v4l2_event *event)
 	return 0;
 }
 
-static int camera_v4l2_querycap(struct file *filep, void *fh,
-	struct v4l2_capability *cap)
+static int camera_v4l2_g_pixelaspect(struct file *filep, void *fh,
+				int type, struct v4l2_fract *f)
 {
 	int rc;
 	struct v4l2_event event;
@@ -108,8 +108,8 @@ static int camera_v4l2_querycap(struct file *filep, void *fh,
 	return rc;
 }
 
-static int camera_v4l2_s_crop(struct file *filep, void *fh,
-	const struct v4l2_crop *crop)
+static int camera_v4l2_s_selection(struct file *filep, void *fh,
+	struct v4l2_selection *sel)
 {
 	int rc = 0;
 	struct v4l2_event event;
@@ -117,7 +117,7 @@ static int camera_v4l2_s_crop(struct file *filep, void *fh,
 	if (msm_is_daemon_present() == false)
 		return 0;
 
-	if (crop->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+	if (sel->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 
 		camera_pack_event(filep, MSM_CAMERA_SET_PARM,
 			MSM_CAMERA_PRIV_S_CROP, -1, &event);
@@ -132,8 +132,8 @@ static int camera_v4l2_s_crop(struct file *filep, void *fh,
 	return rc;
 }
 
-static int camera_v4l2_g_crop(struct file *filep, void *fh,
-	struct v4l2_crop *crop)
+static int camera_v4l2_g_selection(struct file *filep, void *fh,
+	struct v4l2_selection *sel)
 {
 	int rc = 0;
 	struct v4l2_event event;
@@ -141,7 +141,7 @@ static int camera_v4l2_g_crop(struct file *filep, void *fh,
 	if (msm_is_daemon_present() == false)
 		return 0;
 
-	if (crop->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+	if (sel->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		camera_pack_event(filep, MSM_CAMERA_GET_PARM,
 			MSM_CAMERA_PRIV_G_CROP, -1, &event);
 
@@ -264,7 +264,8 @@ static int camera_v4l2_qbuf(struct file *filep, void *fh,
 	if (WARN_ON(!session))
 		return -EIO;
 	mutex_lock(&sp->lock);
-	ret = vb2_qbuf(&sp->vb2_q, pb);
+	ret = vb2_qbuf(&sp->vb2_q,
+			pvdev->vdev->v4l2_dev->mdev, pb);
 	mutex_unlock(&sp->lock);
 	return ret;
 }
@@ -525,9 +526,9 @@ static long camera_v4l2_vidioc_private_ioctl(struct file *filep, void *fh,
 }
 
 static const struct v4l2_ioctl_ops camera_v4l2_ioctl_ops = {
-	.vidioc_querycap = camera_v4l2_querycap,
-	.vidioc_s_crop = camera_v4l2_s_crop,
-	.vidioc_g_crop = camera_v4l2_g_crop,
+	.vidioc_g_pixelaspect = camera_v4l2_g_pixelaspect,
+	.vidioc_s_selection = camera_v4l2_s_selection,
+	.vidioc_g_selection = camera_v4l2_g_selection,
 	.vidioc_queryctrl = camera_v4l2_queryctrl,
 	.vidioc_g_ctrl = camera_v4l2_g_ctrl,
 	.vidioc_s_ctrl = camera_v4l2_s_ctrl,

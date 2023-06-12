@@ -414,31 +414,31 @@ static struct vb2_ops msm_jpegdma_vb2_q_ops = {
 
 /*
  * msm_jpegdma_get_userptr - Map and get buffer handler for user pointer buffer.
- * @alloc_ctx: Contexts allocated in buf_setup.
+ * @vb: vb2_buffer
+ * @dev: Contexts allocated in buf_setup.
  * @vaddr: Virtual addr passed from userpsace (in our case ion fd)
  * @size: Size of the buffer
  * @write: True if buffer will be used for writing the data.
  */
-static void *msm_jpegdma_get_userptr(struct device *alloc_ctx,
-	unsigned long vaddr, unsigned long size,
-	enum dma_data_direction dma_dir)
+static void *msm_jpegdma_get_userptr(struct vb2_buffer *vb, struct device *dev,
+				unsigned long vaddr, unsigned long size)
 {
-	struct msm_jpegdma_device *dma = (void *)alloc_ctx;
+	struct msm_jpegdma_device *dma = (void *)dev;
 	struct msm_jpegdma_buf_handle *buf;
 	struct msm_jpeg_dma_buff __user *up_buff;
 	struct msm_jpeg_dma_buff kp_buff;
 	int ret;
 
 	msm_jpegdma_cast_long_to_buff_ptr(vaddr, &up_buff);
-
-	if (!access_ok(VERIFY_READ, up_buff,
+	dma->vb = vb;
+	if (!access_ok(up_buff,
 		sizeof(struct msm_jpeg_dma_buff)) ||
 		get_user(kp_buff.fd, &up_buff->fd)) {
 		dev_err(dma->dev, "Error getting user data\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (!access_ok(VERIFY_WRITE, up_buff,
+	if (!access_ok(up_buff,
 		sizeof(struct msm_jpeg_dma_buff)) ||
 		put_user(kp_buff.fd, &up_buff->fd)) {
 		dev_err(dma->dev, "Error putting user data\n");
@@ -841,7 +841,7 @@ static int msm_jpegdma_qbuf(struct file *file, void *fh,
 
 	msm_jpegdma_cast_long_to_buff_ptr(buf->m.userptr, &up_buff);
 	mutex_lock(&ctx->lock);
-	if (!access_ok(VERIFY_READ, up_buff,
+	if (!access_ok(up_buff,
 		sizeof(struct msm_jpeg_dma_buff)) ||
 		get_user(kp_buff.fd, &up_buff->fd) ||
 		get_user(kp_buff.offset, &up_buff->offset)) {
@@ -850,7 +850,7 @@ static int msm_jpegdma_qbuf(struct file *file, void *fh,
 		return -EFAULT;
 	}
 
-	if (!access_ok(VERIFY_WRITE, up_buff,
+	if (!access_ok(up_buff,
 		sizeof(struct msm_jpeg_dma_buff)) ||
 		put_user(kp_buff.fd, &up_buff->fd) ||
 		put_user(kp_buff.offset, &up_buff->offset)) {
@@ -945,18 +945,19 @@ static int msm_jpegdma_streamoff(struct file *file,
 }
 
 /*
- * msm_jpegdma_cropcap - V4l2 ioctl crop capabilities.
+ * msm_jpegdma_g_pixelaspect - V4l2 ioctl crop capabilities.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @a: Pointer to v4l2_cropcap struct need to be set.
+ * @type: V4l2 buf video type
+ * @a: Pointer to v4l2_fract struct need to be set.
  */
-static int msm_jpegdma_cropcap(struct file *file, void *fh,
-	struct v4l2_cropcap *a)
+static int msm_jpegdma_g_pixelaspect(struct file *file, void *fh,
+				int type, struct v4l2_fract *f)
 {
 	struct jpegdma_ctx *ctx = msm_jpegdma_ctx_from_fh(fh);
 	struct v4l2_format *format;
 
-	switch (a->type) {
+	switch (type) {
 	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
 		format = &ctx->format_out;
 		break;
@@ -967,39 +968,34 @@ static int msm_jpegdma_cropcap(struct file *file, void *fh,
 		return -EINVAL;
 	}
 
-	a->bounds.top = 0;
-	a->bounds.left = 0;
-	a->bounds.width = format->fmt.pix.width;
-	a->bounds.height = format->fmt.pix.height;
-
-	a->defrect = ctx->crop;
-
-	a->pixelaspect.numerator = 1;
-	a->pixelaspect.denominator = 1;
+	f->numerator = 1;
+	f->denominator = 1;
 
 	return 0;
 }
 
 /*
- * msm_jpegdma_g_crop - V4l2 ioctl get crop.
+ * msm_jpegdma_g_selection - V4l2 ioctl get crop.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @crop: Pointer to v4l2_crop struct need to be set.
+ * @crop: Pointer to v4l2_selection struct need to be set.
  */
-static int msm_jpegdma_g_crop(struct file *file, void *fh,
-	struct v4l2_crop *crop)
+static int msm_jpegdma_g_selection(struct file *file, void *fh,
+	struct v4l2_selection *sel)
 {
 	struct jpegdma_ctx *ctx = msm_jpegdma_ctx_from_fh(fh);
 
-	switch (crop->type) {
-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
-		crop->c = ctx->crop;
-		break;
-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
-		crop->c.left = 0;
-		crop->c.top = 0;
-		crop->c.width = ctx->format_cap.fmt.pix.width;
-		crop->c.height = ctx->format_cap.fmt.pix.height;
+	/* Crop is supported only for input buffers */
+	if (sel->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+		return -EINVAL;
+
+	switch (sel->target) {
+	case V4L2_SEL_TGT_CROP_BOUNDS:
+	case V4L2_SEL_TGT_CROP_DEFAULT:
+		sel->r.left = 0;
+		sel->r.top = 0;
+		sel->r.width = ctx->format_cap.fmt.pix.width;
+		sel->r.height = ctx->format_cap.fmt.pix.height;
 		break;
 	default:
 		return -EINVAL;
@@ -1008,46 +1004,46 @@ static int msm_jpegdma_g_crop(struct file *file, void *fh,
 }
 
 /*
- * msm_jpegdma_s_crop - V4l2 ioctl set crop.
+ * msm_jpegdma_s_selection - V4l2 ioctl set crop.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @crop: Pointer to v4l2_crop struct need to be set.
+ * @crop: Pointer to v4l2_selection struct need to be set.
  */
-static int msm_jpegdma_s_crop(struct file *file, void *fh,
-	const struct v4l2_crop *crop)
+static int msm_jpegdma_s_selection(struct file *file, void *fh,
+	struct v4l2_selection *sel)
 {
 	struct jpegdma_ctx *ctx = msm_jpegdma_ctx_from_fh(fh);
 	int ret = 0;
 
 	/* Crop is supported only for input buffers */
-	if (crop->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
+	if (sel->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
 		return -EINVAL;
 
-	if (crop->c.left < 0 || crop->c.top < 0 ||
-	    crop->c.height == 0 || crop->c.width == 0)
+	if (sel->r.left < 0 || sel->r.top < 0 ||
+	    sel->r.height == 0 || sel->r.width == 0)
 		return -EINVAL;
 
 	/* Upscale is not supported */
-	if (crop->c.width < ctx->format_cap.fmt.pix.width)
+	if (sel->r.width < ctx->format_cap.fmt.pix.width)
 		return -EINVAL;
 
-	if (crop->c.height < ctx->format_cap.fmt.pix.height)
+	if (sel->r.height < ctx->format_cap.fmt.pix.height)
 		return -EINVAL;
 
-	if (crop->c.width + crop->c.left > ctx->format_out.fmt.pix.width)
+	if (sel->r.width + sel->r.left > ctx->format_out.fmt.pix.width)
 		return -EINVAL;
 
-	if (crop->c.height + crop->c.top > ctx->format_out.fmt.pix.height)
+	if (sel->r.height + sel->r.top > ctx->format_out.fmt.pix.height)
 		return -EINVAL;
 
-	if (crop->c.width % formats[ctx->format_idx].h_align)
+	if (sel->r.width % formats[ctx->format_idx].h_align)
 		return -EINVAL;
 
-	if (crop->c.height % formats[ctx->format_idx].v_align)
+	if (sel->r.height % formats[ctx->format_idx].v_align)
 		return -EINVAL;
 
 	mutex_lock(&ctx->lock);
-	ctx->crop = crop->c;
+	ctx->crop = sel->r;
 	if (atomic_read(&ctx->active))
 		ret = msm_jpegdma_update_hw_config(ctx);
 	mutex_unlock(&ctx->lock);
@@ -1055,7 +1051,7 @@ static int msm_jpegdma_s_crop(struct file *file, void *fh,
 }
 
 /*
- * msm_jpegdma_g_crop - V4l2 ioctl get parm.
+ * msm_jpegdma_g_parm - V4l2 ioctl get parm.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
  * @a: Pointer to v4l2_streamparm struct need to be filled.
@@ -1144,9 +1140,9 @@ static const struct v4l2_ioctl_ops fd_ioctl_ops = {
 	.vidioc_dqbuf             = msm_jpegdma_dqbuf,
 	.vidioc_streamon          = msm_jpegdma_streamon,
 	.vidioc_streamoff         = msm_jpegdma_streamoff,
-	.vidioc_cropcap           = msm_jpegdma_cropcap,
-	.vidioc_g_crop            = msm_jpegdma_g_crop,
-	.vidioc_s_crop            = msm_jpegdma_s_crop,
+	.vidioc_g_pixelaspect     = msm_jpegdma_g_pixelaspect,
+	.vidioc_g_selection       = msm_jpegdma_g_selection,
+	.vidioc_s_selection       = msm_jpegdma_s_selection,
 	.vidioc_g_parm            = msm_jpegdma_g_parm,
 	.vidioc_s_parm            = msm_jpegdma_s_parm,
 	.vidioc_g_ctrl            = msm_jpegdma_g_ctrl,
@@ -1499,16 +1495,12 @@ static struct platform_driver jpegdma_driver = {
 	},
 };
 
-static int __init msm_jpegdma_init_module(void)
+int msm_jpegdma_init_module(void)
 {
 	return platform_driver_register(&jpegdma_driver);
 }
 
-static void __exit msm_jpegdma_exit_module(void)
+void msm_jpegdma_exit_module(void)
 {
 	platform_driver_unregister(&jpegdma_driver);
 }
-
-module_init(msm_jpegdma_init_module);
-module_exit(msm_jpegdma_exit_module);
-MODULE_DESCRIPTION("MSM JPEG DMA driver");

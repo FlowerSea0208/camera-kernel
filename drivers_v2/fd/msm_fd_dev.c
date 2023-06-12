@@ -25,6 +25,7 @@
 #include <linux/clk.h>
 #include <linux/clk/qcom.h>
 
+#include "msm_fd_compat.h"
 #include "msm_fd_dev.h"
 #include "msm_fd_hw.h"
 #include "msm_fd_regs.h"
@@ -284,16 +285,16 @@ static struct vb2_ops msm_fd_vb2_q_ops = {
 
 /*
  * msm_fd_get_userptr - Map and get buffer handler for user pointer buffer.
- * @alloc_ctx: Contexts allocated in buf_setup.
+ * @vb: vb2_buffer
+ * @dev: Contexts allocated in buf_setup.
  * @vaddr: Virtual addr passed from userpsace (in our case ion fd)
  * @size: Size of the buffer
  * @write: True if buffer will be used for writing the data.
  */
-static void *msm_fd_get_userptr(struct device *alloc_ctx,
-	unsigned long vaddr, unsigned long size,
-	enum dma_data_direction dma_dir)
+static void *msm_fd_get_userptr(struct vb2_buffer *vb, struct device *dev,
+				unsigned long vaddr, unsigned long size)
 {
-	struct msm_fd_mem_pool *pool = (void *)alloc_ctx;
+	struct msm_fd_mem_pool *pool = (void *)dev;
 	struct msm_fd_buf_handle *buf;
 	int ret;
 
@@ -779,7 +780,8 @@ static int msm_fd_qbuf(struct file *file, void *fh,
 	struct fd_ctx *ctx = msm_fd_ctx_from_fh(fh);
 
 	mutex_lock(&ctx->lock);
-	ret = vb2_qbuf(&ctx->vb2_q, pb);
+	ret = vb2_qbuf(&ctx->vb2_q,
+			ctx->fd_device->v4l2_dev.mdev, pb);
 	mutex_unlock(&ctx->lock);
 	return ret;
 
@@ -1092,12 +1094,14 @@ static int msm_fd_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 }
 
 /*
- * msm_fd_cropcap - V4l2 ioctl crop capabilities.
+ * msm_fd_g_pixelaspect - V4l2 ioctl crop capabilities.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @sub: Pointer to v4l2_cropcap struct need to be set.
+ * @type: V4l2 buf video type
+ * @sub: Pointer to v4l2_fract struct need to be set.
  */
-static int msm_fd_cropcap(struct file *file, void *fh, struct v4l2_cropcap *a)
+static int msm_fd_g_pixelaspect(struct file *file, void *fh,
+				int type, struct v4l2_fract *f)
 {
 	struct fd_ctx *ctx = msm_fd_ctx_from_fh(fh);
 
@@ -1106,26 +1110,20 @@ static int msm_fd_cropcap(struct file *file, void *fh, struct v4l2_cropcap *a)
 		return -EINVAL;
 	}
 
-	a->bounds.top = 0;
-	a->bounds.left = 0;
-	a->bounds.width = ctx->format.size->width;
-	a->bounds.height =  ctx->format.size->height;
-
-	a->defrect = ctx->format.crop;
-
-	a->pixelaspect.numerator = 1;
-	a->pixelaspect.denominator = 1;
+	f->numerator = 1;
+	f->denominator = 1;
 
 	return 0;
 }
 
 /*
- * msm_fd_g_crop - V4l2 ioctl get crop.
+ * msm_fd_g_selection - V4l2 ioctl get crop.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @sub: Pointer to v4l2_crop struct need to be set.
+ * @sub: Pointer to v4l2_selection struct need to be set.
  */
-static int msm_fd_g_crop(struct file *file, void *fh, struct v4l2_crop *crop)
+static int msm_fd_g_selection(struct file *file, void *fh,
+	struct v4l2_selection *sel)
 {
 	struct fd_ctx *ctx = msm_fd_ctx_from_fh(fh);
 
@@ -1134,19 +1132,19 @@ static int msm_fd_g_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 		return -EINVAL;
 	}
 
-	crop->c = ctx->format.crop;
+	sel->r = ctx->format.crop;
 
 	return 0;
 }
 
 /*
- * msm_fd_s_crop - V4l2 ioctl set crop.
+ * msm_fd_s_selection - V4l2 ioctl set crop.
  * @file: Pointer to file struct.
  * @fh: V4l2 File handle.
- * @sub: Pointer to v4l2_crop struct need to be set.
+ * @sub: Pointer to v4l2_selection struct need to be set.
  */
-static int msm_fd_s_crop(struct file *file, void *fh,
-	const struct v4l2_crop *crop)
+static int msm_fd_s_selection(struct file *file, void *fh,
+	struct v4l2_selection *sel)
 {
 	struct fd_ctx *ctx = msm_fd_ctx_from_fh(fh);
 	int min_face_size;
@@ -1159,16 +1157,16 @@ static int msm_fd_s_crop(struct file *file, void *fh,
 	/* First check that crop is valid */
 	min_face_size = msm_fd_min_size[ctx->settings.min_size_index];
 
-	if (crop->c.width < min_face_size || crop->c.height < min_face_size)
+	if (sel->r.width < min_face_size || sel->r.height < min_face_size)
 		return -EINVAL;
 
-	if (crop->c.width + crop->c.left > ctx->format.size->width)
+	if (sel->r.width + sel->r.left > ctx->format.size->width)
 		return -EINVAL;
 
-	if (crop->c.height + crop->c.top > ctx->format.size->height)
+	if (sel->r.height + sel->r.top > ctx->format.size->height)
 		return -EINVAL;
 
-	ctx->format.crop = crop->c;
+	ctx->format.crop = sel->r;
 
 	return 0;
 }
@@ -1188,9 +1186,9 @@ static const struct v4l2_ioctl_ops fd_ioctl_ops = {
 	.vidioc_queryctrl         = msm_fd_guery_ctrl,
 	.vidioc_s_ctrl            = msm_fd_s_ctrl,
 	.vidioc_g_ctrl            = msm_fd_g_ctrl,
-	.vidioc_cropcap           = msm_fd_cropcap,
-	.vidioc_g_crop            = msm_fd_g_crop,
-	.vidioc_s_crop            = msm_fd_s_crop,
+	.vidioc_g_pixelaspect     = msm_fd_g_pixelaspect,
+	.vidioc_g_selection       = msm_fd_g_selection,
+	.vidioc_s_selection       = msm_fd_s_selection,
 	.vidioc_subscribe_event   = msm_fd_subscribe_event,
 	.vidioc_unsubscribe_event = msm_fd_unsubscribe_event,
 	.vidioc_default           = msm_fd_private_ioctl,
@@ -1480,17 +1478,12 @@ static struct platform_driver fd_driver = {
 	},
 };
 
-static int __init msm_fd_init_module(void)
+int msm_fd_init_module(void)
 {
 	return platform_driver_register(&fd_driver);
 }
 
-static void __exit msm_fd_exit_module(void)
+void msm_fd_exit_module(void)
 {
 	platform_driver_unregister(&fd_driver);
 }
-
-module_init(msm_fd_init_module);
-module_exit(msm_fd_exit_module);
-MODULE_DESCRIPTION("MSM FD driver");
-MODULE_LICENSE("GPL v2");

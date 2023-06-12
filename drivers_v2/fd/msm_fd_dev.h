@@ -17,13 +17,13 @@
 #include <media/v4l2-fh.h>
 #include <media/v4l2-ctrls.h>
 #include <media/videobuf2-v4l2.h>
-#include <linux/msm-bus.h>
-#include <media/msm_fd.h>
+#include "msm_fd.h"
 #include <linux/dma-buf.h>
 #include <linux/msm_ion.h>
 #include "cam_soc_api.h"
 #include "cam_hw_ops.h"
 #include "msm_cpp.h"
+#include "cam_soc_bus.h"
 
 /* Maximum number of result buffers */
 #define MSM_FD_MAX_RESULT_BUFS 5
@@ -269,4 +269,6 @@ struct msm_fd_device {
 	uint32_t clk_rate_idx;
 };
 
+int msm_fd_init_module(void);
+void msm_fd_exit_module(void);
 #endif /* __MSM_FD_DEV_H__ */
