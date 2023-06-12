@@ -130,7 +130,6 @@ static void msm_vfe48_deinit_bandwidth_mgr(
 		struct msm_isp_bandwidth_mgr *isp_bandwidth_mgr)
 {
 	msm_camera_unregister_bus_client(CAM_BUS_CLIENT_VFE);
-	isp_bandwidth_mgr->bus_client = 0;
 }
 
 static int msm_vfe48_init_bandwidth_mgr(struct vfe_device *vfe_dev,
@@ -154,7 +153,6 @@ static int msm_vfe48_init_bandwidth_mgr(struct vfe_device *vfe_dev,
 		return vfe_dev->hw_info->vfe_ops.platform_ops.init_bw_mgr(
 						vfe_dev, isp_bandwidth_mgr);
 	}
-	isp_bandwidth_mgr->bus_client = MSM_VFE48_BUS_CLIENT_INIT;
 	return rc;
 }
 
@@ -659,17 +657,12 @@ static struct platform_driver vfe48_driver = {
 	},
 };
 
-static int __init msm_vfe47_init_module(void)
+int msm_vfe48_init_module(void)
 {
 	return platform_driver_register(&vfe48_driver);
 }
 
-static void __exit msm_vfe47_exit_module(void)
+void msm_vfe48_exit_module(void)
 {
 	platform_driver_unregister(&vfe48_driver);
 }
-
-module_init(msm_vfe47_init_module);
-module_exit(msm_vfe47_exit_module);
-MODULE_DESCRIPTION("MSM VFE48 driver");
-MODULE_LICENSE("GPL v2");

@@ -16,6 +16,7 @@
 #include <linux/mutex.h>
 #include <soc/qcom/camera2.h>
 #include <linux/qcom_scm.h>
+#include <linux/qseecom_kernel.h>
 #include <soc/qcom/qseecom_scm.h>
 #include <linux/qseecom_kernel.h>
 #include "msm_camera_io_util.h"

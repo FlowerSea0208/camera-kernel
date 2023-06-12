@@ -48,4 +48,6 @@ struct msm_eeprom_ctrl_t {
 	uint8_t is_supported;
 };
 
+int msm_eeprom_init_module(void);
+void msm_eeprom_exit_module(void);
 #endif

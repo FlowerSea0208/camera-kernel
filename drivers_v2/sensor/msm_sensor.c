@@ -15,7 +15,7 @@
 #include "msm_cci.h"
 #include "msm_camera_io_util.h"
 #include "msm_camera_i2c_mux.h"
-#include <linux/regulator/rpm-smd-regulator.h>
+//#include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/regulator/consumer.h>
 
 #undef CDBG
@@ -47,6 +47,8 @@ static void msm_sensor_adjust_mclk(struct msm_camera_power_ctrl_t *ctrl)
 static void msm_sensor_misc_regulator(
 	struct msm_sensor_ctrl_t *sctrl, uint32_t enable)
 {
+//TODO:NTC
+#if 0
 	int32_t rc = 0;
 
 	if (enable) {
@@ -78,6 +80,7 @@ static void msm_sensor_misc_regulator(
 			rpm_regulator_put(sctrl->misc_regulator);
 		}
 	}
+#endif
 }
 
 int32_t msm_sensor_free_sensor_data(struct msm_sensor_ctrl_t *s_ctrl)

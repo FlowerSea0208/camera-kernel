@@ -26,9 +26,6 @@
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
 
-#define TRUE  1
-#define FALSE 0
-
 #define CCI_PINCTRL_STATE_DEFAULT "cci_default"
 #define CCI_PINCTRL_STATE_SLEEP "cci_suspend"
 
@@ -236,4 +233,6 @@ static inline struct v4l2_subdev *msm_cci_get_subdev(void)
 #define VIDIOC_MSM_CCI_CFG \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct msm_camera_cci_ctrl *)
 
+int msm_cci_init_module(void);
+void msm_cci_exit_module(void);
 #endif

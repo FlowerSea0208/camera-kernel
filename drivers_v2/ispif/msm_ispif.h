@@ -79,4 +79,6 @@ struct ispif_device {
 	int vfe_vdd_count;
 	int stereo_configured[VFE_MAX];
 };
+int msm_ispif_init_module(void);
+void msm_ispif_exit_module(void);
 #endif

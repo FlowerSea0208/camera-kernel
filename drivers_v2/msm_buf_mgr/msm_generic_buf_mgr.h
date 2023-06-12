@@ -52,6 +52,35 @@ struct msm_buf_mngr_user_buf_cont_info {
 	struct dma_buf *dmabuf;
 };
 
+#ifdef CONFIG_COMPAT
+
+struct msm_buf_mngr_info32_t {
+	uint32_t session_id;
+	uint32_t stream_id;
+	uint32_t frame_id;
+	struct old_timeval32 timestamp;
+	uint32_t index;
+	uint32_t reserved;
+	enum msm_camera_buf_mngr_buf_type type;
+	struct msm_camera_user_buf_cont_t user_buf;
+};
+
+#define VIDIOC_MSM_BUF_MNGR_GET_BUF32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 33, struct msm_buf_mngr_info32_t)
+
+#define VIDIOC_MSM_BUF_MNGR_PUT_BUF32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 34, struct msm_buf_mngr_info32_t)
+
+#define VIDIOC_MSM_BUF_MNGR_BUF_DONE32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 35, struct msm_buf_mngr_info32_t)
+
+#define VIDIOC_MSM_BUF_MNGR_FLUSH32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 39, struct msm_buf_mngr_info32_t)
+
+#define VIDIOC_MSM_BUF_MNGR_BUF_ERROR32 \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 41, struct msm_buf_mngr_info32_t)
+#endif
+
 /* kernel space functions*/
 struct msm_cam_buf_mgr_req_ops {
 	int (*msm_cam_buf_mgr_ops)(unsigned int cmd, void *argp);
@@ -61,4 +90,7 @@ struct msm_cam_buf_mgr_req_ops {
  * client.
  */
 int msm_cam_buf_mgr_register_ops(struct msm_cam_buf_mgr_req_ops *cb_struct);
+
+int32_t msm_buf_mngr_init(void);
+void msm_buf_mngr_exit(void);
 #endif

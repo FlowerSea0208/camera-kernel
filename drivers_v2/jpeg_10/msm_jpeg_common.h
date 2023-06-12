@@ -35,4 +35,6 @@ enum JPEG_ROTATION {
 	JPEG_ROTATION_270
 };
 
+int msm_jpeg_driver_init(void);
+void msm_jpeg_driver_exit(void);
 #endif /* MSM_JPEG_COMMON_H */

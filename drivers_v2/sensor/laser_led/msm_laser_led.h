@@ -54,4 +54,6 @@ struct msm_laser_led_ctrl_t {
 	enum cci_i2c_master_t cci_master;
 };
 
+int msm_laser_led_init_module(void);
+void msm_laser_led_exit_module(void);
 #endif

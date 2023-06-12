@@ -937,7 +937,7 @@ static int msm_ispif_config(struct ispif_device *ispif,
 			msm_ispif_select_clk_mux(ispif, intftype,
 				params->entries[i].csid, vfe_intf);
 			if (intftype == PIX0 && params->stereo_enable &&
-			    params->right_entries[i].csid < CSID_MAX)
+			    params->right_entries[i].csid < MSM_CSID_MAX)
 				msm_ispif_select_clk_mux(ispif, PIX1,
 					params->right_entries[i].csid,
 					vfe_intf);
@@ -953,7 +953,7 @@ static int msm_ispif_config(struct ispif_device *ispif,
 		msm_ispif_sel_csid_core(ispif, intftype,
 			params->entries[i].csid, vfe_intf);
 		if (intftype == PIX0 && params->stereo_enable &&
-		    params->right_entries[i].csid < CSID_MAX)
+		    params->right_entries[i].csid < MSM_CSID_MAX)
 			/* configure right stereo csid */
 			msm_ispif_sel_csid_core(ispif, PIX1,
 				params->right_entries[i].csid, vfe_intf);
@@ -1023,7 +1023,7 @@ static void msm_ispif_config_stereo(struct ispif_device *ispif,
 		}
 		if (params->entries[i].intftype == PIX0 &&
 			params->stereo_enable &&
-			params->right_entries[i].csid < CSID_MAX &&
+			params->right_entries[i].csid < MSM_CSID_MAX &&
 			!ispif->stereo_configured[vfe_intf]) {
 			msm_camera_io_w_mb(0x3,
 				ispif->base + ISPIF_VFE_m_OUTPUT_SEL(vfe_intf));
@@ -2134,17 +2134,12 @@ static struct platform_driver ispif_driver = {
 	},
 };
 
-static int __init msm_ispif_init_module(void)
+int msm_ispif_init_module(void)
 {
 	return platform_driver_register(&ispif_driver);
 }
 
-static void __exit msm_ispif_exit_module(void)
+void msm_ispif_exit_module(void)
 {
 	platform_driver_unregister(&ispif_driver);
 }
-
-module_init(msm_ispif_init_module);
-module_exit(msm_ispif_exit_module);
-MODULE_DESCRIPTION("MSM ISP Interface driver");
-MODULE_LICENSE("GPL v2");

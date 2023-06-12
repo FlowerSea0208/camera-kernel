@@ -21,9 +21,8 @@
 #include <linux/delay.h>
 #include <media/v4l2-subdev.h>
 #include <media/msmb_isp.h>
-#include <linux/msm-bus.h>
-#include <linux/msm-bus-board.h>
-
+#include  "msmb_isp_compat.h"
+#include "cam_soc_bus.h"
 #include "msm_buf_mgr.h"
 #include "cam_hw_ops.h"
 #include <soc/qcom/cx_ipeak.h>
@@ -320,7 +319,7 @@ struct msm_isp_bandwidth_info {
 };
 
 struct msm_isp_bandwidth_mgr {
-	uint32_t bus_client;
+	void *bus_client;
 	uint32_t bus_vector_active_idx;
 	uint32_t use_count;
 	struct msm_isp_bandwidth_info client_info[MAX_ISP_CLIENT];
@@ -681,7 +680,7 @@ struct msm_isp_statistics {
 };
 
 struct msm_isp_bw_req_info {
-	uint32_t client;
+	void *client;
 	unsigned long long timestamp;
 	uint64_t total_ab;
 	uint64_t total_ib;
@@ -890,4 +889,16 @@ struct vfe_parent_device {
 };
 int vfe_hw_probe(struct platform_device *pdev);
 void msm_isp_update_last_overflow_ab_ib(struct vfe_device *vfe_dev);
+int msm_vfe47_init_module(void);
+void msm_vfe47_exit_module(void);
+int msm_vfe48_init_module(void);
+void msm_vfe48_exit_module(void);
+int msm_vfe46_init_module(void);
+void msm_vfe46_exit_module(void);
+int msm_vfe44_init_module(void);
+void msm_vfe44_exit_module(void);
+int msm_vfe40_init_module(void);
+void msm_vfe40_exit_module(void);
+int msm_vfe_init_module(void);
+void msm_vfe_exit_module(void);
 #endif

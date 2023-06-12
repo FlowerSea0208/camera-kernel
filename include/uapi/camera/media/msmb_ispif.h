@@ -69,7 +69,7 @@ enum msm_ispif_csid {
 	CSID1,
 	CSID2,
 	CSID3,
-	CSID_MAX
+	MSM_CSID_MAX
 };
 
 enum msm_ispif_pixel_odd_even {

@@ -22,4 +22,6 @@ struct msm_sensor_init_t {
 	wait_queue_head_t state_wait;
 };
 
+int msm_sensor_init_module(void);
+void msm_sensor_exit_module(void);
 #endif

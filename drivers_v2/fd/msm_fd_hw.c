@@ -20,8 +20,6 @@
 #include <linux/interrupt.h>
 #include <linux/iommu.h>
 #include <linux/msm_ion.h>
-#include <linux/msm-bus.h>
-#include <linux/msm-bus-board.h>
 #include <media/videobuf2-core.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-mapping.h>
@@ -30,6 +28,7 @@
 #include "msm_fd_regs.h"
 #include "cam_smmu_api.h"
 #include "msm_camera_io_util.h"
+#include "cam_soc_bus.h"
 
 /* After which revision misc irq for engine is needed */
 #define MSM_FD_MISC_IRQ_FROM_REV 0x10010000

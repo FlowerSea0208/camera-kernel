@@ -299,7 +299,7 @@ static int msm_isp_enable_debugfs(struct vfe_device *vfe_dev,
 	return 0;
 }
 
-void msm_isp_update_req_history(uint32_t client, uint64_t ab,
+void msm_isp_update_req_history(void *client, uint64_t ab,
 				 uint64_t ib,
 				 struct msm_isp_bandwidth_info *client_info,
 				 unsigned long long ts)
@@ -390,11 +390,11 @@ static long msm_isp_dqevent(struct file *file, struct v4l2_fh *vfh, void *arg)
 			event_data32->timestamp.tv_sec =
 					event_data->timestamp.tv_sec;
 			event_data32->timestamp.tv_usec =
-					event_data->timestamp.tv_usec;
+					event_data->timestamp.tv_nsec * 1000;
 			event_data32->mono_timestamp.tv_sec =
 					event_data->mono_timestamp.tv_sec;
 			event_data32->mono_timestamp.tv_usec =
-					event_data->mono_timestamp.tv_usec;
+					event_data->mono_timestamp.tv_nsec * 1000;
 			event_data32->frame_id = event_data->frame_id;
 			memcpy(&(event_data32->u), &(event_data->u),
 						sizeof(event_data32->u));
@@ -469,7 +469,7 @@ static void isp_vma_close(struct vm_area_struct *vma)
 	pr_debug("%s: close called\n", __func__);
 }
 
-static int isp_vma_fault(struct vm_fault *vmf)
+static vm_fault_t isp_vma_fault(struct vm_fault *vmf)
 {
 	struct page *page;
 	struct vfe_device *vfe_dev = vmf->vma->vm_private_data;
@@ -794,17 +794,12 @@ static struct platform_driver vfe_driver = {
 	},
 };
 
-static int __init msm_vfe_init_module(void)
+int msm_vfe_init_module(void)
 {
 	return platform_driver_register(&vfe_driver);
 }
 
-static void __exit msm_vfe_exit_module(void)
+void msm_vfe_exit_module(void)
 {
 	platform_driver_unregister(&vfe_driver);
 }
-
-late_initcall(msm_vfe_init_module);
-module_exit(msm_vfe_exit_module);
-MODULE_DESCRIPTION("MSM VFE driver");
-MODULE_LICENSE("GPL v2");

@@ -68,4 +68,7 @@ struct msm_ir_led_ctrl_t {
 	enum msm_camera_ir_led_state_t ir_led_state;
 };
 
-#endif
+int msm_ir_led_init_module(void);
+void msm_ir_led_exit_module(void);
+
+# endif

@@ -1361,7 +1361,7 @@ static struct platform_driver msm_flash_platform_driver = {
 	},
 };
 
-static int __init msm_flash_init_module(void)
+int msm_flash_init_module(void)
 {
 	int32_t rc = 0;
 
@@ -1373,7 +1373,7 @@ static int __init msm_flash_init_module(void)
 	return rc;
 }
 
-static void __exit msm_flash_exit_module(void)
+void msm_flash_exit_module(void)
 {
 	platform_driver_unregister(&msm_flash_platform_driver);
 }
@@ -1413,8 +1413,3 @@ static struct msm_flash_table msm_i2c_flash_table = {
 		.camera_flash_query_current = NULL,
 	},
 };
-
-module_init(msm_flash_init_module);
-module_exit(msm_flash_exit_module);
-MODULE_DESCRIPTION("MSM FLASH");
-MODULE_LICENSE("GPL v2");

@@ -2028,17 +2028,12 @@ static struct platform_driver vfe46_driver = {
 	},
 };
 
-static int __init msm_vfe46_init_module(void)
+int msm_vfe46_init_module(void)
 {
 	return platform_driver_register(&vfe46_driver);
 }
 
-static void __exit msm_vfe46_exit_module(void)
+void msm_vfe46_exit_module(void)
 {
 	platform_driver_unregister(&vfe46_driver);
 }
-
-module_init(msm_vfe46_init_module);
-module_exit(msm_vfe46_exit_module);
-MODULE_DESCRIPTION("MSM VFE46 driver");
-MODULE_LICENSE("GPL v2");

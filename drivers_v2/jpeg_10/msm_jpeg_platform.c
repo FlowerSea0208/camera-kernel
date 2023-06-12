@@ -17,13 +17,10 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/clk/qcom.h>
-#include <linux/msm-bus.h>
-#include <linux/msm-bus-board.h>
 #include <linux/iommu.h>
-#include <asm/dma-iommu.h>
 #include <linux/dma-direction.h>
 #include <linux/dma-buf.h>
-
+#include "cam_soc_bus.h"
 #include "msm_camera_io_util.h"
 #include "msm_jpeg_platform.h"
 #include "msm_jpeg_sync.h"

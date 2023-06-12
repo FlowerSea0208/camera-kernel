@@ -2226,17 +2226,12 @@ static struct platform_driver cci_driver = {
 	},
 };
 
-static int __init msm_cci_init_module(void)
+int msm_cci_init_module(void)
 {
 	return platform_driver_register(&cci_driver);
 }
 
-static void __exit msm_cci_exit_module(void)
+void msm_cci_exit_module(void)
 {
 	platform_driver_unregister(&cci_driver);
 }
-
-module_init(msm_cci_init_module);
-module_exit(msm_cci_exit_module);
-MODULE_DESCRIPTION("MSM CCI driver");
-MODULE_LICENSE("GPL v2");

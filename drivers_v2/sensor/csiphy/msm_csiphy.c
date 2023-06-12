@@ -2519,17 +2519,12 @@ static struct platform_driver csiphy_driver = {
 	},
 };
 
-static int __init msm_csiphy_init_module(void)
+int msm_csiphy_init_module(void)
 {
 	return platform_driver_register(&csiphy_driver);
 }
 
-static void __exit msm_csiphy_exit_module(void)
+void msm_csiphy_exit_module(void)
 {
 	platform_driver_unregister(&csiphy_driver);
 }
-
-module_init(msm_csiphy_init_module);
-module_exit(msm_csiphy_exit_module);
-MODULE_DESCRIPTION("MSM CSIPHY driver");
-MODULE_LICENSE("GPL v2");

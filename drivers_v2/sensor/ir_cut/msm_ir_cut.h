@@ -69,4 +69,6 @@ struct msm_ir_cut_ctrl_t {
 	uint8_t cam_pinctrl_status;
 };
 
+int msm_ir_cut_init_module(void);
+void msm_ir_cut_exit_module(void);
 #endif

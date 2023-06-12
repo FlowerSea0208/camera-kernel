@@ -301,7 +301,7 @@ static struct platform_driver msm_jpeg_driver = {
 	},
 };
 
-static int __init msm_jpeg_driver_init(void)
+int msm_jpeg_driver_init(void)
 {
 	int rc;
 
@@ -309,12 +309,7 @@ static int __init msm_jpeg_driver_init(void)
 	return rc;
 }
 
-static void __exit msm_jpeg_driver_exit(void)
+void msm_jpeg_driver_exit(void)
 {
 	platform_driver_unregister(&msm_jpeg_driver);
 }
-
-MODULE_DESCRIPTION("msm jpeg jpeg driver");
-
-module_init(msm_jpeg_driver_init);
-module_exit(msm_jpeg_driver_exit);

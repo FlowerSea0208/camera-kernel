@@ -442,7 +442,6 @@ static int msm_csid_config(struct csid_device *csid_dev,
 			csid_params->phy_sel, csid_params->is_secure);
 
 		msm_camera_tz_clear_tzbsp_status();
-
 		rc = qcom_scm_camera_protect_phy_lanes(csid_params->is_secure,
 			CSIPHY_LANES_MASKS[csid_params->phy_sel]);
 		if (rc) {

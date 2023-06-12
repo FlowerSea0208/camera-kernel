@@ -368,7 +368,7 @@ static int32_t msm_ir_led_platform_probe(struct platform_device *pdev)
 	ir_led_ctrl->pdev = pdev;
 
 	/* Reading PWM device node */
-	ir_led_ctrl->pwm_dev = of_pwm_get(pdev->dev.of_node, NULL);
+	ir_led_ctrl->pwm_dev = of_pwm_get(&pdev->dev, pdev->dev.of_node, NULL);
 
 	if (IS_ERR(ir_led_ctrl->pwm_dev)) {
 		rc = PTR_ERR(ir_led_ctrl->pwm_dev);
@@ -426,7 +426,7 @@ static struct platform_driver msm_ir_led_platform_driver = {
 	},
 };
 
-static int __init msm_ir_led_init_module(void)
+int msm_ir_led_init_module(void)
 {
 	int32_t rc = 0;
 
@@ -440,7 +440,7 @@ static int __init msm_ir_led_init_module(void)
 	return rc;
 }
 
-static void __exit msm_ir_led_exit_module(void)
+void msm_ir_led_exit_module(void)
 {
 	platform_driver_unregister(&msm_ir_led_platform_driver);
 }
@@ -454,8 +454,3 @@ static struct msm_ir_led_table msm_default_ir_led_table = {
 		.camera_ir_led_on = msm_ir_led_on,
 	},
 };
-
-module_init(msm_ir_led_init_module);
-module_exit(msm_ir_led_exit_module);
-MODULE_DESCRIPTION("MSM IR LED");
-MODULE_LICENSE("GPL v2");

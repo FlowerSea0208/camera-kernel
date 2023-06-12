@@ -2058,7 +2058,8 @@ MODULE_DEVICE_TABLE(of, msm_actuator_i2c_dt_match);
 static struct i2c_driver msm_actuator_i2c_driver = {
 	.id_table = msm_actuator_i2c_id,
 	.probe  = msm_actuator_i2c_probe,
-	.remove = __exit_p(msm_actuator_i2c_remove),
+	//TODO:NTC
+	.remove = NULL,
 	.driver = {
 		.name = "qcom,actuator",
 		.owner = THIS_MODULE,
@@ -2082,12 +2083,20 @@ static struct platform_driver msm_actuator_platform_driver = {
 	},
 };
 
-static int __init msm_actuator_init_module(void)
+int msm_actuator_init_module(void)
 {
 	CDBG("Enter\n");
 	platform_driver_register(&msm_actuator_platform_driver);
 	return i2c_add_driver(&msm_actuator_i2c_driver);
 }
+
+void msm_actuator_exit_module(void)
+{
+	CDBG("Exit\n");
+	platform_driver_unregister(&msm_actuator_platform_driver);
+	i2c_del_driver(&msm_actuator_i2c_driver);
+}
+
 
 static struct msm_actuator msm_vcm_actuator_table = {
 	.act_type = ACTUATOR_VCM,
@@ -2144,7 +2153,3 @@ static struct msm_actuator msm_bivcm_actuator_table = {
 		.actuator_park_lens = NULL,
 	},
 };
-
-module_init(msm_actuator_init_module);
-MODULE_DESCRIPTION("MSM ACTUATOR");
-MODULE_LICENSE("GPL v2");

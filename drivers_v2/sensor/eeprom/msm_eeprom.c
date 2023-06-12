@@ -1966,7 +1966,7 @@ static struct spi_driver msm_eeprom_spi_driver = {
 	.remove = msm_eeprom_spi_remove,
 };
 
-static int __init msm_eeprom_init_module(void)
+int msm_eeprom_init_module(void)
 {
 	int rc = 0;
 
@@ -1978,14 +1978,9 @@ static int __init msm_eeprom_init_module(void)
 	return i2c_add_driver(&msm_eeprom_i2c_driver);
 }
 
-static void __exit msm_eeprom_exit_module(void)
+void msm_eeprom_exit_module(void)
 {
 	platform_driver_unregister(&msm_eeprom_platform_driver);
 	spi_unregister_driver(&msm_eeprom_spi_driver);
 	i2c_del_driver(&msm_eeprom_i2c_driver);
 }
-
-module_init(msm_eeprom_init_module);
-module_exit(msm_eeprom_exit_module);
-MODULE_DESCRIPTION("MSM EEPROM driver");
-MODULE_LICENSE("GPL v2");

@@ -625,7 +625,7 @@ static struct platform_driver msm_ir_cut_platform_driver = {
 	},
 };
 
-static int __init msm_ir_cut_init_module(void)
+int msm_ir_cut_init_module(void)
 {
 	int32_t rc = 0;
 
@@ -639,7 +639,7 @@ static int __init msm_ir_cut_init_module(void)
 	return rc;
 }
 
-static void __exit msm_ir_cut_exit_module(void)
+void msm_ir_cut_exit_module(void)
 {
 	platform_driver_unregister(&msm_ir_cut_platform_driver);
 }
@@ -653,8 +653,3 @@ static struct msm_ir_cut_table msm_gpio_ir_cut_table = {
 		.camera_ir_cut_on = msm_ir_cut_on,
 	},
 };
-
-module_init(msm_ir_cut_init_module);
-module_exit(msm_ir_cut_exit_module);
-MODULE_DESCRIPTION("MSM IR CUT");
-MODULE_LICENSE("GPL v2");

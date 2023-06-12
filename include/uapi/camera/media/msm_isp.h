@@ -1,8 +1,6 @@
 #ifndef __UAPI_MSM_ISP_H__
 #define __UAPI_MSM_ISP_H__
 
-#define BIT(nr)			(1UL << (nr))
-
 /* ISP message IDs */
 #define MSG_ID_RESET_ACK                0
 #define MSG_ID_START_ACK                1

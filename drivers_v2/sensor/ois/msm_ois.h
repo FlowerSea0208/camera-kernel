@@ -70,4 +70,6 @@ struct msm_ois_ctrl_t {
 	struct msm_ois_board_info *oboard_info;
 };
 
+int msm_ois_init_module(void);
+void msm_ois_exit_module(void);
 #endif

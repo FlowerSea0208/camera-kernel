@@ -1556,7 +1556,7 @@ static struct i2c_driver msm_sensor_driver_i2c = {
 	},
 };
 
-static int __init msm_sensor_driver_init(void)
+int msm_sensor_driver_init(void)
 {
 	int32_t rc = 0;
 
@@ -1572,14 +1572,9 @@ static int __init msm_sensor_driver_init(void)
 	return rc;
 }
 
-static void __exit msm_sensor_driver_exit(void)
+void msm_sensor_driver_exit(void)
 {
 	CDBG("Enter");
 	platform_driver_unregister(&msm_sensor_platform_driver);
 	i2c_del_driver(&msm_sensor_driver_i2c);
 }
-
-module_init(msm_sensor_driver_init);
-module_exit(msm_sensor_driver_exit);
-MODULE_DESCRIPTION("msm_sensor_driver");
-MODULE_LICENSE("GPL v2");

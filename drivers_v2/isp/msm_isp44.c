@@ -1959,17 +1959,12 @@ static struct platform_driver vfe44_driver = {
 	},
 };
 
-static int __init msm_vfe44_init_module(void)
+int msm_vfe44_init_module(void)
 {
 	return platform_driver_register(&vfe44_driver);
 }
 
-static void __exit msm_vfe44_exit_module(void)
+void msm_vfe44_exit_module(void)
 {
 	platform_driver_unregister(&vfe44_driver);
 }
-
-module_init(msm_vfe44_init_module);
-module_exit(msm_vfe44_exit_module);
-MODULE_DESCRIPTION("MSM VFE44 driver");
-MODULE_LICENSE("GPL v2");

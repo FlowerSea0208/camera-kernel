@@ -13,7 +13,7 @@
 #include <linux/ktime.h>
 #include <linux/mutex.h>
 #include <soc/qcom/camera2.h>
-#include "qseecom_kernel.h"
+#include <linux/qseecom_kernel.h>
 #include "msm_camera_i2c.h"
 #include "msm_camera_tz_util.h"
 #include "msm_cci.h"

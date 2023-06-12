@@ -19,12 +19,13 @@
 #include <linux/compat.h>
 #include <linux/ratelimit.h>
 #include <media/msm_jpeg.h>
-#include <linux/msm-bus.h>
+#include "cam_soc_bus.h"
 #include "msm_jpeg_sync.h"
 #include "msm_jpeg_core.h"
 #include "msm_jpeg_platform.h"
 #include "msm_jpeg_common.h"
 #include "cam_hw_ops.h"
+#include "cam_smmu_api.h"
 
 #define JPEG_REG_SIZE 0x308
 #define JPEG_DEV_CNT 4
@@ -1280,9 +1281,6 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 	int rc = 0;
 	struct msm_jpeg_ctrl_cmd *pctrl_cmd = NULL, ctrl_cmd = {0};
 	struct msm_jpeg_buf jpeg_buf = {0};
-	mm_segment_t old_fs;
-
-	old_fs = get_fs();
 
 	switch (cmd) {
 	case MSM_JPEG_IOCTL_GET_HW_VERSION:
@@ -1304,9 +1302,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		if (rc < 0)
 			break;
 
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_ioctl_reset(pgmn_dev, (void __user *) &ctrl_cmd);
-		set_fs(old_fs);
 		kfree(pctrl_cmd);
 		break;
 
@@ -1339,10 +1335,8 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		rc = msm_jpeg_get_jpeg_buf32(&jpeg_buf, (void __user *) arg);
 		if (rc < 0)
 			break;
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_input_buf_enqueue(pgmn_dev,
 			(void __user *) &jpeg_buf);
-		set_fs(old_fs);
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_GET:
@@ -1350,9 +1344,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_GET32:
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_input_get(pgmn_dev, (void __user *) &jpeg_buf);
-		set_fs(old_fs);
 		if (rc < 0)
 			break;
 		rc = msm_jpeg_put_jpeg_buf32(&jpeg_buf, (void __user *) arg);
@@ -1372,10 +1364,8 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		rc = msm_jpeg_get_jpeg_buf32(&jpeg_buf, (void __user *) arg);
 		if (rc < 0)
 			break;
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_output_buf_enqueue(pgmn_dev,
 			(void __user *) &jpeg_buf);
-		set_fs(old_fs);
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_GET:
@@ -1383,9 +1373,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_GET32:
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_output_get(pgmn_dev, (void __user *) &jpeg_buf);
-		set_fs(old_fs);
 		if (rc < 0)
 			break;
 		rc = msm_jpeg_put_jpeg_buf32(&jpeg_buf, (void __user *) arg);
@@ -1400,9 +1388,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_EVT_GET32:
-		set_fs(KERNEL_DS);
 		rc = msm_jpeg_evt_get(pgmn_dev, (void __user *) &ctrl_cmd);
-		set_fs(old_fs);
 		if (rc < 0)
 			break;
 		msm_jpeg_put_ctrl_cmd32(&ctrl_cmd, (void __user *) arg);

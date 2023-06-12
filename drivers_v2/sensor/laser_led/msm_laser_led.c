@@ -601,7 +601,7 @@ static struct platform_driver msm_laser_led_platform_driver = {
 	},
 };
 
-static int __init msm_laser_led_init_module(void)
+int msm_laser_led_init_module(void)
 {
 	int32_t rc;
 
@@ -616,12 +616,7 @@ static int __init msm_laser_led_init_module(void)
 	return rc;
 }
 
-static void __exit msm_laser_led_exit_module(void)
+void msm_laser_led_exit_module(void)
 {
 	platform_driver_unregister(&msm_laser_led_platform_driver);
 }
-
-module_init(msm_laser_led_init_module);
-module_exit(msm_laser_led_exit_module);
-MODULE_DESCRIPTION("MSM IR LED");
-MODULE_LICENSE("GPL v2");

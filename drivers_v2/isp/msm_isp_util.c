@@ -22,7 +22,7 @@
 #include "cam_smmu_api.h"
 #include "msm_isp48.h"
 #define CREATE_TRACE_POINTS
-#include "trace/events/msm_cam.h"
+#include "msm_cam_trace.h"
 
 #ifndef UINT16_MAX
 #define UINT16_MAX             (65535U)
@@ -207,17 +207,17 @@ uint32_t msm_isp_get_framedrop_period(
 void msm_isp_get_timestamp(struct msm_isp_timestamp *time_stamp,
 	struct vfe_device *vfe_dev)
 {
-	struct timespec ts;
+	struct timespec64 ts;
 
-	do_gettimeofday(&(time_stamp->event_time));
+	time_stamp->event_time = ktime_to_timespec64(ktime_get());
 	if (vfe_dev->vt_enable) {
 		msm_isp_get_avtimer_ts(time_stamp);
 		time_stamp->buf_time.tv_sec    = time_stamp->vt_time.tv_sec;
-		time_stamp->buf_time.tv_usec   = time_stamp->vt_time.tv_usec;
+		time_stamp->buf_time.tv_nsec   = time_stamp->vt_time.tv_nsec;
 	} else {
-		get_monotonic_boottime(&ts);
+		ts = ktime_to_timespec64(ktime_get());
 		time_stamp->buf_time.tv_sec    = ts.tv_sec;
-		time_stamp->buf_time.tv_usec   = ts.tv_nsec/1000;
+		time_stamp->buf_time.tv_nsec   = ts.tv_nsec;
 		time_stamp->buf_time_ns        =
 			((uint64_t)ts.tv_sec * 1000000000) + ts.tv_nsec;
 	}
@@ -2604,7 +2604,7 @@ void msm_isp_irq_debug_dump(struct vfe_device *vfe_dev)
 	dump_index = vfe_dev->common_data->vfe_irq_dump.current_irq_index;
 	for (i = 0; i < MAX_VFE_IRQ_DEBUG_DUMP_SIZE; i++) {
 		trace_msm_cam_ping_pong_debug_dump(
-			vfe_dev->common_data->vfe_irq_dump.irq_debug[
+			&vfe_dev->common_data->vfe_irq_dump.irq_debug[
 				dump_index % MAX_VFE_IRQ_DEBUG_DUMP_SIZE]);
 		dump_index++;
 	}
@@ -2626,7 +2626,7 @@ void msm_isp_tasklet_debug_dump(struct vfe_device *vfe_dev)
 	dump_index = vfe_dev->common_data->vfe_irq_dump.current_tasklet_index;
 	for (i = 0; i < MAX_VFE_IRQ_DEBUG_DUMP_SIZE; i++) {
 		trace_msm_cam_tasklet_debug_dump(
-			vfe_dev->common_data->vfe_irq_dump.tasklet_debug[
+			&vfe_dev->common_data->vfe_irq_dump.tasklet_debug[
 				dump_index % MAX_VFE_IRQ_DEBUG_DUMP_SIZE]);
 		dump_index++;
 	}

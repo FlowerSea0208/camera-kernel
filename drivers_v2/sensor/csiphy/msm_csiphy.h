@@ -17,7 +17,7 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <media/v4l2-subdev.h>
-#include <media/msm_cam_sensor.h>
+#include <msm_cam_sensor_compat.h>
 #include "msm_sd.h"
 #include "msm_camera_io_util.h"
 #include "msm_camera_dt_util.h"
@@ -255,4 +255,8 @@ struct csiphy_device {
 
 #define VIDIOC_MSM_CSIPHY_RELEASE \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 9, void *)
+
+int msm_csiphy_init_module(void);
+void msm_csiphy_exit_module(void);
+
 #endif

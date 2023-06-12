@@ -14,7 +14,16 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/platform_device.h>
 #include "msm_camera_i2c_mux.h"
+#include "msm_camera_io_util.h"
+#include "cam_soc_api.h"
+
+#ifdef CONFIG_CAM_I2C_MUX_DBG
+#define CDBG(fmt, args...) pr_err(fmt, ##args)
+#else
+#define CDBG(fmt, args...) pr_debug(fmt, ##args)
+#endif
 
 /* TODO move this somewhere else */
 #define MSM_I2C_MUX_DRV_NAME "msm_cam_i2c_mux"
@@ -39,7 +48,7 @@ static int msm_i2c_mux_config(struct i2c_mux_device *mux_device, uint8_t *mode)
 
 static int msm_i2c_mux_init(struct i2c_mux_device *mux_device)
 {
-	int rc = 0, val = 0;
+	int val = 0;
 
 	if (mux_device->use_count == 0) {
 		val = msm_camera_io_r(mux_device->rw_base);

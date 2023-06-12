@@ -12,11 +12,12 @@
 #include <linux/io.h>
 #include <media/v4l2-subdev.h>
 #include <asm/div64.h>
+#include <linux/videodev2.h>
 #include "msm_isp_util.h"
 #include "msm_isp_stats_util.h"
 #include "msm_isp_axi_util.h"
 #include "msm_isp48.h"
-#include "trace/events/msm_cam.h"
+#include "msm_cam_trace.h"
 
 #define HANDLE_TO_IDX(handle) (handle & 0xFF)
 #define ISP_SOF_DEBUG_COUNT 0
@@ -871,7 +872,7 @@ static void msm_isp_sync_dual_cam_frame_id(
 	}
 	/* copy highest frame id to the intf based on sof delta */
 	current_time = ts->buf_time.tv_sec * 1000 +
-		ts->buf_time.tv_usec / 1000;
+		ts->buf_time.tv_nsec / 1000000;
 
 	if (current_time > master_time &&
 		(current_time - master_time) > ms_res->sof_delta_threshold) {
@@ -968,9 +969,9 @@ void msm_isp_increment_frame_id(struct vfe_device *vfe_dev,
 		sof_info->frame_id = vfe_dev->axi_data.src_info[
 			frame_src].frame_id;
 		sof_info->timestamp_ms = ts->event_time.tv_sec * 1000 +
-			ts->event_time.tv_usec / 1000;
+			ts->event_time.tv_nsec / 1000000;
 		sof_info->mono_timestamp_ms = ts->buf_time.tv_sec * 1000 +
-			ts->buf_time.tv_usec / 1000;
+			ts->buf_time.tv_nsec / 1000000;
 		spin_unlock_irqrestore(
 			&vfe_dev->common_data->common_dev_data_lock, flags);
 	} else {
@@ -1326,14 +1327,14 @@ void msm_isp_start_avtimer(void)
 void msm_isp_get_avtimer_ts(
 		struct msm_isp_timestamp *time_stamp)
 {
-	struct timespec ts;
+	struct timespec64 ts;
 
 	pr_debug("%s: AVTimer driver not available using system time\n",
 		__func__);
 
-	get_monotonic_boottime(&ts);
+	ktime_get_boottime_ts64(&ts);
 	time_stamp->vt_time.tv_sec    = ts.tv_sec;
-	time_stamp->vt_time.tv_usec   = ts.tv_nsec/1000;
+	time_stamp->vt_time.tv_nsec   = ts.tv_nsec;
 }
 #endif
 

@@ -1065,7 +1065,7 @@ MODULE_DEVICE_TABLE(of, msm_ois_i2c_dt_match);
 static struct i2c_driver msm_ois_i2c_driver = {
 	.id_table = msm_ois_i2c_id,
 	.probe  = msm_ois_i2c_probe,
-	.remove = __exit_p(msm_ois_i2c_remove),
+	.remove = NULL,
 	.driver = {
 		.name = "qcom,ois",
 		.owner = THIS_MODULE,
@@ -1089,7 +1089,7 @@ static struct platform_driver msm_ois_platform_driver = {
 	},
 };
 
-static int __init msm_ois_init_module(void)
+int msm_ois_init_module(void)
 {
 	int32_t rc = 0;
 
@@ -1101,13 +1101,8 @@ static int __init msm_ois_init_module(void)
 	return i2c_add_driver(&msm_ois_i2c_driver);
 }
 
-static void __exit msm_ois_exit_module(void)
+void msm_ois_exit_module(void)
 {
 	platform_driver_unregister(&msm_ois_platform_driver);
 	i2c_del_driver(&msm_ois_i2c_driver);
 }
-
-module_init(msm_ois_init_module);
-module_exit(msm_ois_exit_module);
-MODULE_DESCRIPTION("MSM OIS");
-MODULE_LICENSE("GPL v2");

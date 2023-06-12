@@ -27,21 +27,39 @@
 #include <linux/debugfs.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-subdev.h>
+#include <media/msmb_generic_buf_mgr.h>
 #include "msm.h"
 #include "msm_vb2.h"
 #include "msm_sd.h"
 #include "cam_hw_ops.h"
-#include <media/msmb_generic_buf_mgr.h>
+#include "cam_smmu_api.h"
+#include "msm_generic_buf_mgr.h"
+#include "msm_cci.h"
+#include "msm_csid.h"
+#include "msm_csiphy.h"
+#include "msm_actuator.h"
+#include "msm_eeprom.h"
+#include "msm_ois.h"
+#include "msm_flash.h"
+#include "msm_ir_led.h"
+#include "msm_ir_cut.h"
+#include "msm_laser_led.h"
+#include "msm_sensor_driver.h"
+#include "msm_sensor_init.h"
+#include "isp/msm_isp.h"
+#include "msm_ispif.h"
+#include "msm_cpp.h"
+#include "msm_jpeg_common.h"
+#include "msm_jpeg_dma_dev.h"
+#include "msm_fd_dev.h"
 
 static struct v4l2_device *msm_v4l2_dev;
 static struct list_head    ordered_sd_list;
 static struct mutex        ordered_sd_mtx;
 static struct mutex        v4l2_event_mtx;
 
-#if 0
 static atomic_t qos_add_request_done = ATOMIC_INIT(0);
 static struct pm_qos_request msm_v4l2_pm_qos_request;
-#endif
 
 static struct msm_queue_head *msm_session_q;
 
@@ -58,7 +76,6 @@ static spinlock_t msm_eventq_lock;
 static struct pid *msm_pid;
 static spinlock_t msm_pid_lock;
 
-static uint32_t gpu_limit;
 
 /*
  * It takes 20 bytes + NULL character to write the
@@ -225,29 +242,23 @@ static inline int __msm_queue_find_command_ack_q(void *d1, void *d2)
 static inline void msm_pm_qos_add_request(void)
 {
 	pr_info("%s: add request", __func__);
-#if 0
 	if (atomic_cmpxchg(&qos_add_request_done, 0, 1))
 		return;
-	pm_qos_add_request(&msm_v4l2_pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
-	PM_QOS_DEFAULT_VALUE);
-#endif
+	cpu_latency_qos_add_request(&msm_v4l2_pm_qos_request,
+		PM_QOS_DEFAULT_VALUE);
 }
 
 static void msm_pm_qos_remove_request(void)
 {
 	pr_info("%s: remove request", __func__);
-#if 0
-	pm_qos_remove_request(&msm_v4l2_pm_qos_request);
-#endif
+	cpu_latency_qos_remove_request(&msm_v4l2_pm_qos_request);
 }
 
 void msm_pm_qos_update_request(int val)
 {
 	pr_info("%s: update request %d", __func__, val);
-#if 0
 	msm_pm_qos_add_request();
-	pm_qos_update_request(&msm_v4l2_pm_qos_request, val);
-#endif
+	cpu_latency_qos_update_request(&msm_v4l2_pm_qos_request, val);
 }
 
 struct msm_session *msm_session_find(unsigned int session_id)
@@ -497,15 +508,6 @@ int msm_create_session(unsigned int session_id, struct video_device *vdev)
 	mutex_init(&session->close_lock);
 	rwlock_init(&session->stream_rwlock);
 
-#if 0
-	if (gpu_limit) {
-		session->sysfs_pwr_limit = kgsl_pwr_limits_add(KGSL_DEVICE_3D0);
-		if (session->sysfs_pwr_limit)
-			kgsl_pwr_limits_set_freq(session->sysfs_pwr_limit,
-				gpu_limit);
-	}
-#endif
-
 	return 0;
 }
 EXPORT_SYMBOL(msm_create_session);
@@ -671,12 +673,6 @@ int msm_destroy_session(unsigned int session_id)
 	if (!session)
 		return -EINVAL;
 
-#if 0
-	if (gpu_limit && session->sysfs_pwr_limit) {
-		kgsl_pwr_limits_set_default(session->sysfs_pwr_limit);
-		kgsl_pwr_limits_del(session->sysfs_pwr_limit);
-	}
-#endif
 	msm_destroy_session_streams(session);
 	msm_remove_session_cmd_ack_q(session);
 	mutex_destroy(&session->lock);
@@ -1437,9 +1433,6 @@ static int msm_probe(struct platform_device *pdev)
 		goto v4l2_fail;
 	}
 
-	of_property_read_u32(pdev->dev.of_node,
-		"qcom,gpu-limit", &gpu_limit);
-
 	goto probe_end;
 
 v4l2_fail:
@@ -1479,11 +1472,60 @@ static struct platform_driver msm_driver = {
 
 static int __init msm_init(void)
 {
+	cam_smmu_init_module();
+	msm_buf_mngr_init();
+	msm_cci_init_module();
+	msm_csid_init_module();
+	msm_csiphy_init_module();
+	msm_actuator_init_module();
+	msm_eeprom_init_module();
+	msm_ois_init_module();
+	msm_flash_init_module();
+	msm_ir_led_init_module();
+	msm_ir_cut_init_module();
+	msm_laser_led_init_module();
+	msm_sensor_driver_init();
+	msm_sensor_init_module();
+	msm_vfe48_init_module();
+	msm_vfe47_init_module();
+	msm_vfe46_init_module();
+	msm_vfe44_init_module();
+	msm_vfe40_init_module();
+	msm_vfe_init_module();
+	msm_ispif_init_module();
+	msm_cpp_init_module();
+	msm_jpeg_driver_init();
+	msm_jpegdma_init_module();
+	msm_fd_init_module();
 	return platform_driver_register(&msm_driver);
 }
 
 static void __exit msm_exit(void)
 {
+	cam_smmu_exit_module();
+	msm_buf_mngr_exit();
+	msm_cci_exit_module();
+	msm_csid_exit_module();
+	msm_csiphy_exit_module();
+	msm_actuator_exit_module();
+	msm_eeprom_exit_module();
+	msm_ois_exit_module();
+	msm_flash_exit_module();
+	msm_ir_led_exit_module();
+	msm_ir_cut_exit_module();
+	msm_laser_led_exit_module();
+	msm_sensor_driver_exit();
+	msm_sensor_exit_module();
+	msm_vfe48_exit_module();
+	msm_vfe47_exit_module();
+	msm_vfe46_exit_module();
+	msm_vfe44_exit_module();
+	msm_vfe40_exit_module();
+	msm_vfe_exit_module();
+	msm_ispif_exit_module();
+	msm_cpp_exit_module();
+	msm_jpegdma_exit_module();
+	msm_fd_exit_module();
 	platform_driver_unregister(&msm_driver);
 }
 

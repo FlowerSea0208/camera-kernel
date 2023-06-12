@@ -25,6 +25,7 @@
 #include "cam_hw_ops.h"
 #include <media/msmb_pproc.h>
 #include <soc/qcom/cx_ipeak.h>
+#include "msmb_pproc_compat.h"
 
 /* hw version info:
  * 31:28  Major version
@@ -155,7 +156,7 @@ struct msm_queue_cmd {
 	enum msm_queue type;
 	void *command;
 	atomic_t on_heap;
-	struct timespec ts;
+	struct timespec64 ts;
 	uint32_t error_code;
 	uint32_t trans_code;
 };
@@ -308,4 +309,6 @@ void msm_cpp_vbif_register_error_handler(void *dev,
 	enum cpp_vbif_client client,
 	int (*client_vbif_error_handler)(void *, uint32_t));
 
+int msm_cpp_init_module(void);
+void msm_cpp_exit_module(void);
 #endif /* __MSM_CPP_H__ */

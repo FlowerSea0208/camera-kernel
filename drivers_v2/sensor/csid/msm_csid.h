@@ -17,7 +17,7 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <media/v4l2-subdev.h>
-#include <media/msm_cam_sensor.h>
+#include "msm_cam_sensor.h"
 #include "msm_sd.h"
 #include "cam_soc_api.h"
 
@@ -119,4 +119,7 @@ struct csid_device {
 
 #define VIDIOC_MSM_CSID_RELEASE \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 12, struct v4l2_subdev*)
+
+int msm_csid_init_module(void);
+void msm_csid_exit_module(void);
 #endif

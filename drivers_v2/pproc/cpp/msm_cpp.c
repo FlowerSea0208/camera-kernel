@@ -300,7 +300,7 @@ static void msm_enqueue(struct msm_device_queue *queue,
 static int msm_cpp_notify_frame_done(struct cpp_device *cpp_dev,
 	uint8_t put_buf);
 static int32_t cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin);
-static void cpp_timer_callback(unsigned long data);
+static void cpp_timer_callback(struct timer_list *t);
 
 static uint8_t induce_error;
 static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev);
@@ -1699,7 +1699,7 @@ static int msm_cpp_notify_frame_done(struct cpp_device *cpp_dev,
 	frame_qcmd = msm_dequeue(queue, list_frame, POP_FRONT);
 	if (frame_qcmd) {
 		processed_frame = frame_qcmd->command;
-		do_gettimeofday(&(processed_frame->out_time));
+		processed_frame->out_time = ktime_to_timespec64(ktime_get());
 		kfree(frame_qcmd);
 		event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_ATOMIC);
 		if (!event_qcmd) {
@@ -2042,7 +2042,7 @@ error:
 	pr_debug("%s:%d] exit\n", __func__, __LINE__);
 }
 
-static void cpp_timer_callback(unsigned long data)
+static void cpp_timer_callback(struct timer_list *t)
 {
 	struct msm_cpp_work_t *work =
 		cpp_timer.data.cpp_dev->work;
@@ -2138,7 +2138,7 @@ static int msm_cpp_send_frame_to_hardware(struct cpp_device *cpp_dev,
 		}
 		msm_cpp_write(MSM_CPP_MSG_ID_TRAILER, cpp_dev->base);
 
-		do_gettimeofday(&(process_frame->in_time));
+		process_frame->in_time = ktime_to_timespec64(ktime_get());
 		rc = 0;
 	} else {
 		pr_err("process queue full. drop frame\n");
@@ -3688,7 +3688,6 @@ STREAM_BUFF_END:
 		break;
 	case VIDIOC_MSM_CPP_IOMMU_ATTACH: {
 		if (cpp_dev->iommu_state == CPP_IOMMU_STATE_DETACHED) {
-			int32_t stall_disable;
 			struct msm_camera_smmu_attach_type cpp_attach_info;
 
 			if (ioctl_ptr->len !=
@@ -3706,10 +3705,6 @@ STREAM_BUFF_END:
 			}
 
 			cpp_dev->security_mode = cpp_attach_info.attach;
-			stall_disable = 1;
-			/* disable smmu stall on fault */
-			cam_smmu_set_attr(cpp_dev->iommu_hdl,
-				DOMAIN_ATTR_CB_STALL_DISABLE, &stall_disable);
 			if (cpp_dev->security_mode == SECURE_MODE) {
 				rc = cam_smmu_ops(cpp_dev->iommu_hdl,
 					CAM_SMMU_ATTACH_SEC_CPP);
@@ -3907,18 +3902,18 @@ static struct msm_cpp_frame_info_t *get_64bit_cpp_frame_from_compat(
 
 	new_frame->timestamp.tv_sec =
 		(unsigned long)new_frame32->timestamp.tv_sec;
-	new_frame->timestamp.tv_usec =
-		(unsigned long)new_frame32->timestamp.tv_usec;
+	new_frame->timestamp.tv_nsec =
+		(unsigned long)new_frame32->timestamp.tv_usec * 100;
 
 	new_frame->in_time.tv_sec =
 		(unsigned long)new_frame32->in_time.tv_sec;
-	new_frame->in_time.tv_usec =
-		(unsigned long)new_frame32->in_time.tv_usec;
+	new_frame->in_time.tv_nsec =
+		(unsigned long)new_frame32->in_time.tv_usec * 1000;
 
 	new_frame->out_time.tv_sec =
 		(unsigned long)new_frame32->out_time.tv_sec;
-	new_frame->out_time.tv_usec =
-		(unsigned long)new_frame32->out_time.tv_usec;
+	new_frame->out_time.tv_nsec =
+		(unsigned long)new_frame32->out_time.tv_usec * 1000;
 
 	new_frame->msg_len = new_frame32->msg_len;
 	new_frame->identity = new_frame32->identity;
@@ -4022,13 +4017,13 @@ static void get_compat_frame_from_64bit(struct msm_cpp_frame_info_t *frame,
 	k32_frame->dst_fd = frame->dst_fd;
 
 	k32_frame->timestamp.tv_sec = (uint32_t)frame->timestamp.tv_sec;
-	k32_frame->timestamp.tv_usec = (uint32_t)frame->timestamp.tv_usec;
+	k32_frame->timestamp.tv_usec = (uint32_t)(frame->timestamp.tv_nsec/1000);
 
 	k32_frame->in_time.tv_sec = (uint32_t)frame->in_time.tv_sec;
-	k32_frame->in_time.tv_usec = (uint32_t)frame->in_time.tv_usec;
+	k32_frame->in_time.tv_usec = (uint32_t)(frame->in_time.tv_nsec/1000);
 
 	k32_frame->out_time.tv_sec = (uint32_t)frame->out_time.tv_sec;
-	k32_frame->out_time.tv_usec = (uint32_t)frame->out_time.tv_usec;
+	k32_frame->out_time.tv_usec = (uint32_t)(frame->out_time.tv_nsec/1000);
 
 	k32_frame->msg_len = frame->msg_len;
 	k32_frame->identity = frame->identity;
@@ -4335,6 +4330,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	}
 	case VIDIOC_MSM_CPP_QUEUE_BUF32:
 	{
+		uint32_t tv_usec;
 		struct msm_pproc_queue_buf_info32_t __user *u32_queue_buf =
 			(struct msm_pproc_queue_buf_info32_t __user *)
 			kp_ioctl.ioctl_ptr;
@@ -4351,8 +4347,9 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 			&u32_queue_buf->buff_mgr_info.index);
 		get_user(k_queue_buf.buff_mgr_info.timestamp.tv_sec,
 			&u32_queue_buf->buff_mgr_info.timestamp.tv_sec);
-		get_user(k_queue_buf.buff_mgr_info.timestamp.tv_usec,
+		get_user(tv_usec,
 			&u32_queue_buf->buff_mgr_info.timestamp.tv_usec);
+		k_queue_buf.buff_mgr_info.timestamp.tv_nsec = tv_usec*1000;
 
 		kp_ioctl.ioctl_ptr = (__force void __user *)&k_queue_buf;
 		kp_ioctl.len = sizeof(struct msm_pproc_queue_buf_info);
@@ -4746,8 +4743,8 @@ static int cpp_probe(struct platform_device *pdev)
 	atomic_set(&cpp_timer.used, 0);
 	/* install timer for cpp timeout */
 	CPP_DBG("Installing cpp_timer\n");
-	setup_timer(&cpp_timer.cpp_timer,
-		cpp_timer_callback, (unsigned long)&cpp_timer);
+	timer_setup(&cpp_timer.cpp_timer,
+		cpp_timer_callback, 0);
 	cpp_dev->fw_name_bin = NULL;
 	cpp_dev->max_timeout_trial_cnt = MSM_CPP_MAX_TIMEOUT_TRIAL;
 
@@ -4847,12 +4844,12 @@ static struct platform_driver cpp_driver = {
 	},
 };
 
-static int __init msm_cpp_init_module(void)
+int msm_cpp_init_module(void)
 {
 	return platform_driver_register(&cpp_driver);
 }
 
-static void __exit msm_cpp_exit_module(void)
+void msm_cpp_exit_module(void)
 {
 	platform_driver_unregister(&cpp_driver);
 }
@@ -4881,8 +4878,3 @@ static int msm_cpp_enable_debugfs(struct cpp_device *cpp_dev)
 
 	return 0;
 }
-
-module_init(msm_cpp_init_module);
-module_exit(msm_cpp_exit_module);
-MODULE_DESCRIPTION("MSM CPP driver");
-MODULE_LICENSE("GPL v2");

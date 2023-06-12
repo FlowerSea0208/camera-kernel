@@ -110,4 +110,6 @@ struct msm_actuator_ctrl_t {
 	uint8_t cam_pinctrl_status;
 };
 
+int msm_actuator_init_module(void);
+void msm_actuator_exit_module(void);
 #endif

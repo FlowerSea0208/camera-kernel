@@ -166,7 +166,7 @@ static long msm_sensor_init_subdev_fops_ioctl(
 }
 #endif
 
-static int __init msm_sensor_init_module(void)
+int msm_sensor_init_module(void)
 {
 	int ret = 0;
 	/* Allocate memory for msm_sensor_init control structure */
@@ -212,14 +212,9 @@ error:
 	return ret;
 }
 
-static void __exit msm_sensor_exit_module(void)
+void msm_sensor_exit_module(void)
 {
 	msm_sd_unregister(&s_init->msm_sd);
 	mutex_destroy(&s_init->imutex);
 	kfree(s_init);
 }
-
-module_init(msm_sensor_init_module);
-module_exit(msm_sensor_exit_module);
-MODULE_DESCRIPTION("msm_sensor_init");
-MODULE_LICENSE("GPL v2");

@@ -276,6 +276,7 @@ static void msm_buf_mngr_contq_listdel(struct msm_buf_mngr_device *dev,
 {
 	int rc;
 	struct msm_buf_mngr_user_buf_cont_info *cont_bufs, *cont_save;
+	struct dma_buf_map mapping;
 
 	list_for_each_entry_safe_reverse(cont_bufs,
 		cont_save, &dev->cont_qhead, entry) {
@@ -283,8 +284,9 @@ static void msm_buf_mngr_contq_listdel(struct msm_buf_mngr_device *dev,
 		(cont_bufs->strid == stream)) {
 			if (cnt == 1 && unmap == 1) {
 				/* dma_buf_vunmap ignored vaddr(2nd argument) */
+				dma_buf_map_set_vaddr(&mapping, cont_bufs->paddr);
 				dma_buf_vunmap(cont_bufs->dmabuf,
-					cont_bufs->paddr);
+					&mapping);
 				rc = dma_buf_end_cpu_access(cont_bufs->dmabuf,
 					DMA_BIDIRECTIONAL);
 				if (rc) {
@@ -357,6 +359,7 @@ static int msm_buf_mngr_handle_cont_cmd(struct msm_buf_mngr_device *dev,
 {
 	int rc = 0, i = 0;
 	struct dma_buf *dmabuf = NULL;
+	struct dma_buf_map mapping;
 	struct msm_camera_user_buf_cont_t *iaddr, *temp_addr;
 	struct msm_buf_mngr_user_buf_cont_info *new_entry, *bufs, *save;
 	size_t size;
@@ -372,6 +375,7 @@ static int msm_buf_mngr_handle_cont_cmd(struct msm_buf_mngr_device *dev,
 	}
 
 	mutex_lock(&dev->cont_mutex);
+	iaddr = NULL;
 
 	if (cont_cmd->cmd == MSM_CAMERA_BUF_MNGR_CONT_MAP) {
 		if (!list_empty(&dev->cont_qhead)) {
@@ -414,7 +418,14 @@ static int msm_buf_mngr_handle_cont_cmd(struct msm_buf_mngr_device *dev,
 			pr_err("dma begin access failed rc=%d", rc);
 			return rc;
 		}
-		iaddr = dma_buf_vmap(dmabuf);
+		rc = dma_buf_vmap(dmabuf, &mapping);
+		if (rc) {
+			iaddr = NULL;
+		} else {
+			iaddr = (mapping.is_iomem) ?
+				(struct msm_camera_user_buf_cont_t *)mapping.vaddr_iomem :
+				(struct msm_camera_user_buf_cont_t *)mapping.vaddr;
+		}
 		if (IS_ERR_OR_NULL(iaddr)) {
 			pr_err("dma_buf_vmap failed\n");
 			rc = -EINVAL;
@@ -468,7 +479,8 @@ free_list:
 		}
 	}
 	// ion_unmap_kernel(dev->ion_client, ion_handle);
-	dma_buf_vunmap(dmabuf, iaddr);
+	dma_buf_map_set_vaddr(&mapping, iaddr);
+	dma_buf_vunmap(dmabuf, &mapping);
 	rc = dma_buf_end_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
 	if (rc) {
 		pr_err("Failed in end cpu access, dmabuf=%pK", dmabuf);
@@ -670,7 +682,7 @@ static long msm_camera_buf_mgr_fetch_buf_info(
 	buf_info->frame_id = buf_info32->frame_id;
 	buf_info->index = buf_info32->index;
 	buf_info->timestamp.tv_sec = (long) buf_info32->timestamp.tv_sec;
-	buf_info->timestamp.tv_usec = (long) buf_info32->timestamp.tv_usec;
+	buf_info->timestamp.tv_nsec = (long) (buf_info32->timestamp.tv_usec*1000);
 	buf_info->reserved = buf_info32->reserved;
 	buf_info->type = buf_info32->type;
 	return 0;
@@ -687,7 +699,7 @@ static long msm_camera_buf_mgr_update_buf_info(
 	buf_info32->stream_id = buf_info->stream_id;
 	buf_info32->index = buf_info->index;
 	buf_info32->timestamp.tv_sec = (int32_t) buf_info->timestamp.tv_sec;
-	buf_info32->timestamp.tv_usec = (int32_t) buf_info->timestamp.tv_usec;
+	buf_info32->timestamp.tv_usec = (int32_t) (buf_info->timestamp.tv_nsec/1000);
 	buf_info32->reserved = buf_info->reserved;
 	buf_info32->type = buf_info->type;
 	buf_info32->user_buf.buf_cnt = buf_info->user_buf.buf_cnt;
@@ -883,7 +895,7 @@ static long msm_buf_subdev_fops_ioctl(struct file *file,
 	return video_usercopy(file, cmd, arg, msm_bmgr_subdev_do_ioctl);
 }
 
-static int32_t __init msm_buf_mngr_init(void)
+int32_t msm_buf_mngr_init(void)
 {
 	int32_t rc = 0;
 
@@ -934,14 +946,9 @@ end:
 	return rc;
 }
 
-static void __exit msm_buf_mngr_exit(void)
+void msm_buf_mngr_exit(void)
 {
 	msm_sd_unregister(&msm_buf_mngr_dev->subdev);
 	mutex_destroy(&msm_buf_mngr_dev->cont_mutex);
 	kfree(msm_buf_mngr_dev);
 }
-
-module_init(msm_buf_mngr_init);
-module_exit(msm_buf_mngr_exit);
-MODULE_DESCRIPTION("MSM Buffer Manager");
-MODULE_LICENSE("GPL v2");
