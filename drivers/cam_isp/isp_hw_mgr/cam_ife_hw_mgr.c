@@ -635,6 +635,10 @@ static void cam_ife_hw_mgr_dump_src_acq_info(
 	struct cam_isp_resource_node *hw_res = NULL;
 	int i = 0;
 
+	if (hwr_mgr_ctx->is_offline)
+		hw_mgr_res = list_first_entry(&hwr_mgr_ctx->res_list_ife_src,
+			struct cam_isp_hw_mgr_res, list);
+
 	CAM_INFO(CAM_ISP,
 		"Acquired HW for ctx: %u with pix_port: %u rdi_port: %u",
 		hwr_mgr_ctx->ctx_index, num_pix_port, num_rdi_port);
@@ -2206,7 +2210,7 @@ static int cam_ife_hw_mgr_preprocess_port(
 	return 0;
 }
 
-static int cam_ife_hw_mgr_acquire_offline_res_ife_bus_rd(
+static int cam_ife_hw_mgr_acquire_res_ife_bus_rd(
 	struct cam_ife_hw_mgr_ctx                  *ife_ctx,
 	struct cam_isp_in_port_generic_info        *in_port)
 {
@@ -2418,7 +2422,7 @@ end:
 	return rc;
 }
 
-static int cam_ife_mgr_acquire_hw_for_fe_ctx(
+static int cam_ife_mgr_acquire_hw_for_offline_ctx(
 	struct cam_ife_hw_mgr_ctx           *ife_ctx,
 	struct cam_isp_in_port_generic_info *in_port,
 	uint32_t                            *num_pix_port,
@@ -2450,7 +2454,7 @@ static int cam_ife_mgr_acquire_hw_for_fe_ctx(
 		return -EINVAL;
 	}
 
-	rc = cam_ife_hw_mgr_acquire_offline_res_ife_bus_rd(ife_ctx, in_port);
+	rc = cam_ife_hw_mgr_acquire_res_ife_bus_rd(ife_ctx, in_port);
 
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Acquire IFE BUS RD resource Failed");
@@ -2517,15 +2521,19 @@ static int cam_ife_mgr_acquire_hw_for_ctx(
 	cam_ife_hw_mgr_preprocess_port(ife_ctx, in_port, &ipp_count,
 		&rdi_count, &ppp_count, &ife_rd_count, &lcr_count);
 
-	if (ife_rd_count) {
-		CAM_ERR(CAM_ISP, "Invalid BUS RD port for non-FE ctx");
-		return -EINVAL;
-	}
-
 	if (!ipp_count && !rdi_count && !ppp_count && !lcr_count) {
 		CAM_ERR(CAM_ISP,
 			"No PIX or RDI or PPP or LCR resource");
 		return -EINVAL;
+	}
+
+	if (ife_rd_count) {
+		rc = cam_ife_hw_mgr_acquire_res_ife_bus_rd(ife_ctx, in_port);
+
+		if (rc) {
+			CAM_ERR(CAM_ISP, "Acquire IFE BUS RD resource Failed");
+			goto err;
+		}
 	}
 
 	if (ipp_count || lcr_count) {
@@ -2952,8 +2960,8 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		}
 		CAM_DBG(CAM_ISP, "in_res_type %x", in_port->res_type);
 
-		if (ife_ctx->is_fe_enabled)
-			rc = cam_ife_mgr_acquire_hw_for_fe_ctx(
+		if (ife_ctx->is_offline)
+			rc = cam_ife_mgr_acquire_hw_for_offline_ctx(
 				ife_ctx, in_port,
 				&num_pix_port_per_in,
 				&acquire_args->acquired_hw_id[i],
