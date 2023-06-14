@@ -12,6 +12,9 @@ ifeq ($(call is-board-platform-in-list, $(TARGET_BOARD_PLATFORM)),true)
 LOCAL_PATH := $(call my-dir)
 # Path to DLKM make scripts
 DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+
+LOCAL_MODULE_DDK_BUILD := true
+
 CAMERA_SRC_FILES := \
                     $(addprefix $(LOCAL_PATH)/, $(call all-named-files-under,*.h,drivers dt-bindings include))\
                     $(addprefix $(LOCAL_PATH)/, $(call all-named-files-under,*.mk,config))\
