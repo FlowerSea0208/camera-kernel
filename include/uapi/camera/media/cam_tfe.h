@@ -74,6 +74,7 @@
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CSID_CLOCK_CONFIG   3
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_INIT_CONFIG         4
 #define CAM_ISP_TFE_GENERIC_BLOB_TYPE_DYNAMIC_MODE_SWITCH 15
+#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_LIMITER_CFG      16
 
 /* DSP mode */
 #define CAM_ISP_TFE_DSP_MODE_NONE                   0
@@ -131,6 +132,25 @@ struct cam_isp_tfe_query_cap_cmd {
 	__s32                           num_dev;
 	__u32                           reserved;
 	struct cam_isp_tfe_dev_cap_info dev_caps[CAM_ISP_TFE_HW_MAX];
+};
+
+/**
+ * struct cam_isp_tfe_query_cap_cmd_v2 - ISP TFE query device
+ * capability payload
+ *
+ * @version                     returned query cap cmd api version
+ * @num_dev:                    returned number of device capabilities
+ * @device_iommu:               returned iommu handles for device
+ * @cdm_iommu:                  returned iommu handles for cdm
+ * @dev_caps:                   returned device capability array
+ *
+ */
+struct cam_isp_tfe_query_cap_cmd_v2 {
+	__u32                           version;
+	__s32                           num_dev;
+	struct cam_iommu_handle         device_iommu;
+	struct cam_iommu_handle         cdm_iommu;
+	struct cam_isp_tfe_dev_cap_info dev_caps[1];
 };
 
 /* Acquire Device */
@@ -476,6 +496,36 @@ struct cam_isp_tfe_acquire_hw_info {
 	__u32                input_info_size;
 	__u32                input_info_offset;
 	__u64                data;
+};
+
+/**
+ * struct cam_isp_tfe_wm_bw_limiter_config - ISP TFE write master
+ *                                       BW limter config
+ *
+ *
+ * @res_type          : output resource type defined in file cam_isp_tfe.h
+ * @enable_limiter    : 0 for disable else enabled
+ * @counter_limit     : Max counter value
+ */
+struct cam_isp_tfe_wm_bw_limiter_config {
+	__u32         res_type;
+	__u32         enable_limiter;
+	__u32         counter_limit[CAM_PACKET_MAX_PLANES];
+};
+
+/**
+ * struct cam_isp_tfe_out_rsrc_bw_limiter_config - ISP TFE out rsrc BW limiter config
+ *
+ *    Configure BW limiter for ISP TFE WMs
+ *
+ * @version          : Version field
+ * @num_ports        : Number of ports
+ * @bw_limit_config  : WM BW limiter config
+ */
+struct cam_isp_tfe_out_rsrc_bw_limiter_config {
+	__u32                                       version;
+	__u32                                       num_ports;
+	struct cam_isp_tfe_wm_bw_limiter_config     bw_limiter_config[1];
 };
 
 #define CAM_TFE_ACQUIRE_COMMON_VER0         0x1000

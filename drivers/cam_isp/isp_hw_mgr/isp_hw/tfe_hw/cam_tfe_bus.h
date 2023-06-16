@@ -195,6 +195,8 @@ struct cam_tfe_bus_tfe_out_hw_info {
  * @num_comp_grp:          Number of composite group
  * @max_wm_per_comp_grp:   Max number of wm associated with one composite group
  * @comp_done_shift:       Mask shift for comp done mask
+ * @mode_cfg_shift:        Mask shift for mode config
+ * @height_shift:          Mask shift for height shift
  * @top_bus_wr_irq_shift:  Mask shift for top level BUS WR irq
  * @comp_buf_done_mask:    Composite buf done bits mask
  * @comp_rup_done_mask:    Reg update done mask
@@ -203,6 +205,9 @@ struct cam_tfe_bus_tfe_out_hw_info {
  * @support_consumed_addr: Indicate if bus support consumed address
  * @pdaf_rdi2_mux_en:      Indicate is PDAF is muxed with RDI2
  * @pack_align_shift:      pack alignment shift
+ * @max_bw_counter_limit:  Max BW counter limit
+ * @counter_limit_shift:   Mask shift for BW counter limit
+ * @counter_limit_mask:    Default Mask of BW limit counter
  */
 struct cam_tfe_bus_hw_info {
 	struct cam_tfe_bus_reg_offset_common common_reg;
@@ -215,7 +220,7 @@ struct cam_tfe_bus_hw_info {
 	uint32_t num_comp_grp;
 	uint32_t max_wm_per_comp_grp;
 	uint32_t comp_done_shift;
-	uint32_t en_cfg_shift;
+	uint32_t mode_cfg_shift;
 	uint32_t height_shift;
 	uint32_t top_bus_wr_irq_shift;
 	uint32_t comp_buf_done_mask;
@@ -225,6 +230,9 @@ struct cam_tfe_bus_hw_info {
 	bool support_consumed_addr;
 	bool pdaf_rdi2_mux_en;
 	uint32_t pack_align_shift;
+	uint32_t max_bw_counter_limit;
+	uint32_t counter_limit_shift;
+	uint32_t counter_limit_mask;
 };
 
 /*
