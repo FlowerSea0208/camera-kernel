@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundataion. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -19,7 +20,7 @@ module_param(debug_type, uint, 0644);
 
 struct camera_debug_settings cam_debug;
 
-const struct camera_debug_settings *cam_debug_get_settings()
+const struct camera_debug_settings *cam_debug_get_settings(void)
 {
 	return &cam_debug;
 }
