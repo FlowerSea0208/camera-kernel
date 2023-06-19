@@ -31,7 +31,6 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define PARK_LENS_SMALL_STEP 3
 #define MAX_QVALUE 4096
 
-static struct v4l2_file_operations msm_actuator_v4l2_subdev_fops;
 static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl);
 
@@ -1638,17 +1637,22 @@ static long msm_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_actuator_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_actuator_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-	struct msm_actuator_cfg_data32 *u32 =
-		(struct msm_actuator_cfg_data32 *)arg;
+	struct msm_actuator_cfg_data32 data;
+	struct msm_actuator_cfg_data32 *u32;
 	struct msm_actuator_cfg_data actuator_data;
-	void *parg = arg;
+	uint32_t subdev_id;
 	long rc;
+	void *parg = (void *)arg;
 
+	if (copy_from_user(&data, (void __user *)arg,
+		sizeof(data))) {
+		pr_err("Failed to copy from user");
+		return -EFAULT;
+	}
+	u32 = &data;
 	switch (cmd) {
 	case VIDIOC_MSM_ACTUATOR_CFG32:
 		cmd = VIDIOC_MSM_ACTUATOR_CFG;
@@ -1760,6 +1764,14 @@ static long msm_actuator_subdev_do_ioctl(
 	case VIDIOC_MSM_ACTUATOR_CFG:
 		pr_err("%s: invalid cmd 0x%x received\n", __func__, cmd);
 		return -EINVAL;
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		parg = &subdev_id;
+		break;
 	}
 
 	rc = msm_actuator_subdev_ioctl(sd, cmd, parg);
@@ -1781,12 +1793,6 @@ static long msm_actuator_subdev_do_ioctl(
 	}
 
 	return rc;
-}
-
-static long msm_actuator_subdev_fops_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_actuator_subdev_do_ioctl);
 }
 #endif
 
@@ -1840,6 +1846,9 @@ static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 
 static struct v4l2_subdev_core_ops msm_actuator_subdev_core_ops = {
 	.ioctl = msm_actuator_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_actuator_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_actuator_subdev_ops = {
@@ -1922,13 +1931,6 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 	act_ctrl_t->msm_sd.sd.entity.function = MSM_CAMERA_SUBDEV_ACTUATOR;
 	act_ctrl_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&act_ctrl_t->msm_sd);
-	msm_cam_copy_v4l2_subdev_fops(&msm_actuator_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_actuator_v4l2_subdev_fops.compat_ioctl32 =
-		msm_actuator_subdev_fops_ioctl;
-#endif
-	act_ctrl_t->msm_sd.sd.devnode->fops =
-		&msm_actuator_v4l2_subdev_fops;
 	act_ctrl_t->actuator_state = ACT_DISABLE_STATE;
 	pr_info("%s : succeeded\n", __func__);
 	CDBG("Exit\n");
@@ -2036,14 +2038,6 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&msm_actuator_t->msm_sd);
 	msm_actuator_t->actuator_state = ACT_DISABLE_STATE;
-	msm_cam_copy_v4l2_subdev_fops(&msm_actuator_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_actuator_v4l2_subdev_fops.compat_ioctl32 =
-		msm_actuator_subdev_fops_ioctl;
-#endif
-	msm_actuator_t->msm_sd.sd.devnode->fops =
-		&msm_actuator_v4l2_subdev_fops;
-
 	CDBG("Exit\n");
 	return rc;
 }

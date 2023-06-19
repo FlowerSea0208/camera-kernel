@@ -217,16 +217,21 @@ static long msm_ispif_cmd_ext(struct v4l2_subdev *sd,
 
 	if (is_compat_task()) {
 #ifdef CONFIG_COMPAT
-		struct ispif_cfg_data_ext_32 *pcdata32 =
-			(struct ispif_cfg_data_ext_32 *)arg;
+		struct ispif_cfg_data_ext_32 cdata32;
 
-		if (pcdata32 == NULL) {
+		if ((void __user *)arg == NULL) {
 			pr_err("Invalid params passed from user\n");
 			return -EINVAL;
 		}
-		pcdata.cfg_type  = pcdata32->cfg_type;
-		pcdata.size = pcdata32->size;
-		pcdata.data = compat_ptr(pcdata32->data);
+		if (copy_from_user(&cdata32, (void __user *)arg,
+			sizeof(cdata32))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata32));
+			return -EFAULT;
+		}
+		pcdata.cfg_type  = cdata32.cfg_type;
+		pcdata.size = cdata32.size;
+		pcdata.data = compat_ptr(cdata32.data);
 #endif
 	} else {
 		struct ispif_cfg_data_ext *pcdata64 =
@@ -265,34 +270,25 @@ static long msm_ispif_cmd_ext(struct v4l2_subdev *sd,
 
 #ifdef CONFIG_COMPAT
 static long msm_ispif_subdev_ioctl_compat(struct v4l2_subdev *sd,
-	unsigned int cmd, void *arg)
+	unsigned int cmd, unsigned long arg)
 {
 	if (WARN_ON(!sd))
 		return -EINVAL;
 
 	switch (cmd) {
 	case VIDIOC_MSM_ISPIF_CFG_EXT_COMPAT:
-		return msm_ispif_cmd_ext(sd, arg);
+		return msm_ispif_cmd_ext(sd, (void __user *)arg);
 
 	default:
-		return msm_ispif_subdev_ioctl_unlocked(sd, cmd, arg);
+		return msm_ispif_subdev_ioctl_unlocked(sd, cmd, (void __user *)arg);
 	}
 }
-static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
-	unsigned int cmd, void *arg)
-{
-	if (is_compat_task())
-		return msm_ispif_subdev_ioctl_compat(sd, cmd, arg);
-	else
-		return msm_ispif_subdev_ioctl_unlocked(sd, cmd, arg);
-}
-#else
+#endif
 static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
 	return msm_ispif_subdev_ioctl_unlocked(sd, cmd, arg);
 }
-#endif
 static void msm_ispif_put_regulator(struct ispif_device *ispif_dev)
 {
 	int i;
@@ -1860,6 +1856,21 @@ static long msm_ispif_cmd(struct v4l2_subdev *sd, void *arg)
 	int i;
 	struct msm_ispif_param_data_ext params;
 
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		struct ispif_cfg_data cdata;
+
+		if (copy_from_user(&cdata, (void __user *)arg,
+			sizeof(cdata))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata));
+			return -EFAULT;
+		}
+		pcdata = &cdata;
+#endif
+	} else {
+		pcdata = (struct ispif_cfg_data *)arg;
+	}
 	if (WARN_ON(!sd) || WARN_ON(!pcdata))
 		return -EINVAL;
 
@@ -1899,8 +1910,6 @@ static long msm_ispif_cmd(struct v4l2_subdev *sd, void *arg)
 	return rc;
 }
 
-static struct v4l2_file_operations msm_ispif_v4l2_subdev_fops;
-
 static long msm_ispif_subdev_ioctl_unlocked(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
@@ -1926,21 +1935,6 @@ static long msm_ispif_subdev_ioctl_unlocked(struct v4l2_subdev *sd,
 			__func__, cmd);
 		return -ENOIOCTLCMD;
 	}
-}
-
-static long msm_ispif_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-
-	return msm_ispif_subdev_ioctl(sd, cmd, arg);
-}
-
-static long msm_ispif_subdev_fops_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_ispif_subdev_do_ioctl);
 }
 
 static int ispif_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
@@ -2002,6 +1996,9 @@ end:
 
 static struct v4l2_subdev_core_ops msm_ispif_subdev_core_ops = {
 	.ioctl = &msm_ispif_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = &msm_ispif_subdev_ioctl_compat,
+#endif
 };
 
 static const struct v4l2_subdev_ops msm_ispif_subdev_ops = {
@@ -2087,13 +2084,6 @@ static int ispif_probe(struct platform_device *pdev)
 		pr_err("%s: msm_sd_register error = %d\n", __func__, rc);
 		goto sd_reg_fail;
 	}
-	msm_cam_copy_v4l2_subdev_fops(&msm_ispif_v4l2_subdev_fops);
-	msm_ispif_v4l2_subdev_fops.unlocked_ioctl =
-		msm_ispif_subdev_fops_ioctl;
-#ifdef CONFIG_COMPAT
-	msm_ispif_v4l2_subdev_fops.compat_ioctl32 = msm_ispif_subdev_fops_ioctl;
-#endif
-	ispif->msm_sd.sd.devnode->fops = &msm_ispif_v4l2_subdev_fops;
 	ispif->ispif_state = ISPIF_POWER_DOWN;
 	ispif->open_cnt = 0;
 	init_completion(&ispif->reset_complete[VFE0]);

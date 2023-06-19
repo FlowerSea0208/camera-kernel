@@ -378,24 +378,22 @@ static long msm_sensor_subdev_ioctl(struct v4l2_subdev *sd,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_sensor_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_sensor_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-
+	struct sensorb_cfg_data32 data;
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_CFG32:
 		cmd = VIDIOC_MSM_SENSOR_CFG;
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_sensor_subdev_ioctl(sd, cmd, &data);
 	default:
-		return msm_sensor_subdev_ioctl(sd, cmd, arg);
+		return msm_sensor_subdev_ioctl(sd, cmd, (void *)arg);
 	}
-}
-
-long msm_sensor_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_sensor_subdev_do_ioctl);
 }
 
 static int msm_sensor_config32(struct msm_sensor_ctrl_t *s_ctrl,
@@ -1457,6 +1455,9 @@ static int msm_sensor_power(struct v4l2_subdev *sd, int on)
 }
 static struct v4l2_subdev_core_ops msm_sensor_subdev_core_ops = {
 	.ioctl = msm_sensor_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_sensor_subdev_do_ioctl32,
+#endif
 	.s_power = msm_sensor_power,
 };
 static struct v4l2_subdev_ops msm_sensor_subdev_ops = {

@@ -23,8 +23,10 @@
 
 DEFINE_MSM_MUTEX(msm_ir_cut_mutex);
 
-static struct v4l2_file_operations msm_ir_cut_v4l2_subdev_fops;
-
+#ifdef CONFIG_COMPAT
+static long msm_ir_cut_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg);
+#endif
 static const struct of_device_id msm_ir_cut_dt_match[] = {
 	{.compatible = "qcom,ir-cut", .data = NULL},
 	{}
@@ -362,6 +364,9 @@ static long msm_ir_cut_subdev_ioctl(struct v4l2_subdev *sd,
 
 static struct v4l2_subdev_core_ops msm_ir_cut_subdev_core_ops = {
 	.ioctl = msm_ir_cut_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_ir_cut_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_ir_cut_subdev_ops = {
@@ -484,37 +489,42 @@ static int32_t msm_ir_cut_get_dt_data(struct device_node *of_node,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_ir_cut_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_ir_cut_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
 	int32_t rc = 0;
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-	struct msm_ir_cut_cfg_data_t32 *u32 =
-		(struct msm_ir_cut_cfg_data_t32 *)arg;
+	struct msm_ir_cut_cfg_data_t32 *u32;
+	struct msm_ir_cut_cfg_data_t32 data;
 	struct msm_ir_cut_cfg_data_t ir_cut_data;
+	uint32_t subdev_id;
 
 	CDBG("Enter");
-	ir_cut_data.cfg_type = u32->cfg_type;
-
 	switch (cmd) {
 	case VIDIOC_MSM_IR_CUT_CFG32:
 		cmd = VIDIOC_MSM_IR_CUT_CFG;
-		break;
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(data));
+			return -EFAULT;
+		}
+		u32 = &data;
+		ir_cut_data.cfg_type = u32->cfg_type;
+		return msm_ir_cut_subdev_ioctl(sd, cmd, &ir_cut_data);
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_ir_cut_subdev_ioctl(sd, cmd, &subdev_id);
 	default:
-		return msm_ir_cut_subdev_ioctl(sd, cmd, arg);
+		return msm_ir_cut_subdev_ioctl(sd, cmd, (void *)arg);
 	}
 
-	rc = msm_ir_cut_subdev_ioctl(sd, cmd, &ir_cut_data);
 
 	CDBG("Exit");
 	return rc;
-}
-
-static long msm_ir_cut_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_ir_cut_subdev_do_ioctl);
 }
 #endif
 
@@ -603,12 +613,6 @@ static int32_t msm_ir_cut_platform_probe(struct platform_device *pdev)
 
 	CDBG("%s:%d ir_cut sd name = %s", __func__, __LINE__,
 		ir_cut_ctrl->msm_sd.sd.entity.name);
-	msm_ir_cut_v4l2_subdev_fops = v4l2_subdev_fops;
-#ifdef CONFIG_COMPAT
-	msm_ir_cut_v4l2_subdev_fops.compat_ioctl32 =
-		msm_ir_cut_subdev_fops_ioctl;
-#endif
-	ir_cut_ctrl->msm_sd.sd.devnode->fops = &msm_ir_cut_v4l2_subdev_fops;
 
 	CDBG("probe success\n");
 	return rc;

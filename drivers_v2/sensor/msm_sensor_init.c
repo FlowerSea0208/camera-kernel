@@ -23,14 +23,18 @@
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 static struct msm_sensor_init_t *s_init;
-static struct v4l2_file_operations msm_sensor_init_v4l2_subdev_fops;
 /* Static function declaration */
 static long msm_sensor_init_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg);
+static long msm_sensor_init_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg);
 
 /* Static structure declaration */
 static struct v4l2_subdev_core_ops msm_sensor_init_subdev_core_ops = {
 	.ioctl = msm_sensor_init_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_sensor_init_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_sensor_init_subdev_ops = {
@@ -127,18 +131,22 @@ static long msm_sensor_init_subdev_ioctl(struct v4l2_subdev *sd,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_sensor_init_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_sensor_init_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
-	int32_t             rc = 0;
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-	struct sensor_init_cfg_data32 *u32 =
-		(struct sensor_init_cfg_data32 *)arg;
+	int32_t rc = 0;
+	struct sensor_init_cfg_data32 data;
+	struct sensor_init_cfg_data32 *u32;
 	struct sensor_init_cfg_data sensor_init_data;
 
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_INIT_CFG32:
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		u32 = &data;
 		memset(&sensor_init_data, 0, sizeof(sensor_init_data));
 		sensor_init_data.cfgtype = u32->cfgtype;
 		sensor_init_data.cfg.setting =
@@ -153,16 +161,15 @@ static long msm_sensor_init_subdev_do_ioctl(
 		u32->probed_info = sensor_init_data.probed_info;
 		strlcpy(u32->entity_name, sensor_init_data.entity_name,
 			sizeof(sensor_init_data.entity_name));
+		if (copy_to_user((void __user *)arg, &data,
+			sizeof(data))) {
+			pr_err("Failed to copy to user");
+			return -EFAULT;
+		}
 		return 0;
 	default:
-		return msm_sensor_init_subdev_ioctl(sd, cmd, arg);
+		return msm_sensor_init_subdev_ioctl(sd, cmd, (void *)arg);
 	}
-}
-
-static long msm_sensor_init_subdev_fops_ioctl(
-	struct file *file, unsigned int cmd, unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_sensor_init_subdev_do_ioctl);
 }
 #endif
 
@@ -195,14 +202,6 @@ int msm_sensor_init_module(void)
 		CDBG("%s: msm_sd_register error = %d\n", __func__, ret);
 		goto error;
 	}
-	msm_cam_copy_v4l2_subdev_fops(&msm_sensor_init_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_sensor_init_v4l2_subdev_fops.compat_ioctl32 =
-		msm_sensor_init_subdev_fops_ioctl;
-#endif
-	s_init->msm_sd.sd.devnode->fops =
-		&msm_sensor_init_v4l2_subdev_fops;
-
 	init_waitqueue_head(&s_init->state_wait);
 
 	return 0;

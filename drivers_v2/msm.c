@@ -210,13 +210,6 @@ static void msm_enqueue(struct msm_queue_head *qhead,
 	spin_unlock_irqrestore(&qhead->lock, flags);
 }
 
-
-static const struct v4l2_file_operations *msm_cam_get_v4l2_subdev_fops_ptr(
-	void)
-{
-	return &v4l2_subdev_fops;
-}
-
 /* index = session id */
 static inline int __msm_queue_find_session(void *d1, void *d2)
 {
@@ -352,18 +345,9 @@ void msm_delete_stream(unsigned int session_id, unsigned int stream_id)
 }
 EXPORT_SYMBOL(msm_delete_stream);
 
-static void msm_sd_unregister_subdev(struct video_device *vdev)
-{
-	struct v4l2_subdev *sd = video_get_drvdata(vdev);
-
-	sd->devnode = NULL;
-	kfree_sensitive(vdev);
-}
-
 static inline int __msm_sd_register_subdev(struct v4l2_subdev *sd)
 {
 	int rc = 0;
-	struct video_device *vdev;
 
 	if (!msm_v4l2_dev || !sd || !sd->name[0])
 		return -EINVAL;
@@ -378,35 +362,17 @@ static inline int __msm_sd_register_subdev(struct v4l2_subdev *sd)
 	/* Register a device node for every subdev marked with the
 	 * V4L2_SUBDEV_FL_HAS_DEVNODE flag.
 	 */
-	if (!(sd->flags & V4L2_SUBDEV_FL_HAS_DEVNODE))
-		return rc;
-
-	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
-	if (!vdev) {
-		rc = -ENOMEM;
+	rc = v4l2_device_register_subdev_nodes(msm_v4l2_dev);
+	if (rc) {
+		pr_err("Device Register subdev node failed: rc = %d", rc);
 		goto clean_up;
 	}
 
-	video_set_drvdata(vdev, sd);
-	strlcpy(vdev->name, sd->name, sizeof(vdev->name));
-	vdev->v4l2_dev = msm_v4l2_dev;
-	vdev->fops = msm_cam_get_v4l2_subdev_fops_ptr();
-	vdev->release = msm_sd_unregister_subdev;
-	rc = __video_register_device(vdev, VFL_TYPE_SUBDEV, -1, 1,
-		  sd->owner);
-	if (rc < 0) {
-		kfree_sensitive(vdev);
-		goto clean_up;
+	if ((sd->flags & V4L2_SUBDEV_FL_HAS_DEVNODE)) {
+		sd->entity.name = video_device_node_name(sd->devnode);
+		pr_info("created node :%s", sd->entity.name);
 	}
-
-#if defined(CONFIG_MEDIA_CONTROLLER)
-	sd->entity.info.dev.major = VIDEO_MAJOR;
-	sd->entity.info.dev.minor = vdev->minor;
-	sd->entity.name = video_device_node_name(vdev);
-#endif
-	sd->devnode = vdev;
 	return 0;
-
 clean_up:
 	if (sd->devnode)
 		video_unregister_device(sd->devnode);

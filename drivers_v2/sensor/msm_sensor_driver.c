@@ -25,7 +25,6 @@
 
 #define SENSOR_MAX_MOUNTANGLE (360)
 
-static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
 static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
 
 /* Static declaration */
@@ -113,13 +112,6 @@ static int32_t msm_sensor_driver_create_i2c_v4l_subdev
 		pr_err("failed: msm_sd_register rc %d", rc);
 		return rc;
 	}
-	msm_sensor_v4l2_subdev_fops = v4l2_subdev_fops;
-#ifdef CONFIG_COMPAT
-	msm_sensor_v4l2_subdev_fops.compat_ioctl32 =
-		msm_sensor_subdev_fops_ioctl;
-#endif
-	s_ctrl->msm_sd.sd.devnode->fops =
-		&msm_sensor_v4l2_subdev_fops;
 	CDBG("%s:%d\n", __func__, __LINE__);
 	return rc;
 }
@@ -156,13 +148,6 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 		pr_err("failed: msm_sd_register rc %d", rc);
 		return rc;
 	}
-	msm_cam_copy_v4l2_subdev_fops(&msm_sensor_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_sensor_v4l2_subdev_fops.compat_ioctl32 =
-		msm_sensor_subdev_fops_ioctl;
-#endif
-	s_ctrl->msm_sd.sd.devnode->fops =
-		&msm_sensor_v4l2_subdev_fops;
 
 	return rc;
 }

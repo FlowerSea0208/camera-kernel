@@ -124,6 +124,11 @@ static int msm_cpp_dump_addr(struct cpp_device *cpp_dev,
 	struct msm_cpp_frame_info_t *frame_info);
 static int32_t msm_cpp_reset_vbif_and_load_fw(struct cpp_device *cpp_dev);
 
+#ifdef CONFIG_COMPAT
+static long msm_cpp_subdev_fops_compat_ioctl(struct v4l2_subdev *sd,
+	unsigned int cmd, unsigned long arg);
+#endif
+
 #if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
 #else
@@ -3767,6 +3772,27 @@ STREAM_BUFF_END:
 		}
 		break;
 	}
+//TODO:NTC vfh
+#if 0
+	case VIDIOC_MSM_CPP_GET_INST_INFO: {
+		uint32_t i;
+		struct msm_cpp_frame_info_t inst_info;
+
+		memset(&inst_info, 0, sizeof(struct msm_cpp_frame_info_t));
+		for (i = 0; i < MAX_ACTIVE_CPP_INSTANCE; i++) {
+			if (cpp_dev->cpp_subscribe_list[i].vfh == vfh) {
+				inst_info.inst_id = i;
+				break;
+			}
+		}
+		if (copy_to_user(
+				(void __user *)ioctl_ptr->ioctl_ptr, &inst_info,
+				sizeof(struct msm_cpp_frame_info_t))) {
+			return -EFAULT;
+		}
+		break;
+	}
+#endif
 	}
 	mutex_unlock(&cpp_dev->mutex);
 	CPP_DBG("X\n");
@@ -3789,6 +3815,9 @@ static int msm_cpp_unsubscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
 
 static struct v4l2_subdev_core_ops msm_cpp_subdev_core_ops = {
 	.ioctl = msm_cpp_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_cpp_subdev_fops_compat_ioctl,
+#endif
 	.subscribe_event = msm_cpp_subscribe_event,
 	.unsubscribe_event = msm_cpp_unsubscribe_event,
 };
@@ -3797,6 +3826,8 @@ static const struct v4l2_subdev_ops msm_cpp_subdev_ops = {
 	.core = &msm_cpp_subdev_core_ops,
 };
 
+//TODO:NTC VIDIOC_MSM_CPP_GET_INST_INFO:
+#if 0
 static long msm_cpp_subdev_do_ioctl(
 	struct file *file, unsigned int cmd, void *arg)
 {
@@ -3863,7 +3894,7 @@ static long msm_cpp_subdev_fops_ioctl(struct file *file, unsigned int cmd,
 {
 	return video_usercopy(file, cmd, arg, msm_cpp_subdev_do_ioctl);
 }
-
+#endif
 
 #ifdef CONFIG_COMPAT
 static struct msm_cpp_frame_info_t *get_64bit_cpp_frame_from_compat(
@@ -4059,11 +4090,9 @@ static void get_compat_frame_from_64bit(struct msm_cpp_frame_info_t *frame,
 		frame->batch_info.pick_preview_idx;
 }
 
-static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
+static long msm_cpp_subdev_fops_compat_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 	struct cpp_device *cpp_dev = NULL;
 
 	int32_t rc = 0;
@@ -4084,9 +4113,9 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		return -EINVAL;
 	}
 	cpp_dev = v4l2_get_subdevdata(sd);
-	if (!vdev || !cpp_dev) {
-		pr_err("Invalid vdev %pK or cpp_dev %pK structures!",
-			vdev, cpp_dev);
+	if (!cpp_dev) {
+		pr_err("Invalid cpp_dev %pK structures!",
+			cpp_dev);
 		return -EINVAL;
 	}
 	mutex_lock(&cpp_dev->mutex);
@@ -4196,6 +4225,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	case VIDIOC_MSM_CPP_LOAD_FIRMWARE32:
 		cmd = VIDIOC_MSM_CPP_LOAD_FIRMWARE;
 		break;
+//TODO:NTC
+#if 0
 	case VIDIOC_MSM_CPP_GET_INST_INFO32:
 	{
 		struct cpp_device *cpp_dev = v4l2_get_subdevdata(sd);
@@ -4219,6 +4250,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		cmd = VIDIOC_MSM_CPP_GET_INST_INFO;
 		break;
 	}
+#endif
 	case VIDIOC_MSM_CPP_FLUSH_QUEUE32:
 		cmd = VIDIOC_MSM_CPP_FLUSH_QUEUE;
 		break;
@@ -4463,12 +4495,6 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 }
 #endif
 
-static struct v4l2_file_operations msm_cpp_v4l2_subdev_fops = {
-	.unlocked_ioctl = msm_cpp_subdev_fops_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl32 = msm_cpp_subdev_fops_compat_ioctl,
-#endif
-};
 static  int msm_cpp_update_gdscr_status(struct cpp_device *cpp_dev,
 	bool status)
 {
@@ -4701,16 +4727,11 @@ static int cpp_probe(struct platform_device *pdev)
 	cpp_dev->msm_sd.sd.entity.name = pdev->name;
 	cpp_dev->msm_sd.close_seq = MSM_SD_CLOSE_3RD_CATEGORY;
 	msm_sd_register(&cpp_dev->msm_sd);
-	msm_cam_copy_v4l2_subdev_fops(&msm_cpp_v4l2_subdev_fops);
-	msm_cpp_v4l2_subdev_fops.unlocked_ioctl = msm_cpp_subdev_fops_ioctl;
-#ifdef CONFIG_COMPAT
-	msm_cpp_v4l2_subdev_fops.compat_ioctl32 =
-		msm_cpp_subdev_fops_compat_ioctl;
+
+//TODO:NTC VIDIOC_MSM_CPP_GET_INST_INFO
+#if 0
+	cpp_dev->msm_sd.sd.devnode->fops->unlocked_ioctl = msm_cpp_subdev_fops_ioctl;
 #endif
-
-	cpp_dev->msm_sd.sd.devnode->fops = &msm_cpp_v4l2_subdev_fops;
-
-
 	msm_camera_io_w(0x0, cpp_dev->base +
 					   MSM_CPP_MICRO_IRQGEN_MASK);
 	msm_camera_io_w(0xFFFF, cpp_dev->base +

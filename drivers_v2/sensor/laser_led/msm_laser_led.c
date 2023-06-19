@@ -22,8 +22,6 @@
 
 DEFINE_MSM_MUTEX(msm_laser_led_mutex);
 
-static struct v4l2_file_operations msm_laser_led_v4l2_subdev_fops;
-
 static const struct of_device_id msm_laser_led_dt_match[] = {
 	{.compatible = "qcom,laser-led", .data = NULL},
 	{}
@@ -144,29 +142,21 @@ static int msm_laser_led_close(struct v4l2_subdev *sd,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_laser_led_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_laser_led_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
 	int32_t rc = 0;
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 
 	CDBG("Enter\n");
 	switch (cmd) {
 	case VIDIOC_MSM_LASER_LED_CFG32:
 		cmd = VIDIOC_MSM_LASER_LED_CFG;
 	default:
-		rc =  msm_laser_led_subdev_ioctl(sd, cmd, arg);
+		rc =  msm_laser_led_subdev_ioctl(sd, cmd, (void __user *)arg);
 	}
 
 	CDBG("Exit\n");
 	return rc;
-}
-
-static long msm_laser_led_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg)
-{
-	return msm_laser_led_subdev_do_ioctl(file, cmd, (void *)arg);
 }
 
 static int32_t msm_laser_led_control32(
@@ -498,6 +488,9 @@ static long msm_laser_led_subdev_ioctl(struct v4l2_subdev *sd,
 
 static struct v4l2_subdev_core_ops msm_laser_led_subdev_core_ops = {
 	.ioctl = msm_laser_led_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_laser_led_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_laser_led_subdev_ops = {
@@ -578,14 +571,6 @@ static int32_t msm_laser_led_platform_probe(struct platform_device *pdev)
 
 	CDBG("laser_led sd name = %s\n",
 		laser_led_ctrl->msm_sd.sd.entity.name);
-	msm_laser_led_v4l2_subdev_fops = v4l2_subdev_fops;
-#ifdef CONFIG_COMPAT
-	msm_laser_led_v4l2_subdev_fops.compat_ioctl32 =
-		msm_laser_led_subdev_fops_ioctl;
-#endif
-	laser_led_ctrl->msm_sd.sd.devnode->fops =
-		&msm_laser_led_v4l2_subdev_fops;
-
 	CDBG("probe success\n");
 	return rc;
 }

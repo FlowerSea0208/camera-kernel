@@ -27,7 +27,10 @@ DEFINE_MSM_MUTEX(msm_ois_mutex);
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
-static struct v4l2_file_operations msm_ois_v4l2_subdev_fops;
+#ifdef CONFIG_COMPAT
+static long msm_ois_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg);
+#endif
 static int32_t msm_ois_power_up(struct msm_ois_ctrl_t *o_ctrl);
 static int32_t msm_ois_power_down(struct msm_ois_ctrl_t *o_ctrl);
 
@@ -766,6 +769,9 @@ static int32_t msm_ois_power_up(struct msm_ois_ctrl_t *o_ctrl)
 
 static struct v4l2_subdev_core_ops msm_ois_subdev_core_ops = {
 	.ioctl = msm_ois_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_ois_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_ois_subdev_ops = {
@@ -844,26 +850,29 @@ probe_failure:
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_ois_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_ois_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
 	long rc = 0;
-	struct video_device *vdev;
-	struct v4l2_subdev *sd;
 	struct msm_ois_cfg_data32 *u32;
+	struct msm_ois_cfg_data32 data;
 	struct msm_ois_cfg_data ois_data;
 	void *parg;
 	struct msm_camera_i2c_seq_reg_setting settings;
 	struct msm_camera_i2c_seq_reg_setting32 settings32;
 
-	if (!file || !arg) {
+	if ((void __user *)arg == NULL) {
 		pr_err("%s:failed NULL parameter\n", __func__);
 		return -EINVAL;
 	}
-	vdev = video_devdata(file);
-	sd = vdev_to_v4l2_subdev(vdev);
-	u32 = (struct msm_ois_cfg_data32 *)arg;
-	parg = arg;
+	if (copy_from_user(&data, (void __user *)arg,
+		sizeof(data))) {
+		pr_err("Failed to copy from user_ptr=%pK size=%zu",
+			(void __user *)arg, sizeof(data));
+		return -EFAULT;
+	}
+	u32 = &data;
+	parg = (void *)&data;
 
 	switch (cmd) {
 	case VIDIOC_MSM_OIS_CFG32:
@@ -930,12 +939,6 @@ static long msm_ois_subdev_do_ioctl(
 	rc = msm_ois_subdev_ioctl(sd, cmd, parg);
 
 	return rc;
-}
-
-static long msm_ois_subdev_fops_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_ois_subdev_do_ioctl);
 }
 #endif
 
@@ -1038,13 +1041,6 @@ static int32_t msm_ois_platform_probe(struct platform_device *pdev)
 	msm_ois_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&msm_ois_t->msm_sd);
 	msm_ois_t->ois_state = OIS_DISABLE_STATE;
-	msm_cam_copy_v4l2_subdev_fops(&msm_ois_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_ois_v4l2_subdev_fops.compat_ioctl32 =
-		msm_ois_subdev_fops_ioctl;
-#endif
-	msm_ois_t->msm_sd.sd.devnode->fops =
-		&msm_ois_v4l2_subdev_fops;
 
 	CDBG("Exit\n");
 	return rc;

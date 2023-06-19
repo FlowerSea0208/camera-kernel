@@ -23,7 +23,8 @@
 
 DEFINE_MSM_MUTEX(msm_eeprom_mutex);
 #ifdef CONFIG_COMPAT
-static struct v4l2_file_operations msm_eeprom_v4l2_subdev_fops;
+static long msm_eeprom_subdev_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg);
 #endif
 
 /*
@@ -787,6 +788,9 @@ static const struct v4l2_subdev_internal_ops msm_eeprom_internal_ops = {
 
 static struct v4l2_subdev_core_ops msm_eeprom_subdev_core_ops = {
 	.ioctl = msm_eeprom_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_eeprom_subdev_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_eeprom_subdev_ops = {
@@ -1658,38 +1662,35 @@ static int msm_eeprom_config32(struct msm_eeprom_ctrl_t *e_ctrl,
 }
 
 static long msm_eeprom_subdev_ioctl32(struct v4l2_subdev *sd,
-		unsigned int cmd, void *arg)
+		unsigned int cmd, unsigned long arg)
 {
 	struct msm_eeprom_ctrl_t *e_ctrl = v4l2_get_subdevdata(sd);
-	void *argp = (void *)arg;
+	uint32_t subdev_id;
+	struct msm_eeprom_cfg_data32 cdata;
 
 	CDBG("%s E\n", __func__);
-	CDBG("%s:%d a_ctrl %pK argp %pK\n", __func__, __LINE__, e_ctrl, argp);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		return msm_eeprom_get_subdev_id(e_ctrl, argp);
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
+			return -EFAULT;
+		}
+		return msm_eeprom_get_subdev_id(e_ctrl, &subdev_id);
 	case VIDIOC_MSM_EEPROM_CFG32:
-		return msm_eeprom_config32(e_ctrl, argp);
+		if (copy_from_user(&cdata, (void __user *)arg,
+			sizeof(cdata))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata));
+			return -EFAULT;
+		}
+		return msm_eeprom_config32(e_ctrl, &cdata);
 	default:
 		return -ENOIOCTLCMD;
 	}
 
 	CDBG("%s X\n", __func__);
-}
-
-static long msm_eeprom_subdev_do_ioctl32(
-	struct file *file, unsigned int cmd, void *arg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-
-	return msm_eeprom_subdev_ioctl32(sd, cmd, arg);
-}
-
-static long msm_eeprom_subdev_fops_ioctl32(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_eeprom_subdev_do_ioctl32);
 }
 
 #endif
@@ -1861,13 +1862,6 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 	media_entity_pads_init(&e_ctrl->msm_sd.sd.entity, 0, NULL);
 	e_ctrl->msm_sd.sd.entity.function = MSM_CAMERA_SUBDEV_EEPROM;
 	msm_sd_register(&e_ctrl->msm_sd);
-
-#ifdef CONFIG_COMPAT
-	msm_cam_copy_v4l2_subdev_fops(&msm_eeprom_v4l2_subdev_fops);
-	msm_eeprom_v4l2_subdev_fops.compat_ioctl32 =
-		msm_eeprom_subdev_fops_ioctl32;
-	e_ctrl->msm_sd.sd.devnode->fops = &msm_eeprom_v4l2_subdev_fops;
-#endif
 
 	e_ctrl->is_supported = (e_ctrl->is_supported << 1) | 1;
 	CDBG("%s X\n", __func__);

@@ -66,8 +66,6 @@
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
-static struct v4l2_file_operations msm_csiphy_v4l2_subdev_fops;
-
 static void msm_csiphy_write_settings(
 	struct csiphy_device *csiphy_dev,
 	struct csiphy_settings_t csiphy_settings)
@@ -2191,31 +2189,47 @@ static long msm_csiphy_subdev_ioctl(struct v4l2_subdev *sd,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_csiphy_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_csiphy_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-	struct csiphy_cfg_data32 *u32 =
-		(struct csiphy_cfg_data32 *)arg;
+	struct csiphy_cfg_data32 data;
+	struct csiphy_cfg_data32 *u32;
 	struct csiphy_cfg_data csiphy_data;
+	uint32_t subdev_id;
+	struct msm_camera_csi_lane_params csi_lane_params;
 
 	switch (cmd) {
 	case VIDIOC_MSM_CSIPHY_IO_CFG32:
 		cmd = VIDIOC_MSM_CSIPHY_IO_CFG;
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(data));
+			return -EFAULT;
+		}
+		u32 = &data;
 		csiphy_data.cfgtype = u32->cfgtype;
 		csiphy_data.cfg.csiphy_params =
 			compat_ptr(u32->cfg.csiphy_params);
-		return msm_csiphy_subdev_ioctl(sd, cmd, &csiphy_data);
+		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)&csiphy_data);
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+	case VIDIOC_MSM_CSIPHY_RELEASE:
+	case MSM_SD_SHUTDOWN:
+		if (copy_from_user(&csi_lane_params, (void __user *)arg,
+			sizeof(csi_lane_params))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)&csi_lane_params);
 	default:
-		return msm_csiphy_subdev_ioctl(sd, cmd, arg);
+		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)arg);
 	}
-}
-
-static long msm_csiphy_subdev_fops_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_csiphy_subdev_do_ioctl);
 }
 #endif
 
@@ -2223,6 +2237,9 @@ static const struct v4l2_subdev_internal_ops msm_csiphy_internal_ops;
 
 static struct v4l2_subdev_core_ops msm_csiphy_subdev_core_ops = {
 	.ioctl = &msm_csiphy_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_csiphy_subdev_do_ioctl32,
+#endif
 };
 
 static const struct v4l2_subdev_ops msm_csiphy_subdev_ops = {
@@ -2459,13 +2476,6 @@ static int csiphy_probe(struct platform_device *pdev)
 	}
 	msm_camera_enable_irq(new_csiphy_dev->irq, false);
 
-	msm_cam_copy_v4l2_subdev_fops(&msm_csiphy_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_csiphy_v4l2_subdev_fops.compat_ioctl32 =
-		msm_csiphy_subdev_fops_ioctl;
-#endif
-	new_csiphy_dev->msm_sd.sd.devnode->fops =
-		&msm_csiphy_v4l2_subdev_fops;
 	new_csiphy_dev->csiphy_state = CSIPHY_POWER_DOWN;
 	return 0;
 

@@ -711,11 +711,9 @@ static long msm_camera_buf_mgr_update_buf_info(
 		return -EFAULT;
 	return 0;
 }
-static long msm_camera_buf_mgr_internal_compat_ioctl(struct file *file,
+static long msm_camera_buf_mgr_internal_compat_ioctl(struct v4l2_subdev *sd,
 		unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 	long rc = 0;
 	struct msm_camera_private_ioctl_arg k_ioctl;
 	void __user *tmp_compat_ioctl_ptr = NULL;
@@ -765,11 +763,9 @@ static long msm_camera_buf_mgr_internal_compat_ioctl(struct file *file,
 	return 0;
 }
 
-static long msm_bmgr_subdev_fops_compat_ioctl(struct file *file,
+static long msm_bmgr_subdev_fops_compat_ioctl(struct v4l2_subdev *sd,
 		unsigned int cmd, unsigned long arg)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
 	int32_t rc = 0;
 
 	/* Convert 32 bit IOCTL ID's to 64 bit IOCTL ID's
@@ -830,7 +826,7 @@ static long msm_bmgr_subdev_fops_compat_ioctl(struct file *file,
 		break;
 	}
 	case VIDIOC_MSM_BUF_MNGR_IOCTL_CMD: {
-		rc = msm_camera_buf_mgr_internal_compat_ioctl(file, cmd, arg);
+		rc = msm_camera_buf_mgr_internal_compat_ioctl(sd, cmd, arg);
 		if (rc < 0) {
 			pr_debug("Subdev cmd %d fail\n", cmd);
 			return rc;
@@ -860,6 +856,9 @@ static long msm_bmgr_subdev_fops_compat_ioctl(struct file *file,
 
 static struct v4l2_subdev_core_ops msm_buf_mngr_subdev_core_ops = {
 	.ioctl = msm_buf_mngr_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_bmgr_subdev_fops_compat_ioctl,
+#endif
 };
 
 static const struct v4l2_subdev_internal_ops
@@ -876,25 +875,6 @@ static const struct of_device_id msm_buf_mngr_dt_match[] = {
 	{}
 };
 
-static struct v4l2_file_operations msm_buf_v4l2_subdev_fops;
-
-static long msm_bmgr_subdev_do_ioctl(
-		struct file *file, unsigned int cmd, void *arg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-
-	return v4l2_subdev_call(sd, core, ioctl, cmd, arg);
-}
-
-
-static long msm_buf_subdev_fops_ioctl(struct file *file,
-		unsigned int cmd,
-		unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_bmgr_subdev_do_ioctl);
-}
-
 int32_t msm_buf_mngr_init(void)
 {
 	int32_t rc = 0;
@@ -908,12 +888,6 @@ int32_t msm_buf_mngr_init(void)
 	/* Sub-dev */
 	v4l2_subdev_init(&msm_buf_mngr_dev->subdev.sd,
 		&msm_buf_mngr_subdev_ops);
-	msm_cam_copy_v4l2_subdev_fops(&msm_buf_v4l2_subdev_fops);
-	msm_buf_v4l2_subdev_fops.unlocked_ioctl = msm_buf_subdev_fops_ioctl;
-#ifdef CONFIG_COMPAT
-	msm_buf_v4l2_subdev_fops.compat_ioctl32 =
-			msm_bmgr_subdev_fops_compat_ioctl;
-#endif
 	snprintf(msm_buf_mngr_dev->subdev.sd.name,
 		ARRAY_SIZE(msm_buf_mngr_dev->subdev.sd.name), "msm_buf_mngr");
 	msm_buf_mngr_dev->subdev.sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
@@ -930,8 +904,6 @@ int32_t msm_buf_mngr_init(void)
 		pr_err("%s: msm_sd_register error = %d\n", __func__, rc);
 		goto end;
 	}
-
-	msm_buf_mngr_dev->subdev.sd.devnode->fops = &msm_buf_v4l2_subdev_fops;
 
 	v4l2_subdev_notify(&msm_buf_mngr_dev->subdev.sd, MSM_SD_NOTIFY_REQ_CB,
 		&msm_buf_mngr_dev->vb2_ops);

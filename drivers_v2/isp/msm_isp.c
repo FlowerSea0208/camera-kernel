@@ -340,7 +340,8 @@ void msm_isp_update_last_overflow_ab_ib(struct vfe_device *vfe_dev)
 	spin_unlock(&req_history_lock);
 }
 
-
+//TODO:NTC dqevent for compat
+#if 0
 #ifdef CONFIG_COMPAT
 static long msm_isp_dqevent(struct file *file, struct v4l2_fh *vfh, void *arg)
 {
@@ -437,6 +438,7 @@ static long msm_isp_subdev_do_ioctl(
 		return v4l2_subdev_call(sd, core, ioctl, cmd, arg);
 	}
 }
+#endif
 
 static struct v4l2_subdev_core_ops msm_vfe_v4l2_subdev_core_ops = {
 	.ioctl = msm_isp_ioctl,
@@ -453,12 +455,8 @@ static struct v4l2_subdev_internal_ops msm_vfe_subdev_internal_ops = {
 	.close = msm_isp_close_node,
 };
 
-static long msm_isp_v4l2_fops_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_isp_subdev_do_ioctl);
-}
-
+//TODO:NTC msm_isp_v4l2_fops_mmap
+#if 0
 static void isp_vma_open(struct vm_area_struct *vma)
 {
 	pr_debug("%s: open called\n", __func__);
@@ -515,15 +513,7 @@ static int msm_isp_v4l2_fops_mmap(struct file *filep,
 		__func__, vma->vm_start);
 	return ret;
 }
-
-static struct v4l2_file_operations msm_isp_v4l2_fops = {
-#ifdef CONFIG_COMPAT
-	.compat_ioctl32 = msm_isp_v4l2_fops_ioctl,
 #endif
-	.unlocked_ioctl = msm_isp_v4l2_fops_ioctl,
-	.mmap = msm_isp_v4l2_fops_mmap
-};
-
 static int vfe_set_common_data(struct platform_device *pdev)
 {
 	struct v4l2_subdev *sd = NULL;
@@ -741,16 +731,11 @@ int vfe_hw_probe(struct platform_device *pdev)
 		pr_err("%s: msm_sd_register error = %d\n", __func__, rc);
 		goto probe_fail3;
 	}
-	msm_cam_copy_v4l2_subdev_fops(&msm_isp_v4l2_fops);
-	msm_isp_v4l2_fops.unlocked_ioctl = msm_isp_v4l2_fops_ioctl;
-#ifdef CONFIG_COMPAT
-	msm_isp_v4l2_fops.compat_ioctl32 =
-		msm_isp_v4l2_fops_ioctl;
+
+//TODO:NTC msm_isp_v4l2_fops_mmap
+#if 0
+	vfe_dev->subdev.sd.devnode->fops->mmap = msm_isp_v4l2_fops_mmap;
 #endif
-	msm_isp_v4l2_fops.mmap = msm_isp_v4l2_fops_mmap;
-
-	vfe_dev->subdev.sd.devnode->fops = &msm_isp_v4l2_fops;
-
 	vfe_dev->buf_mgr = &vfe_buf_mgr;
 	v4l2_subdev_notify(&vfe_dev->subdev.sd,
 		MSM_SD_NOTIFY_REQ_CB, &vfe_vb2_ops);

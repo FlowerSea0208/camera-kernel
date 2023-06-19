@@ -90,10 +90,6 @@ static struct camera_vreg_t csid_vreg_info[] = {
 	{"qcom,mipi-csi-vdd", 0, 0, 12000},
 };
 
-#ifdef CONFIG_COMPAT
-static struct v4l2_file_operations msm_csid_v4l2_subdev_fops;
-#endif
-
 static inline uint32_t msm_camera_vio_r(
 	void __iomem *base_addr, uint32_t offset, uint32_t dev_id) {
 	return msm_camera_tz_r(base_addr, offset,
@@ -1197,19 +1193,33 @@ MEM_CLEAN32:
 }
 
 static long msm_csid_subdev_ioctl32(struct v4l2_subdev *sd,
-			unsigned int cmd, void *arg)
+			unsigned int cmd, unsigned long arg)
 {
 	int rc = -ENOIOCTLCMD;
+	uint32_t data_id;
+	struct csid_cfg_data32 data;
 	struct csid_device *csid_dev = v4l2_get_subdevdata(sd);
 
 	mutex_lock(&csid_dev->mutex);
 	CDBG("%s:%d id %d\n", __func__, __LINE__, csid_dev->pdev->id);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		rc = msm_csid_get_subdev_id(csid_dev, arg);
+		if (copy_from_user(&data_id, (void __user *)arg,
+			sizeof(data_id))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(data_id));
+			return -EFAULT;
+		}
+		rc = msm_csid_get_subdev_id(csid_dev, (void *)&data_id);
 		break;
 	case VIDIOC_MSM_CSID_IO_CFG32:
-		rc = msm_csid_cmd32(csid_dev, arg);
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(data));
+			return -EFAULT;
+		}
+		rc = msm_csid_cmd32(csid_dev, (void *)&data);
 		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		if (csid_dev->csid_state != CSID_POWER_UP)
@@ -1237,25 +1247,14 @@ static long msm_csid_subdev_ioctl32(struct v4l2_subdev *sd,
 	return rc;
 }
 
-static long msm_csid_subdev_do_ioctl32(
-	struct file *file, unsigned int cmd, void *arg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-
-	return msm_csid_subdev_ioctl32(sd, cmd, arg);
-}
-
-static long msm_csid_subdev_fops_ioctl32(struct file *file, unsigned int cmd,
-	unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_csid_subdev_do_ioctl32);
-}
 #endif
 static const struct v4l2_subdev_internal_ops msm_csid_internal_ops;
 
 static struct v4l2_subdev_core_ops msm_csid_subdev_core_ops = {
 	.ioctl = &msm_csid_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = &msm_csid_subdev_ioctl32,
+#endif
 	.interrupt_service_routine = msm_csid_irq_routine,
 };
 
@@ -1358,12 +1357,6 @@ static int csid_probe(struct platform_device *pdev)
 	new_csid_dev->msm_sd.sd.entity.function = MSM_CAMERA_SUBDEV_CSID;
 	new_csid_dev->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x5;
 	msm_sd_register(&new_csid_dev->msm_sd);
-
-#ifdef CONFIG_COMPAT
-	msm_cam_copy_v4l2_subdev_fops(&msm_csid_v4l2_subdev_fops);
-	msm_csid_v4l2_subdev_fops.compat_ioctl32 = msm_csid_subdev_fops_ioctl32;
-	new_csid_dev->msm_sd.sd.devnode->fops = &msm_csid_v4l2_subdev_fops;
-#endif
 
 	rc = msm_camera_register_irq(pdev, new_csid_dev->irq,
 		msm_csid_irq, IRQF_TRIGGER_RISING, "csid", new_csid_dev);

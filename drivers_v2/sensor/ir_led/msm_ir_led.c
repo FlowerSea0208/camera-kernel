@@ -23,8 +23,6 @@
 
 DEFINE_MSM_MUTEX(msm_ir_led_mutex);
 
-static struct v4l2_file_operations msm_ir_led_v4l2_subdev_fops;
-
 static const struct of_device_id msm_ir_led_dt_match[] = {
 	{.compatible = "qcom,ir-led", .data = NULL},
 	{}
@@ -259,8 +257,52 @@ static long msm_ir_led_subdev_ioctl(struct v4l2_subdev *sd,
 	CDBG("Exit\n");
 }
 
+#ifdef CONFIG_COMPAT
+static long msm_ir_led_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
+{
+	int32_t rc = 0;
+	struct msm_ir_led_cfg_data_t32 data;
+	struct msm_ir_led_cfg_data_t32 *u32;
+	struct msm_ir_led_cfg_data_t ir_led_data;
+	uint32_t subdev_id;
+
+	CDBG("Enter\n");
+	switch (cmd) {
+	case VIDIOC_MSM_IR_LED_CFG32:
+		cmd = VIDIOC_MSM_IR_LED_CFG;
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		u32 = &data;
+		ir_led_data.cfg_type = u32->cfg_type;
+		ir_led_data.pwm_duty_on_ns = u32->pwm_duty_on_ns;
+		ir_led_data.pwm_period_ns = u32->pwm_period_ns;
+
+		return msm_ir_led_subdev_ioctl(sd, cmd, &ir_led_data);
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_ir_led_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+	default:
+		return msm_ir_led_subdev_ioctl(sd, cmd, (void *)arg);
+	}
+
+	CDBG("Exit\n");
+	return rc;
+}
+#endif
+
 static struct v4l2_subdev_core_ops msm_ir_led_subdev_core_ops = {
 	.ioctl = msm_ir_led_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_ir_led_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_ir_led_subdev_ops = {
@@ -311,43 +353,6 @@ static int32_t msm_ir_led_get_dt_data(struct device_node *of_node,
 	fctrl->ir_led_driver_type = IR_LED_DRIVER_DEFAULT;
 	return rc;
 }
-
-#ifdef CONFIG_COMPAT
-static long msm_ir_led_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
-{
-	int32_t rc = 0;
-	struct video_device *vdev = video_devdata(file);
-	struct v4l2_subdev *sd = vdev_to_v4l2_subdev(vdev);
-	struct msm_ir_led_cfg_data_t32 *u32 =
-		(struct msm_ir_led_cfg_data_t32 *)arg;
-	struct msm_ir_led_cfg_data_t ir_led_data;
-
-	CDBG("Enter\n");
-	switch (cmd) {
-	case VIDIOC_MSM_IR_LED_CFG32:
-		cmd = VIDIOC_MSM_IR_LED_CFG;
-		break;
-	default:
-		return msm_ir_led_subdev_ioctl(sd, cmd, arg);
-	}
-
-	ir_led_data.cfg_type = u32->cfg_type;
-	ir_led_data.pwm_duty_on_ns = u32->pwm_duty_on_ns;
-	ir_led_data.pwm_period_ns = u32->pwm_period_ns;
-
-	rc = msm_ir_led_subdev_ioctl(sd, cmd, &ir_led_data);
-
-	CDBG("Exit\n");
-	return rc;
-}
-
-static long msm_ir_led_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_ir_led_subdev_do_ioctl);
-}
-#endif
 
 static int32_t msm_ir_led_platform_probe(struct platform_device *pdev)
 {
@@ -404,12 +409,6 @@ static int32_t msm_ir_led_platform_probe(struct platform_device *pdev)
 
 	CDBG("ir_led sd name = %s\n",
 		ir_led_ctrl->msm_sd.sd.entity.name);
-	msm_ir_led_v4l2_subdev_fops = v4l2_subdev_fops;
-#ifdef CONFIG_COMPAT
-	msm_ir_led_v4l2_subdev_fops.compat_ioctl32 =
-		msm_ir_led_subdev_fops_ioctl;
-#endif
-	ir_led_ctrl->msm_sd.sd.devnode->fops = &msm_ir_led_v4l2_subdev_fops;
 
 	CDBG("probe success\n");
 	return rc;

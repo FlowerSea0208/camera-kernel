@@ -25,7 +25,6 @@
 
 DEFINE_MSM_MUTEX(msm_flash_mutex);
 
-static struct v4l2_file_operations msm_flash_v4l2_subdev_fops;
 static struct led_trigger *torch_trigger;
 
 static const struct of_device_id msm_flash_dt_match[] = {
@@ -55,6 +54,10 @@ static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl = {
 	.i2c_poll =  msm_camera_cci_i2c_poll,
 };
 
+#ifdef CONFIG_COMPAT
+static long msm_flash_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg);
+#endif
 static void msm_torch_brightness_set(struct led_classdev *led_cdev,
 				enum led_brightness value)
 {
@@ -917,6 +920,9 @@ static long msm_flash_subdev_ioctl(struct v4l2_subdev *sd,
 
 static struct v4l2_subdev_core_ops msm_flash_subdev_core_ops = {
 	.ioctl = msm_flash_subdev_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_flash_subdev_do_ioctl32,
+#endif
 };
 
 static struct v4l2_subdev_ops msm_flash_subdev_ops = {
@@ -1190,30 +1196,28 @@ static int32_t msm_flash_get_dt_data(struct device_node *of_node,
 }
 
 #ifdef CONFIG_COMPAT
-static long msm_flash_subdev_do_ioctl(
-	struct file *file, unsigned int cmd, void *arg)
+static long msm_flash_subdev_do_ioctl32(struct v4l2_subdev *sd,
+		unsigned int cmd, unsigned long arg)
 {
 	int32_t i = 0;
 	int32_t rc = 0;
-	struct video_device *vdev;
-	struct v4l2_subdev *sd;
 	struct msm_flash_cfg_data_t32 *u32;
+	struct msm_flash_cfg_data_t32 data;
 	struct msm_flash_cfg_data_t flash_data;
 	struct msm_flash_init_info_t32 flash_init_info32;
 	struct msm_flash_init_info_t flash_init_info;
+	uint32_t subdev_id;
 
 	CDBG("Enter");
 
-	if (!file || !arg) {
-		pr_err("%s:failed NULL parameter\n", __func__);
-		return -EINVAL;
-	}
-	vdev = video_devdata(file);
-	sd = vdev_to_v4l2_subdev(vdev);
-	u32 = (struct msm_flash_cfg_data_t32 *)arg;
-
 	switch (cmd) {
 	case VIDIOC_MSM_FLASH_CFG32:
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		u32 = &data;
 		flash_data.cfg_type = u32->cfg_type;
 		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
 			flash_data.flash_current[i] = u32->flash_current[i];
@@ -1251,27 +1255,28 @@ static long msm_flash_subdev_do_ioctl(
 		default:
 			break;
 		}
+		rc =  msm_flash_subdev_ioctl(sd, cmd, &flash_data);
+		for (i = 0; i < MAX_LED_TRIGGERS; i++) {
+			u32->flash_current[i] = flash_data.flash_current[i];
+			u32->flash_duration[i] = flash_data.flash_duration[i];
+		}
 		break;
 	case VIDIOC_MSM_FLASH_CFG:
 		pr_err("invalid cmd 0x%x received\n", cmd);
 		return -EINVAL;
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_from_user(&subdev_id, (void __user *)arg,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		return msm_flash_subdev_ioctl(sd, cmd, (void *)&subdev_id);
 	default:
-		return msm_flash_subdev_ioctl(sd, cmd, arg);
+		return msm_flash_subdev_ioctl(sd, cmd, (void *)arg);
 	}
 
-	rc =  msm_flash_subdev_ioctl(sd, cmd, &flash_data);
-	for (i = 0; i < MAX_LED_TRIGGERS; i++) {
-		u32->flash_current[i] = flash_data.flash_current[i];
-		u32->flash_duration[i] = flash_data.flash_duration[i];
-	}
 	CDBG("Exit");
 	return rc;
-}
-
-static long msm_flash_subdev_fops_ioctl(struct file *file,
-	unsigned int cmd, unsigned long arg)
-{
-	return video_usercopy(file, cmd, arg, msm_flash_subdev_do_ioctl);
 }
 #endif
 static int32_t msm_flash_platform_probe(struct platform_device *pdev)
@@ -1336,12 +1341,6 @@ static int32_t msm_flash_platform_probe(struct platform_device *pdev)
 
 	CDBG("%s:%d flash sd name = %s", __func__, __LINE__,
 		flash_ctrl->msm_sd.sd.entity.name);
-	msm_cam_copy_v4l2_subdev_fops(&msm_flash_v4l2_subdev_fops);
-#ifdef CONFIG_COMPAT
-	msm_flash_v4l2_subdev_fops.compat_ioctl32 =
-		msm_flash_subdev_fops_ioctl;
-#endif
-	flash_ctrl->msm_sd.sd.devnode->fops = &msm_flash_v4l2_subdev_fops;
 
 	if (flash_ctrl->flash_driver_type == FLASH_DRIVER_PMIC)
 		rc = msm_torch_create_classdev(pdev, flash_ctrl);
