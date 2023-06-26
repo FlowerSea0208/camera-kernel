@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/build_bug.h>
+#include <linux/stringify.h>
 
 #include "cam_req_mgr_dev.h"
 #include "cam_sync_api.h"
@@ -57,6 +59,10 @@
 #include "cam_tfe_csid530.h"
 #include "cam_csid_ppi100.h"
 #include "camera_main.h"
+
+char camera_banner[] = "Camera-Banner: (" __stringify(KBUILD_BUILD_USER) "@"\
+	__stringify(KBUILD_BUILD_HOST) ")\
+	(" __stringify(KBUILD_BUILD_TIMESTAMP) ")";
 
 struct camera_submodule_component {
 	int (*init)(void);
