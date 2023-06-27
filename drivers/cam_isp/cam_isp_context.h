@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_CONTEXT_H_
@@ -256,8 +257,6 @@ struct cam_isp_context_event_record {
  * @custom_enabled:            Custom HW enabled for this ctx
  * @use_frame_header_ts:       Use frame header for qtimer ts
  * @init_timestamp:            Timestamp at which this context is initialized
- * @rxd_epoch:                 Indicate whether epoch has been received. Used to
- *                             decide whether to apply request in offline ctx
  * @workq:                     Worker thread for offline ife
  * @trigger_id:                ID provided by CRM for each ctx on the link
  *
@@ -300,7 +299,6 @@ struct cam_isp_context {
 	bool                                  custom_enabled;
 	bool                                  use_frame_header_ts;
 	unsigned int                          init_timestamp;
-	atomic_t                              rxd_epoch;
 	struct cam_req_mgr_core_workq        *workq;
 	int32_t                               trigger_id;
 };

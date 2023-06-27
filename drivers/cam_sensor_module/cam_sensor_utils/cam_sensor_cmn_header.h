@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SENSOR_CMN_HEADER_
@@ -346,6 +347,9 @@ enum msm_sensor_camera_id_t {
 	CAMERA_5,
 	CAMERA_6,
 	CAMERA_7,
+	CAMERA_8,
+	CAMERA_9,
+	CAMERA_10,
 	MAX_CAMERAS,
 };
 

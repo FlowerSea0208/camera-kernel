@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_MGR_INTF_H_
@@ -231,6 +232,8 @@ enum cam_isp_hw_mgr_command {
 	CAM_ISP_HW_MGR_CMD_SOF_DEBUG,
 	CAM_ISP_HW_MGR_CMD_CTX_TYPE,
 	CAM_ISP_HW_MGR_GET_PACKET_OPCODE,
+	CAM_ISP_HW_MGR_CMD_CHECK_START_OFFLINE,
+	CAM_ISP_HW_MGR_CMD_FLUSH_OFFLINE,
 	CAM_ISP_HW_MGR_GET_LAST_CDM_DONE,
 	CAM_ISP_HW_MGR_CMD_MAX,
 };
@@ -259,6 +262,7 @@ struct cam_isp_hw_cmd_args {
 		uint32_t                      sof_irq_enable;
 		uint32_t                      ctx_type;
 		uint32_t                      packet_op_code;
+		int64_t                       req_id;
 		uint64_t                      last_cdm_done;
 	} u;
 };
