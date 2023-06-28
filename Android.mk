@@ -28,5 +28,6 @@ LOCAL_MODULE                := ais.ko
 LOCAL_MODULE_TAGS           := optional
 
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
+
+endif #TARGET_USES_QMAA_OVERRIDE_CAMERA
 endif #TARGET_IS_HEADLESS
