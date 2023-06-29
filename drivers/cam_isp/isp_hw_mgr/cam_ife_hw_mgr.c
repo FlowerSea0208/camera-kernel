@@ -3175,6 +3175,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	}
 
 	ife_ctx->ctx_in_use = 1;
+	ife_ctx->num_reg_dump_buf = 0;
 
 	acquire_args->valid_acquired_hw =
 		acquire_hw_info->num_inputs;
@@ -3428,6 +3429,7 @@ static int cam_ife_mgr_acquire_dev(void *hw_mgr_priv, void *acquire_hw_args)
 	}
 
 	ife_ctx->ctx_in_use = 1;
+	ife_ctx->num_reg_dump_buf = 0;
 
 	cam_ife_hw_mgr_print_acquire_info(ife_mgr_ctx, total_pix_port,
 		total_pd_port, total_rdi_port, rc);
@@ -4631,6 +4633,7 @@ static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 	ctx->is_rdi_only_context = 0;
 	ctx->cdm_handle = 0;
 	ctx->cdm_ops = NULL;
+	ctx->num_reg_dump_buf = 0;
 	atomic_set(&ctx->overflow_pending, 0);
 	for (i = 0; i < CAM_IFE_HW_NUM_MAX; i++) {
 		ctx->sof_cnt[i] = 0;
@@ -6121,13 +6124,24 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		atomic_read(&ctx->ctx_state) == CAM_IFE_HW_STATE_STARTING)) {
 
 		prepare_hw_data->packet_opcode_type = CAM_ISP_PACKET_INIT_DEV;
-		if ((prepare->num_reg_dump_buf) && (prepare->num_reg_dump_buf <
-			CAM_REG_DUMP_MAX_BUF_ENTRIES)) {
+
+		if ((!prepare->num_reg_dump_buf) || (prepare->num_reg_dump_buf >
+			CAM_REG_DUMP_MAX_BUF_ENTRIES))
+			goto end;
+
+		if (!ctx->num_reg_dump_buf) {
 			ctx->num_reg_dump_buf = prepare->num_reg_dump_buf;
 			memcpy(ctx->reg_dump_buf_desc,
 				prepare->reg_dump_buf_desc,
 				sizeof(struct cam_cmd_buf_desc) *
 				prepare->num_reg_dump_buf);
+		} else {
+			prepare_hw_data->num_reg_dump_buf =
+				prepare->num_reg_dump_buf;
+			memcpy(prepare_hw_data->reg_dump_buf_desc,
+				prepare->reg_dump_buf_desc,
+				sizeof(struct cam_cmd_buf_desc) *
+				prepare_hw_data->num_reg_dump_buf);
 		}
 
 		goto end;
