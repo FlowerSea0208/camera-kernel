@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_MGR_INTF_H_
@@ -243,6 +244,7 @@ enum cam_isp_ctx_type {
 	CAM_ISP_CTX_FS2 = 1,
 	CAM_ISP_CTX_RDI,
 	CAM_ISP_CTX_PIX,
+	CAM_ISP_CTX_OFFLINE,
 	CAM_ISP_CTX_MAX,
 };
 /**

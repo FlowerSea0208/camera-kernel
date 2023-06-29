@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_H_
@@ -77,8 +78,8 @@ enum cam_isp_resource_type {
 	CAM_ISP_RESOURCE_CID,
 	CAM_ISP_RESOURCE_PIX_PATH,
 	CAM_ISP_RESOURCE_VFE_IN,
-	CAM_ISP_RESOURCE_VFE_OUT,
 	CAM_ISP_RESOURCE_VFE_BUS_RD,
+	CAM_ISP_RESOURCE_VFE_OUT,
 	CAM_ISP_RESOURCE_TPG,
 	CAM_ISP_RESOURCE_TFE_IN,
 	CAM_ISP_RESOURCE_TFE_OUT,
@@ -115,6 +116,7 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP,
 	CAM_ISP_HW_CMD_DUMP_HW,
 	CAM_ISP_HW_CMD_TPG_SET_PATTERN,
+	CAM_ISP_HW_CMD_FE_TRIGGER_CMD,
 	CAM_ISP_HW_CMD_MAX,
 };
 
