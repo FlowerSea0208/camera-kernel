@@ -17,7 +17,7 @@
 
 
 /* maximum context numbers */
-#define CAM_CTX_MAX                         10
+#define CAM_CTX_MAX                         20
 #define CAM_MAX_OFFLINE_HW                   2
 
 /* maximum buf done irqs */
