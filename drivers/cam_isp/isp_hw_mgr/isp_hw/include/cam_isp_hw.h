@@ -223,6 +223,7 @@ struct cam_isp_hw_get_wm_update {
 	dma_addr_t                     *image_buf;
 	uint32_t                        num_buf;
 	struct cam_buf_io_cfg          *io_cfg;
+	uint32_t                        unpacker_fmt;
 };
 
 /*

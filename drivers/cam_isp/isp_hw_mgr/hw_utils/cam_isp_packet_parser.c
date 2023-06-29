@@ -530,7 +530,8 @@ int cam_isp_add_io_buffers(
 	struct cam_isp_hw_mgr_res            *res_list_isp_out,
 	struct list_head                     *res_list_ife_in_rd,
 	uint32_t                              size_isp_out,
-	bool                                  fill_fence)
+	bool                                  fill_fence,
+	uint32_t                              unpacker_fmt)
 {
 	int                                 rc = 0;
 	dma_addr_t                          io_addr[CAM_PACKET_MAX_PLANES];
@@ -874,9 +875,10 @@ int cam_isp_add_io_buffers(
 			update_buf.cmd.cmd_buf_addr = kmd_buf_info->cpu_addr +
 				kmd_buf_info->used_bytes/4 +
 					io_cfg_used_bytes/4;
-			bus_rd_update.image_buf = io_addr;
-			bus_rd_update.num_buf   = plane_id;
-			bus_rd_update.io_cfg    = &io_cfg[i];
+			bus_rd_update.image_buf    = io_addr;
+			bus_rd_update.num_buf      = plane_id;
+			bus_rd_update.io_cfg       = &io_cfg[i];
+			bus_rd_update.unpacker_fmt = unpacker_fmt;
 			update_buf.cmd.size = kmd_buf_remain_size;
 			update_buf.rm_update = &bus_rd_update;
 

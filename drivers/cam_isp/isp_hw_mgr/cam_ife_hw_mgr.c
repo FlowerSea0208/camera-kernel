@@ -1124,10 +1124,6 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_pixel(
 	struct cam_isp_hw_mgr_res                *ife_out_res;
 	struct cam_hw_intf                       *hw_intf;
 
-	if (ife_ctx->is_offline) {
-		kzalloc(
-		sizeof(struct cam_isp_in_port_generic_info), GFP_KERNEL);
-	}
 	for (i = 0; i < in_port->num_out_res; i++) {
 		out_port = &in_port->data[i];
 		k = out_port->res_type & 0xFF;
@@ -5987,6 +5983,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 	int rc = 0;
 	struct cam_hw_prepare_update_args *prepare =
 		(struct cam_hw_prepare_update_args *) prepare_hw_update_args;
+	struct cam_ife_hw_mgr_ctx               *ife_ctx;
 	struct cam_ife_hw_concrete_ctx          *ctx;
 	struct cam_ife_hw_mgr                   *hw_mgr;
 	struct cam_kmd_buf_info                  kmd_buf;
@@ -6002,8 +5999,8 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 	prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
 		prepare->priv;
 	hw_mgr = (struct cam_ife_hw_mgr *)hw_mgr_priv;
-	ctx = ((struct cam_ife_hw_mgr_ctx *)
-			prepare->ctxt_to_hw_map)->concr_ctx;
+	ife_ctx =(struct cam_ife_hw_mgr_ctx *)prepare->ctxt_to_hw_map;
+	ctx = ife_ctx->concr_ctx;
 	if (!ctx)
 		CAM_ERR(CAM_ISP, "NULL ctx");
 
@@ -6074,7 +6071,8 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 			prepare, ctx->base[i].idx,
 			&kmd_buf, ctx->res_list_ife_out,
 			&ctx->res_list_ife_in_rd,
-			CAM_IFE_HW_OUT_RES_MAX, fill_fence);
+			CAM_IFE_HW_OUT_RES_MAX, fill_fence,
+			ife_ctx->unpacker_fmt);
 
 		if (rc) {
 			CAM_ERR(CAM_ISP,
@@ -7965,6 +7963,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 
 	if (is_offline) {
 		ife_mgr_ctx->is_offline = true;
+		ife_mgr_ctx->unpacker_fmt = ife_mgr_ctx->bw_data.format;
 		allocated = false;
 		mutex_lock(&ife_hw_mgr->ctx_mutex);
 		ctx_idx =
