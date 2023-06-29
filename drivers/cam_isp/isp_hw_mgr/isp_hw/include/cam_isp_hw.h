@@ -118,6 +118,7 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_TPG_SET_PATTERN,
 	CAM_ISP_HW_CMD_FE_TRIGGER_CMD,
 	CAM_ISP_HW_CMD_WM_UPDATE,
+	CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -243,6 +244,24 @@ struct cam_isp_hw_get_cmd_update {
 		struct cam_isp_hw_get_wm_update      *wm_update;
 		struct cam_isp_hw_get_wm_update      *rm_update;
 	};
+};
+
+/*
+ * struct cam_isp_hw_get_off_clk_thr:
+ *
+ * @Brief:         Get thresholds for offline HW
+ *
+ * @max_clk_threshold:      min clock threshold
+ * @nom_clk_threshold:      nom clock threshold
+ * @min_clk_threshold:      max clock threshold
+ * @bytes_per_clk:          bytes per clock processed
+ *
+ */
+struct cam_isp_hw_get_off_clk_thr {
+	uint32_t   max_clk_threshold;
+	uint32_t   nom_clk_threshold;
+	uint32_t   min_clk_threshold;
+	uint32_t   bytes_per_clk;
 };
 
 /*
