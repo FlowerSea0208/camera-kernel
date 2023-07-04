@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SENSOR_CMN_HEADER_
@@ -28,6 +28,7 @@
 #define CAM_FLASH_NAME     "cam-flash"
 #define CAM_EEPROM_NAME    "cam-eeprom"
 #define CAM_OIS_NAME       "cam-ois"
+#define CAM_LENS_DRIVER_NAME "cam-lensdriver"
 
 #define MAX_SYSTEM_PIPELINE_DELAY 2
 
@@ -128,6 +129,7 @@ enum sensor_sub_module {
 	SUB_MODULE_OIS,
 	SUB_MODULE_IR_LED,
 	SUB_MODULE_EXT,
+	SUB_MODULE_LENS_DRIVER,
 	SUB_MODULE_MAX,
 };
 
@@ -157,6 +159,8 @@ enum cam_sensor_packet_opcodes {
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_READ,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_FRAME_SKIP_UPDATE,
+	CAM_SENSOR_PACKET_OPCODE_SENSOR_POWERON_REG,
+	CAM_SENSOR_PACKET_OPCODE_SENSOR_POWEROFF_REG,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_NOP = 127
 };
 
@@ -177,6 +181,24 @@ enum cam_ois_packet_opcodes {
 	CAM_OIS_PACKET_OPCODE_OIS_CONTROL,
 	CAM_OIS_PACKET_OPCODE_READ,
 	CAM_OIS_PACKET_OPCODE_WRITE_TIME
+};
+
+enum cam_lens_driver_command_type {
+	CAM_LENS_DRIVER_CMD_TYPE_INVALID,
+	CAM_LENS_DRIVER_ABS_MOTOR_MOVE,
+	CAM_LENS_DRIVER_REL_MOTOR_MOVE,
+	CAM_LENS_DRIVER_GET_MOTOR_MOVING_STATUS,
+	CAM_LENS_DRIVER_PI_CALIBRATION,
+	CAM_LENS_DRIVER_SET_MOTOR_CONTROL,
+	CAM_LENS_DRIVER_SET_MOTOR_ACTUAL_POSITION,
+	CAM_LENS_DRIVER_ABORT_MOTOR_MOVING,
+	CAM_LENS_DRIVER_GET_POWER_LEVEL,
+	CAM_LENS_DRIVER_CMD_TYPE_MAX
+};
+
+enum cam_lens_driver_packet_opcodes {
+	CAM_LENS_DRIVER_PACKET_OPCODE_INIT,
+	CAM_LENS_DRIVER_PACKET_OPCODE_MOTOR_OPERATION
 };
 
 enum msm_bus_perf_setting {
@@ -311,6 +333,8 @@ struct i2c_data_settings {
 	struct i2c_settings_array streamon_settings;
 	struct i2c_settings_array streamoff_settings;
 	struct i2c_settings_array read_settings;
+	struct i2c_settings_array poweron_reg_settings;
+	struct i2c_settings_array poweroff_reg_settings;
 	struct i2c_settings_array *per_frame;
 	struct i2c_settings_array *frame_skip;
 };

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -12,7 +12,8 @@
 #include "cam_trace.h"
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
-
+#include "cam_hdmi_bdg_core.h"
+#include "cam_res_mgr_api.h"
 #include <soc/qcom/boot_stats.h>
 
 
@@ -67,6 +68,31 @@ static void cam_sensor_release_stream_rsc(
 		if (rc < 0)
 			CAM_ERR(CAM_SENSOR,
 				"failed while deleting Streamon settings");
+	}
+}
+
+static void cam_sensor_free_power_reg_rsc(
+	struct cam_sensor_ctrl_t *s_ctrl)
+{
+	struct i2c_settings_array *i2c_set = NULL;
+	int rc;
+
+	i2c_set = &(s_ctrl->i2c_data.poweron_reg_settings);
+	if (i2c_set->is_settings_valid == 1) {
+		i2c_set->is_settings_valid = -1;
+		rc = delete_request(i2c_set);
+		if (rc < 0)
+			CAM_ERR(CAM_SENSOR,
+				"failed while deleting PowerOnReg settings");
+	}
+
+	i2c_set = &(s_ctrl->i2c_data.poweroff_reg_settings);
+	if (i2c_set->is_settings_valid == 1) {
+		i2c_set->is_settings_valid = -1;
+		rc = delete_request(i2c_set);
+		if (rc < 0)
+			CAM_ERR(CAM_SENSOR,
+				"failed while deleting PowerOffReg settings");
 	}
 }
 
@@ -297,10 +323,7 @@ static int32_t cam_sensor_i2c_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 		i2c_reg_settings->request_id = csl_packet->header.request_id;
 		i2c_reg_settings->is_settings_valid = 1;
 
-		rc = cam_sensor_update_req_mgr(s_ctrl, csl_packet);
-		if (rc)
-			CAM_ERR(CAM_SENSOR,
-				"Failed in adding request to req_mgr");
+		cam_sensor_update_req_mgr(s_ctrl, csl_packet);
 		goto end;
 	}
 	default:
@@ -529,7 +552,8 @@ int32_t cam_sensor_update_slave_info(struct cam_cmd_probe *probe_info,
 
 int32_t cam_handle_cmd_buffers_for_probe(void *cmd_buf,
 	struct cam_sensor_ctrl_t *s_ctrl,
-	int32_t cmd_buf_num, uint32_t cmd_buf_length, size_t remain_len)
+	int32_t cmd_buf_num, uint32_t cmd_buf_length, size_t remain_len,
+	struct cam_cmd_buf_desc   *cmd_desc)
 {
 	int32_t rc = 0;
 
@@ -568,6 +592,42 @@ int32_t cam_handle_cmd_buffers_for_probe(void *cmd_buf,
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed in updating power settings");
+			return rc;
+		}
+	}
+		break;
+	case 2: {
+		struct i2c_settings_array *i2c_reg_settings = NULL;
+		struct i2c_data_settings *i2c_data = NULL;
+		struct cam_buf_io_cfg *io_cfg = NULL;
+
+		CAM_DBG(CAM_SENSOR, "poweron_reg_settings");
+		i2c_data = &(s_ctrl->i2c_data);
+		i2c_reg_settings = &i2c_data->poweron_reg_settings;
+		i2c_reg_settings->request_id = 0;
+		rc = cam_sensor_i2c_command_parser(&s_ctrl->io_master_info,
+				i2c_reg_settings, cmd_desc, 1, io_cfg);
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+				"Failed in updating power register settings");
+			return rc;
+		}
+	}
+		break;
+	case 3: {
+		struct i2c_settings_array *i2c_reg_settings = NULL;
+		struct i2c_data_settings *i2c_data = NULL;
+		struct cam_buf_io_cfg *io_cfg = NULL;
+
+		CAM_DBG(CAM_SENSOR, "poweroff_reg_settings");
+		i2c_data = &(s_ctrl->i2c_data);
+		i2c_reg_settings = &i2c_data->poweroff_reg_settings;
+		i2c_reg_settings->request_id = 0;
+		rc = cam_sensor_i2c_command_parser(&s_ctrl->io_master_info,
+				i2c_reg_settings, cmd_desc, 1, io_cfg);
+		if (rc < 0) {
+			CAM_ERR(CAM_SENSOR,
+				"Failed in updating power register settings");
 			return rc;
 		}
 	}
@@ -619,7 +679,7 @@ int32_t cam_handle_mem_ptr(uint64_t handle, struct cam_sensor_ctrl_t *s_ctrl)
 		rc = -EINVAL;
 		goto end;
 	}
-	if (pkt->num_cmd_buf != 2) {
+	if (pkt->num_cmd_buf < 2) {
 		CAM_ERR(CAM_SENSOR, "Expected More Command Buffers : %d",
 			 pkt->num_cmd_buf);
 		rc = -EINVAL;
@@ -654,7 +714,7 @@ int32_t cam_handle_mem_ptr(uint64_t handle, struct cam_sensor_ctrl_t *s_ctrl)
 		ptr = (void *) cmd_buf;
 
 		rc = cam_handle_cmd_buffers_for_probe(ptr, s_ctrl,
-			i, cmd_desc[i].length, remain_len);
+			i, cmd_desc[i].length, remain_len, &cmd_desc[i]);
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed to parse the command Buffer Header");
@@ -685,6 +745,8 @@ void cam_sensor_query_cap(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_OIS];
 	query_cap->ir_led_slot_id =
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_IR_LED];
+	query_cap->ldm_slot_id =
+		s_ctrl->sensordata->subdev_id[SUB_MODULE_LENS_DRIVER];
 	query_cap->slot_info =
 		s_ctrl->soc_info.index;
 }
@@ -782,12 +844,16 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	void *arg)
 {
-	int rc = 0, pkt_opcode = 0;
+	int rc = 0, pkt_opcode = 0, gpio_offset = 0, idx = 0;
 	struct cam_control *cmd = (struct cam_control *)arg;
 	struct cam_camera_slave_info *slave_info =
 		&(s_ctrl->sensordata->slave_info);
 	struct cam_sensor_power_ctrl_t *power_info =
 		&s_ctrl->sensordata->power_info;
+	struct msm_camera_gpio_num_info *gpio_num_info =
+		s_ctrl->sensordata->power_info.gpio_num_info;
+	struct cam_sensor_power_setting *power_setting =
+		s_ctrl->sensordata->power_info.power_setting;
 	if (!s_ctrl || !arg) {
 		CAM_ERR(CAM_SENSOR, "s_ctrl is NULL");
 		return -EINVAL;
@@ -854,8 +920,18 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			CAM_ERR(CAM_SENSOR, "power up failed");
 			goto free_power_settings;
 		}
+		if (s_ctrl->i2c_data.poweron_reg_settings.is_settings_valid) {
+			rc = cam_sensor_apply_settings(s_ctrl, 0,
+				CAM_SENSOR_PACKET_OPCODE_SENSOR_POWERON_REG);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "PowerOn REG_WR failed");
+				goto free_power_settings;
+			}
+			cam_hdmi_bdg_set_cam_ctrl(s_ctrl);
+		}
 
 		/* Match sensor ID */
+		s_ctrl->is_always_on = 0;
 		rc = cam_sensor_match_id(s_ctrl);
 		if (rc < 0) {
 			if (slave_info->sensor_hot_plug_type != 1) {
@@ -871,17 +947,34 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			}
 		}
 
+		if (s_ctrl->i2c_data.poweroff_reg_settings.is_settings_valid
+			&& !rc) {
+			rc = cam_sensor_apply_settings(s_ctrl, 0,
+				CAM_SENSOR_PACKET_OPCODE_SENSOR_POWEROFF_REG);
+			s_ctrl->is_always_on = 1;
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "PowerOff REG_WR failed");
+				goto free_power_settings;
+			}
+		}
+
+		if (s_ctrl->is_always_on == 0) {
+			rc = cam_sensor_power_down(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+						"fail in Sensor Power Down");
+				goto free_power_settings;
+			}
+		}
+
 		CAM_INFO(CAM_SENSOR,
-			"Probe success,slot:%d,slave_addr:0x%x,sensor_id:0x%x",
+			"Probe success,slot:%d,slave_addr:0x%x,sensor_id:0x%x, is always on: %d",
 			s_ctrl->soc_info.index,
 			s_ctrl->sensordata->slave_info.sensor_slave_addr,
-			s_ctrl->sensordata->slave_info.sensor_id);
+			s_ctrl->sensordata->slave_info.sensor_id,
+			s_ctrl->is_always_on);
 
-		rc = cam_sensor_power_down(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "fail in Sensor Power Down");
-			goto free_power_settings;
-		}
+		cam_sensor_free_power_reg_rsc(s_ctrl);
 		/*
 		 * Set probe succeeded flag to 1 so that no other camera shall
 		 * probed on this slot
@@ -943,19 +1036,21 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_up(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "Sensor Power up failed");
-			goto release_mutex;
+		if (!s_ctrl->is_always_on) {
+			rc = cam_sensor_power_up(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "Sensor Power up failed");
+				goto release_mutex;
+			}
 		}
 
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
 		s_ctrl->last_flush_req = 0;
 		CAM_INFO(CAM_SENSOR,
-			"CAM_ACQUIRE_DEV Success, sensor_id:0x%x,sensor_slave_addr:0x%x",
+			"CAM_ACQUIRE_DEV Success, sensor_id:0x%x,sensor_slave_addr:0x%x, is always on: %d",
 			s_ctrl->sensordata->slave_info.sensor_id,
-			s_ctrl->sensordata->slave_info.sensor_slave_addr);
-
+			s_ctrl->sensordata->slave_info.sensor_slave_addr,
+			s_ctrl->is_always_on);
 		place_marker("M - Hibernation: CAM_ACQUIRE_DEV Success");
 	}
 		break;
@@ -978,10 +1073,12 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_down(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "Sensor Power Down failed");
-			goto release_mutex;
+		if (!s_ctrl->is_always_on) {
+			rc = cam_sensor_power_down(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "Sensor Power Down failed");
+				goto release_mutex;
+			}
 		}
 
 		cam_sensor_release_per_frame_resource(s_ctrl);
@@ -1026,6 +1123,7 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	}
 	case CAM_START_DEV: {
 		struct cam_req_mgr_timer_notify timer;
+
 		if ((s_ctrl->sensor_state == CAM_SENSOR_INIT) ||
 			(s_ctrl->sensor_state == CAM_SENSOR_START)) {
 			rc = -EINVAL;
@@ -1084,6 +1182,40 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			if (rc < 0) {
 				CAM_ERR(CAM_SENSOR,
 				"cannot apply streamoff settings");
+			}
+			// Toggling sensor reset GPIO here if sensor is in bad state
+			CAM_DBG(CAM_SENSOR, "UMD_recoveryFlag: %d", cmd->reserved);
+			if (cmd->reserved == IS_ERROR_CODE_RECOVERY_FROM_UMD &&
+				gpio_num_info) {
+				// Toggle RESET GPIO with PowerDown sequence
+				for (idx = 0;
+				idx < power_info->power_down_setting_size; idx++) {
+					power_setting = &power_info->power_down_setting[idx];
+					if (!power_setting) {
+						CAM_ERR(CAM_SENSOR,
+							"Invalid power down settings for index %d", idx);
+						return -EINVAL;
+					}
+					gpio_offset = power_setting->seq_type;
+					cam_sensor_toggle_reset_gpio(power_setting,
+						gpio_num_info, gpio_offset, idx);
+				}
+				// 10 msec explicit delay is given b/w PowerDown and PowerUp
+				usleep_range(EXPLICIT_DELAY_BW_POWER_CYCLE * 1000,
+						(EXPLICIT_DELAY_BW_POWER_CYCLE * 1000) + 1000);
+
+				// Toggle RESET GPIO with PowerUp sequence
+				for (idx = 0; idx < power_info->power_setting_size; idx++) {
+					power_setting = &power_info->power_setting[idx];
+					if (!power_setting) {
+						CAM_ERR(CAM_SENSOR,
+							"Invalid power Up Settings for index %d", idx);
+						return -EINVAL;
+					}
+					gpio_offset = power_setting->seq_type;
+					cam_sensor_toggle_reset_gpio(power_setting,
+						gpio_num_info, gpio_offset, idx);
+				}
 			}
 		}
 
@@ -1203,8 +1335,36 @@ free_power_settings:
 	power_info->power_down_setting = NULL;
 	power_info->power_down_setting_size = 0;
 	power_info->power_setting_size = 0;
+	cam_sensor_free_power_reg_rsc(s_ctrl);
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
 	return rc;
+}
+
+void cam_sensor_toggle_reset_gpio(
+	struct cam_sensor_power_setting *power_setting,
+	struct msm_camera_gpio_num_info *gpio_num_info,
+	int gpio_offset,
+	int idx)
+{
+	if (power_setting->seq_type == SENSOR_RESET &&
+		gpio_num_info->valid[gpio_offset] == 1) {
+		CAM_DBG(CAM_SENSOR, "RESET gpio_num: %d",
+			gpio_num_info->gpio_num[gpio_offset]);
+		cam_res_mgr_gpio_set_value(
+			gpio_num_info->gpio_num[gpio_offset],
+				(int)power_setting->config_val);
+		if (power_setting->delay > 20) {
+			msleep(power_setting->delay);
+		} else if (power_setting->delay) {
+			usleep_range(power_setting->delay * 1000,
+				(power_setting->delay * 1000) + 1000);
+		}
+	}
+	CAM_DBG(CAM_SENSOR,
+		"Index: %d Seq: %d ConfigValue: %d Delay: %d",
+		idx, power_setting->seq_type,
+		(int)power_setting->config_val,
+		power_setting->delay);
 }
 
 int cam_sensor_publish_dev_info(struct cam_req_mgr_device_info *info)
@@ -1395,6 +1555,14 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_READ: {
 			i2c_set = &s_ctrl->i2c_data.read_settings;
+			break;
+		}
+		case CAM_SENSOR_PACKET_OPCODE_SENSOR_POWERON_REG: {
+			i2c_set = &s_ctrl->i2c_data.poweron_reg_settings;
+			break;
+		}
+		case CAM_SENSOR_PACKET_OPCODE_SENSOR_POWEROFF_REG: {
+			i2c_set = &s_ctrl->i2c_data.poweroff_reg_settings;
 			break;
 		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE:
