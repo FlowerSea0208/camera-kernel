@@ -1022,6 +1022,8 @@ void msm_isp_increment_frame_id(struct vfe_device *vfe_dev,
 				ISP_EVENT_REG_UPDATE_MISSING);
 		}
 	}
+	vfe_dev->isp_page->kernel_sofid =
+		vfe_dev->axi_data.src_info[frame_src].frame_id;
 }
 
 static void msm_isp_update_pd_stats_idx(struct vfe_device *vfe_dev,
@@ -2415,14 +2417,14 @@ int msm_isp_drop_frame(struct vfe_device *vfe_dev,
 		/*this notify is per ping and pong buffer*/
 		done_buf->is_drop_reconfig = 1;
 		stream_info->current_framedrop_period = 1;
-		/*Avoid Multiple request frames for single SOF*/
-		vfe_dev->axi_data.src_info[VFE_PIX_0].accept_frame = false;
 
 		if (stream_info->current_framedrop_period !=
 			stream_info->requested_framedrop_period) {
 			msm_isp_cfg_framedrop_reg(stream_info);
 		}
 	}
+	/* Avoid Multiple request frames for single SOF */
+	vfe_dev->axi_data.src_info[VFE_PIX_0].accept_frame = false;
 	spin_unlock_irqrestore(&stream_info->lock, flags);
 
 	/* if buf done will not come, we need to process it ourself */
@@ -2470,6 +2472,10 @@ static void msm_isp_input_disable(struct vfe_device *vfe_dev, int cmd_type)
 		/* deactivate the input line */
 		axi_data->src_info[i].active = 0;
 		src_info = &axi_data->src_info[i];
+		if (i == VFE_PIX_0)
+			vfe_dev->isp_page->kernel_sofid = 0;
+
+		vfe_dev->axi_data.src_info[i].frame_id = 0;
 
 		if (src_info->dual_hw_type == DUAL_HW_MASTER_SLAVE) {
 			struct master_slave_resource_info *ms_res =
@@ -2566,7 +2572,8 @@ static void msm_isp_input_enable(struct vfe_device *vfe_dev,
 		if (axi_data->src_info[i].active)
 			continue;
 		/* activate the input since it is deactivated */
-		axi_data->src_info[i].frame_id = 0;
+		if (!ext_read)
+			axi_data->src_info[i].frame_id = 0;
 		vfe_dev->irq_sof_id = 0;
 		if (axi_data->src_info[i].input_mux != EXTERNAL_READ)
 			axi_data->src_info[i].active = 1;
@@ -3777,8 +3784,7 @@ static int msm_isp_request_frame(struct vfe_device *vfe_dev,
 		return 0;
 	} else if ((vfe_dev->axi_data.src_info[frame_src].active && (frame_id !=
 		vfe_dev->axi_data.src_info[frame_src].frame_id +
-		vfe_dev->axi_data.src_info[frame_src].sof_counter_step)) ||
-		((!vfe_dev->axi_data.src_info[frame_src].active))) {
+		vfe_dev->axi_data.src_info[frame_src].sof_counter_step))) {
 		pr_debug("%s:%d invalid frame id %d cur frame id %d pix %d\n",
 			__func__, __LINE__, frame_id,
 			vfe_dev->axi_data.src_info[frame_src].frame_id,
