@@ -856,9 +856,17 @@ struct msm_isp_event_data {
 	/*Wall clock except for buffer divert events
 	 *which use monotonic clock
 	 */
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 timestamp;
 	/* Monotonic timestamp since bootup */
 	struct timespec64 mono_timestamp;
+#else
+	//TODO:NTC
+	struct timeval timestamp;
+	/* Monotonic timestamp since bootup */
+	struct timeval mono_timestamp;
+#endif
 	uint32_t frame_id;
 	union {
 		/* Sent for Stats_Done event */
@@ -889,9 +897,12 @@ struct msm_isp32_event_data {
 	/*Wall clock except for buffer divert events
 	 *which use monotonic clock
 	 */
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 timestamp;
 	/* Monotonic timestamp since bootup */
 	struct timespec64 mono_timestamp;
+#endif
 	enum msm_vfe_input_src input_intf;
 	uint32_t frame_id;
 	union {

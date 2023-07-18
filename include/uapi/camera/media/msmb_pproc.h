@@ -59,7 +59,12 @@ struct msm_cpp_batch_info_t {
 
 struct msm_cpp_frame_info_t {
 	int32_t frame_id;
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 timestamp;
+#else
+	struct timeval timestamp;
+#endif
 	uint32_t inst_id;
 	uint32_t identity;
 	uint32_t client_id;
@@ -69,7 +74,12 @@ struct msm_cpp_frame_info_t {
 	uint32_t *cpp_cmd_msg;
 	int src_fd;
 	int dst_fd;
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 in_time, out_time;
+#else
+	struct timeval in_time, out_time;
+#endif
 	void __user *cookie;
 	int32_t *status;
 	int32_t duplicate_output;
@@ -145,7 +155,12 @@ struct msm_vpe_stream_buff_info_t {
 
 struct msm_vpe_frame_info_t {
 	int32_t frame_id;
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 timestamp;
+#else
+	struct timeval timestamp;
+#endif
 	uint32_t inst_id;
 	uint32_t identity;
 	uint32_t client_id;
@@ -159,7 +174,12 @@ struct msm_vpe_frame_info_t {
 	unsigned long dest_phyaddr;
 	unsigned long src_chroma_plane_offset;
 	unsigned long dest_chroma_plane_offset;
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 in_time, out_time;
+#else
+	struct timeval in_time, out_time;
+#endif
 	void *cookie;
 
 	struct msm_vpe_buffer_info_t input_buffer_info;

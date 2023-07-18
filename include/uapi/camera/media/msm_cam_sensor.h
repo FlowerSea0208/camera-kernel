@@ -6,6 +6,7 @@
 
 #include <linux/types.h>
 #include <linux/i2c.h>
+#include <linux/videodev2.h>
 
 #define I2C_SEQ_REG_SETTING_MAX   5
 
@@ -49,6 +50,10 @@
 	/* 14  GRGR.. BGBG.. */
 #define MSM_V4L2_PIX_FMT_SRGGB14 v4l2_fourcc('R', 'G', '1', '4')
 	/* 14  RGRG.. GBGB.. */
+#define V4L2_PIX_FMT_SBGGRPLAIN16 v4l2_fourcc('B', 'G', '1', '6')
+#define V4L2_PIX_FMT_SGBRGPLAIN16 v4l2_fourcc('G', 'B', '1', '6')
+#define V4L2_PIX_FMT_SGRBGPLAIN16 v4l2_fourcc('G', 'R', '1', '6')
+#define V4L2_PIX_FMT_SRGGBPLAIN16 v4l2_fourcc('R', 'G', '1', '6')
 
 enum flash_type {
 	LED_FLASH = 1,

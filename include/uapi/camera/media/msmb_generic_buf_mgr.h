@@ -19,7 +19,12 @@ struct msm_buf_mngr_info {
 	uint32_t session_id;
 	uint32_t stream_id;
 	uint32_t frame_id;
+#ifdef __KERNEL__
+	//TODO:NTC
 	struct timespec64 timestamp;
+#else
+	struct timeval timestamp;
+#endif
 	uint32_t index;
 	uint32_t reserved;
 	enum msm_camera_buf_mngr_buf_type type;
