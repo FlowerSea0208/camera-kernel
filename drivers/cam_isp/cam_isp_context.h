@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_CONTEXT_H_
@@ -15,6 +15,7 @@
 
 #include "cam_context.h"
 #include "cam_isp_hw_mgr_intf.h"
+#include "cam_req_mgr_workq.h"
 
 /*
  * Maximum hw resource - This number is based on the maximum
@@ -249,11 +250,15 @@ struct cam_isp_context_event_record {
  * @event_record:              Event record array
  * @rdi_only_context:          Get context type information.
  *                             true, if context is rdi only context
+ * @offline_context:           Indicate whether context is for offline IFE
  * @hw_acquired:               Indicate whether HW resources are acquired
  * @init_received:             Indicate whether init config packet is received
  * @split_acquire:             Indicate whether a separate acquire is expected
  * @init_timestamp:            Timestamp at which this context is initialized
- * @isp_device_type            ISP device type
+ * @isp_device_type:           ISP device type
+ * @rxd_epoch:                 Indicate whether epoch has been received. Used to
+ *                             decide whether to apply request in offline ctx
+ * @workq:                     Worker thread for offline ife
  *
  */
 struct cam_isp_context {
@@ -287,11 +292,14 @@ struct cam_isp_context {
 	struct cam_isp_context_event_record   event_record[
 		CAM_ISP_CTX_EVENT_MAX][CAM_ISP_CTX_EVENT_RECORD_MAX_ENTRIES];
 	bool                                  rdi_only_context;
+	bool                                  offline_context;
 	bool                                  hw_acquired;
 	bool                                  init_received;
 	bool                                  split_acquire;
 	unsigned int                          init_timestamp;
 	uint32_t                              isp_device_type;
+	atomic_t                              rxd_epoch;
+	struct cam_req_mgr_core_workq        *workq;
 };
 
 /**

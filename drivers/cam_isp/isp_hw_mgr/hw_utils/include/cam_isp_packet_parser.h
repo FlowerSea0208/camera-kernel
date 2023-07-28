@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_PARSER_H_
@@ -140,7 +141,8 @@ int cam_isp_add_io_buffers(
 	struct cam_isp_hw_mgr_res            *res_list_isp_out,
 	struct list_head                     *res_list_ife_in_rd,
 	uint32_t                              size_isp_out,
-	bool                                  fill_fence);
+	bool                                  fill_fence,
+	uint32_t                              unpacker_fmt);
 
 /*
  * cam_isp_add_reg_update()
@@ -162,4 +164,24 @@ int cam_isp_add_reg_update(
 	uint32_t                              base_idx,
 	struct cam_kmd_buf_info              *kmd_buf_info);
 
+/*
+ * cam_isp_add_go_cmd()
+ *
+ * @brief                  Add go_cmd in the hw entries list for each rd source
+ *
+ * @prepare:               Contain the  packet and HW update variables
+ * @res_list_isp_rd:       Resource list for BUS RD ports
+ * @base_idx:              Base or dev index of the IFE/VFE HW instance
+ * @kmd_buf_info:          Kmd buffer to store the change base command
+ * @return:                0 for success
+ *                         -EINVAL for Fail
+ */
+int cam_isp_add_go_cmd(
+	struct cam_hw_prepare_update_args    *prepare,
+	struct list_head                     *res_list_isp_rd,
+	uint32_t                              base_idx,
+	struct cam_kmd_buf_info              *kmd_buf_info);
+
+
+int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare);
 #endif /*_CAM_ISP_HW_PARSER_H */
