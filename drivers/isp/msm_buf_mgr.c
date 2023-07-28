@@ -719,7 +719,7 @@ static int msm_isp_put_buf(struct msm_isp_buf_mgr *buf_mgr,
 
 static int msm_isp_buf_divert(struct msm_isp_buf_mgr *buf_mgr,
 	uint32_t bufq_handle, uint32_t buf_index,
-	struct timespec64 *tv, uint32_t frame_id)
+	struct __kernel_old_timeval *tv, uint32_t frame_id)
 {
 	unsigned long flags;
 	struct msm_isp_bufq *bufq = NULL;
@@ -757,7 +757,7 @@ static int msm_isp_buf_divert(struct msm_isp_buf_mgr *buf_mgr,
 
 static int msm_isp_buf_err(struct msm_isp_buf_mgr *buf_mgr,
 	uint32_t bufq_handle, uint32_t buf_index,
-	struct timespec64 *tv, uint32_t frame_id, uint32_t output_format)
+	struct __kernel_old_timeval *tv, uint32_t frame_id, uint32_t output_format)
 {
 	int rc = 0;
 	unsigned long flags;
@@ -813,7 +813,7 @@ done:
 
 static int msm_isp_buf_done(struct msm_isp_buf_mgr *buf_mgr,
 	uint32_t bufq_handle, uint32_t buf_index,
-	struct timespec64 *tv, uint32_t frame_id, uint32_t output_format)
+	struct __kernel_old_timeval *tv, uint32_t frame_id, uint32_t output_format)
 {
 	int rc = 0;
 	unsigned long flags;
@@ -868,7 +868,7 @@ done:
 
 static int msm_isp_flush_buf(struct msm_isp_buf_mgr *buf_mgr,
 	uint32_t bufq_handle, enum msm_isp_buffer_flush_t flush_type,
-	struct timespec64 *tv, uint32_t frame_id)
+	struct __kernel_old_timeval *tv, uint32_t frame_id)
 {
 	int i;
 	struct msm_isp_bufq *bufq = NULL;

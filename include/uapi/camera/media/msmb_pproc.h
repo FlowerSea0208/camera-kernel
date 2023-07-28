@@ -60,8 +60,7 @@ struct msm_cpp_batch_info_t {
 struct msm_cpp_frame_info_t {
 	int32_t frame_id;
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 timestamp;
+	struct __kernel_old_timeval timestamp;
 #else
 	struct timeval timestamp;
 #endif
@@ -75,8 +74,7 @@ struct msm_cpp_frame_info_t {
 	int src_fd;
 	int dst_fd;
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 in_time, out_time;
+	struct __kernel_old_timeval in_time, out_time;
 #else
 	struct timeval in_time, out_time;
 #endif
@@ -156,8 +154,7 @@ struct msm_vpe_stream_buff_info_t {
 struct msm_vpe_frame_info_t {
 	int32_t frame_id;
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 timestamp;
+	struct __kernel_old_timeval timestamp;
 #else
 	struct timeval timestamp;
 #endif
@@ -175,8 +172,7 @@ struct msm_vpe_frame_info_t {
 	unsigned long src_chroma_plane_offset;
 	unsigned long dest_chroma_plane_offset;
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 in_time, out_time;
+	struct __kernel_old_timeval in_time, out_time;
 #else
 	struct timeval in_time, out_time;
 #endif

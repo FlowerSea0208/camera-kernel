@@ -857,12 +857,10 @@ struct msm_isp_event_data {
 	 *which use monotonic clock
 	 */
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 timestamp;
+	struct __kernel_old_timeval timestamp;
 	/* Monotonic timestamp since bootup */
-	struct timespec64 mono_timestamp;
+	struct __kernel_old_timeval mono_timestamp;
 #else
-	//TODO:NTC
 	struct timeval timestamp;
 	/* Monotonic timestamp since bootup */
 	struct timeval mono_timestamp;
@@ -898,10 +896,9 @@ struct msm_isp32_event_data {
 	 *which use monotonic clock
 	 */
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 timestamp;
+	struct __kernel_old_timeval timestamp;
 	/* Monotonic timestamp since bootup */
-	struct timespec64 mono_timestamp;
+	struct __kernel_old_timeval mono_timestamp;
 #endif
 	enum msm_vfe_input_src input_intf;
 	uint32_t frame_id;

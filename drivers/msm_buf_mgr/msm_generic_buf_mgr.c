@@ -225,7 +225,7 @@ static int32_t msm_generic_buf_mngr_flush(
 	unsigned long flags;
 	struct msm_get_bufs *bufs, *save;
 	int32_t ret = -EINVAL;
-	struct timespec64 ts;
+	struct __kernel_old_timeval ts;
 
 	spin_lock_irqsave(&buf_mngr_dev->buf_q_spinlock, flags);
 	/*
@@ -682,7 +682,7 @@ static long msm_camera_buf_mgr_fetch_buf_info(
 	buf_info->frame_id = buf_info32->frame_id;
 	buf_info->index = buf_info32->index;
 	buf_info->timestamp.tv_sec = (long) buf_info32->timestamp.tv_sec;
-	buf_info->timestamp.tv_nsec = (long) (buf_info32->timestamp.tv_usec*1000);
+	buf_info->timestamp.tv_usec = (long) (buf_info32->timestamp.tv_usec);
 	buf_info->reserved = buf_info32->reserved;
 	buf_info->type = buf_info32->type;
 	return 0;
@@ -699,7 +699,7 @@ static long msm_camera_buf_mgr_update_buf_info(
 	buf_info32->stream_id = buf_info->stream_id;
 	buf_info32->index = buf_info->index;
 	buf_info32->timestamp.tv_sec = (int32_t) buf_info->timestamp.tv_sec;
-	buf_info32->timestamp.tv_usec = (int32_t) (buf_info->timestamp.tv_nsec/1000);
+	buf_info32->timestamp.tv_usec = (int32_t) (buf_info->timestamp.tv_usec);
 	buf_info32->reserved = buf_info->reserved;
 	buf_info32->type = buf_info->type;
 	buf_info32->user_buf.buf_cnt = buf_info->user_buf.buf_cnt;

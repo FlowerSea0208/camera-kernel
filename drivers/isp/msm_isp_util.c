@@ -208,16 +208,17 @@ void msm_isp_get_timestamp(struct msm_isp_timestamp *time_stamp,
 	struct vfe_device *vfe_dev)
 {
 	struct timespec64 ts;
-
-	time_stamp->event_time = ktime_to_timespec64(ktime_get());
+	ktime_get_real_ts64(&ts);
+	time_stamp->event_time.tv_sec = ts.tv_sec;
+	time_stamp->event_time.tv_usec = ts.tv_nsec/1000;
 	if (vfe_dev->vt_enable) {
 		msm_isp_get_avtimer_ts(time_stamp);
 		time_stamp->buf_time.tv_sec    = time_stamp->vt_time.tv_sec;
-		time_stamp->buf_time.tv_nsec   = time_stamp->vt_time.tv_nsec;
+		time_stamp->buf_time.tv_usec   = time_stamp->vt_time.tv_usec;
 	} else {
-		ts = ktime_to_timespec64(ktime_get());
+		ktime_get_boottime_ts64(&ts);
 		time_stamp->buf_time.tv_sec    = ts.tv_sec;
-		time_stamp->buf_time.tv_nsec   = ts.tv_nsec;
+		time_stamp->buf_time.tv_usec   = ts.tv_nsec/1000;
 		time_stamp->buf_time_ns        =
 			((uint64_t)ts.tv_sec * 1000000000) + ts.tv_nsec;
 	}

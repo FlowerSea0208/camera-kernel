@@ -20,8 +20,7 @@ struct msm_buf_mngr_info {
 	uint32_t stream_id;
 	uint32_t frame_id;
 #ifdef __KERNEL__
-	//TODO:NTC
-	struct timespec64 timestamp;
+	struct __kernel_old_timeval timestamp;
 #else
 	struct timeval timestamp;
 #endif

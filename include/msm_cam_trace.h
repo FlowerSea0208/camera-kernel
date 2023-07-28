@@ -59,7 +59,7 @@ TRACE_EVENT(msm_cam_tasklet_debug_dump,
 		__entry->tv_sec =
 			tasklet_state->ts.buf_time.tv_sec;
 		__entry->tv_usec =
-			tasklet_state->ts.buf_time.tv_nsec/1000;
+			tasklet_state->ts.buf_time.tv_usec;
 	),
 	TP_printk("vfe_id %d, core %d, irq_st0 0x%x, irq_st1 0x%x\n"
 		"pi_po_st 0x%x, time %ld:%ld",
@@ -111,7 +111,7 @@ TRACE_EVENT(msm_cam_ping_pong_debug_dump,
 		__entry->othr_tv_sec =
 			ping_pong_state->ts.buf_time.tv_sec;
 		__entry->othr_tv_usec =
-			ping_pong_state->ts.buf_time.tv_nsec/1000;
+			ping_pong_state->ts.buf_time.tv_usec;
 		__entry->core_id = ping_pong_state->core_id;
 	),
 	TP_printk("vfe_id %d, irq_st0 0x%x, irq_st1 0x%x, pi_po_st 0x%x\n"
