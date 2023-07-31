@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -367,7 +368,7 @@ int32_t cam_sensor_util_write_qtimer_to_io_buffer(
 
 		rc = cam_sensor_util_get_current_qtimer_ns(&qtime_ns);
 		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "failed to get qtimer rc:%d");
+			CAM_ERR(CAM_SENSOR, "failed to get qtimer rc:%d", rc);
 			return rc;
 		}
 
