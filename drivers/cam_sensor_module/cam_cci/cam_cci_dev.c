@@ -84,14 +84,16 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 			cci_master_info = &cci_dev->cci_master_info[MASTER_0];
 			cci_dev->cci_master_info[MASTER_0].reset_pending =
 				FALSE;
-			if (!cci_master_info->status)
+			if (!cci_master_info->status ||
+					cci_master_info->status == -EINVAL)
 				complete(&cci_master_info->reset_complete);
 		}
 		if (cci_dev->cci_master_info[MASTER_1].reset_pending == TRUE) {
 			cci_master_info = &cci_dev->cci_master_info[MASTER_1];
 			cci_dev->cci_master_info[MASTER_1].reset_pending =
 				FALSE;
-			if (!cci_master_info->status)
+			if (!cci_master_info->status ||
+					cci_master_info->status == -EINVAL)
 				complete(&cci_master_info->reset_complete);
 		}
 	}
