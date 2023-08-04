@@ -7,14 +7,7 @@ def _define_module(target, variant):
         ":camera_headers",
         "//msm-kernel:all_headers",
     ]
-    if target == "pineapple":
-        deps.extend([
-            "//vendor/qcom/opensource/securemsm-kernel:securemsm_kernel_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:smmu_proxy_headers",
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-            "//vendor/qcom/opensource/securemsm-kernel:{}_smmu_proxy_dlkm".format(tv),
-            "//vendor/qcom/opensource/mmrm-driver:{}_mmrm_driver".format(tv),
-        ])
+
     ddk_module(
         name = "{}_camera".format(tv),
         out = "camera.ko",
