@@ -1309,6 +1309,10 @@ static int cam_convert_hw_idx_to_ife_hw_num(int hw_idx)
 				return CAM_ISP_IFE1_LITE_HW;
 			else if (hw_idx == 4)
 				return CAM_ISP_IFE2_LITE_HW;
+			else if (hw_idx == 5)
+				return CAM_ISP_IFE3_LITE_HW;
+			else if (hw_idx == 6)
+				return CAM_ISP_IFE4_LITE_HW;
 			break;
 		default:
 			CAM_ERR(CAM_ISP, "Invalid hw_version: 0x%X",
