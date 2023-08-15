@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _CAM_REQ_MGR_CORE_H_
 #define _CAM_REQ_MGR_CORE_H_
@@ -411,6 +411,7 @@ struct cam_req_mgr_connected_device {
  * @wq_congestion        : Indicates if WQ congestion is detected or not
  * @try_for_internal_recovery : If the link stalls try for RT internal recovery
  * @properties_mask      : Indicates if current link enables some special properties
+ * @cont_empty_slots     : Continuous empty slots
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -451,6 +452,7 @@ struct cam_req_mgr_core_link {
 	bool                                 wq_congestion;
 	bool                                 try_for_internal_recovery;
 	uint32_t                             properties_mask;
+	uint32_t                             cont_empty_slots;
 };
 
 /**
