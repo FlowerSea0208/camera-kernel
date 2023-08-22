@@ -1404,6 +1404,7 @@ static int jpegdma_probe(struct platform_device *pdev)
 	jpegdma->video.v4l2_dev = &jpegdma->v4l2_dev;
 	jpegdma->video.vfl_dir = VFL_DIR_M2M;
 	jpegdma->video.vfl_type = VFL_TYPE_VIDEO;
+	jpegdma->video.device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	strlcpy(jpegdma->video.name, MSM_JPEGDMA_DRV_NAME,
 		sizeof(jpegdma->video.name));
 

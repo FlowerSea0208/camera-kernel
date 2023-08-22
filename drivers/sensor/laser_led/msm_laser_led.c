@@ -146,9 +146,19 @@ static long msm_laser_led_subdev_do_ioctl32(struct v4l2_subdev *sd,
 		unsigned int cmd, unsigned long arg)
 {
 	int32_t rc = 0;
+	uint32_t subdev_id;
 
 	CDBG("Enter\n");
 	switch (cmd) {
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		rc = msm_laser_led_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
+			return -EFAULT;
+		}
+		return rc;
 	case VIDIOC_MSM_LASER_LED_CFG32:
 		cmd = VIDIOC_MSM_LASER_LED_CFG;
 	default:

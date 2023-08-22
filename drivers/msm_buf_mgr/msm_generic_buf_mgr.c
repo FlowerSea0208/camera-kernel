@@ -753,6 +753,12 @@ static long msm_camera_buf_mgr_internal_compat_ioctl(struct v4l2_subdev *sd,
 				k_ioctl.id);
 			return rc;
 		}
+		rc = msm_camera_buf_mgr_update_buf_info(&buf_info32, &buf_info,
+			(unsigned long)tmp_compat_ioctl_ptr);
+		if (rc < 0) {
+			pr_err("Update buf info failed for cmd=%d\n", cmd);
+			return rc;
+		}
 		}
 		break;
 	default:

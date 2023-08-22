@@ -118,6 +118,10 @@ struct msm_jpeg_hw_cmds32 {
 	uint32_t m; /* number of elements in the hw_cmd array */
 	struct msm_jpeg_hw_cmd32 hw_cmd[1];
 };
+static int msm_jpeg_get_ctrl_cmd32(struct msm_jpeg_ctrl_cmd *ctrl_cmd,
+	void __user  *arg);
+static int msm_jpeg_get_jpeg_buf32(struct msm_jpeg_buf *jpeg_buf,
+	void __user  *arg);
 #endif
 
 
@@ -464,14 +468,24 @@ static int msm_jpeg_output_buf_enqueue(struct msm_jpeg_device *pgmn_dev,
 	struct msm_jpeg_core_buf *buf_p;
 	uint32_t buf_len_params[10];
 	uint32_t total_len = 0;
-	int n = 0;
+	int n = 0, rc;
 
 	memset(&buf_cmd, 0x0, sizeof(struct msm_jpeg_buf));
 
 	JPEG_DBG("%s:%d] Enter\n", __func__, __LINE__);
-	if (copy_from_user(&buf_cmd, arg, sizeof(struct msm_jpeg_buf))) {
-		JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
-		return -EFAULT;
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		rc = msm_jpeg_get_jpeg_buf32(&buf_cmd, (void __user *) arg);
+		if (rc < 0) {
+			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+			return -EFAULT;
+		}
+#endif
+	} else {
+		if (copy_from_user(&buf_cmd, arg, sizeof(struct msm_jpeg_buf))) {
+			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+			return -EFAULT;
+		}
 	}
 
 	buf_len_params[n++] = buf_cmd.y_len;
@@ -618,13 +632,23 @@ static int msm_jpeg_input_buf_enqueue(struct msm_jpeg_device *pgmn_dev,
 	struct msm_jpeg_buf buf_cmd;
 	uint32_t buf_len_params[10];
 	uint32_t total_len = 0;
-	int n = 0;
+	int n = 0, rc;
 
 	memset(&buf_cmd, 0x0, sizeof(struct msm_jpeg_buf));
 
-	if (copy_from_user(&buf_cmd, arg, sizeof(struct msm_jpeg_buf))) {
-		JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
-		return -EFAULT;
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		rc = msm_jpeg_get_jpeg_buf32(&buf_cmd, (void __user *) arg);
+		if (rc < 0) {
+			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+			return -EFAULT;
+		}
+#endif
+	} else {
+		if (copy_from_user(&buf_cmd, arg, sizeof(struct msm_jpeg_buf))) {
+			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+			return -EFAULT;
+		}
 	}
 	buf_len_params[n++] = buf_cmd.y_len;
 	buf_len_params[n++] = buf_cmd.cbcr_len;
@@ -971,9 +995,20 @@ static int msm_jpeg_ioctl_reset(struct msm_jpeg_device *pgmn_dev,
 	p_ctrl_cmd = &ctrl_cmd;
 
 	if (pgmn_dev->state == MSM_JPEG_INIT) {
-		if (copy_from_user(&ctrl_cmd, arg, sizeof(ctrl_cmd))) {
-			JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
-			return -EFAULT;
+		if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+			rc = msm_jpeg_get_ctrl_cmd32(&ctrl_cmd,
+				(void __user *) arg);
+			if (rc < 0) {
+				JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+				return -EFAULT;
+			}
+#endif
+		} else {
+			if (copy_from_user(&ctrl_cmd, arg, sizeof(ctrl_cmd))) {
+				JPEG_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
+				return -EFAULT;
+			}
 		}
 		pgmn_dev->op_mode = p_ctrl_cmd->type;
 
@@ -1297,12 +1332,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_RESET32:
-		rc = msm_jpeg_get_ctrl_cmd32(&ctrl_cmd,
-			(void __user *) arg);
-		if (rc < 0)
-			break;
-
-		rc = msm_jpeg_ioctl_reset(pgmn_dev, (void __user *) &ctrl_cmd);
+		rc = msm_jpeg_ioctl_reset(pgmn_dev, (void __user *) arg);
 		kfree(pctrl_cmd);
 		break;
 
@@ -1332,11 +1362,8 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_BUF_ENQUEUE32:
-		rc = msm_jpeg_get_jpeg_buf32(&jpeg_buf, (void __user *) arg);
-		if (rc < 0)
-			break;
 		rc = msm_jpeg_input_buf_enqueue(pgmn_dev,
-			(void __user *) &jpeg_buf);
+			(void __user *) arg);
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_GET:
@@ -1361,11 +1388,8 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_BUF_ENQUEUE32:
-		rc = msm_jpeg_get_jpeg_buf32(&jpeg_buf, (void __user *) arg);
-		if (rc < 0)
-			break;
 		rc = msm_jpeg_output_buf_enqueue(pgmn_dev,
-			(void __user *) &jpeg_buf);
+			(void __user *) arg);
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_GET:

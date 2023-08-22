@@ -1204,13 +1204,13 @@ static long msm_csid_subdev_ioctl32(struct v4l2_subdev *sd,
 	CDBG("%s:%d id %d\n", __func__, __LINE__, csid_dev->pdev->id);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&data_id, (void __user *)arg,
+		rc = msm_csid_get_subdev_id(csid_dev, (void *)&data_id);
+		if (copy_to_user((void __user *)arg, &data_id,
 			sizeof(data_id))) {
-			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
 				(void __user *)arg, sizeof(data_id));
 			return -EFAULT;
 		}
-		rc = msm_csid_get_subdev_id(csid_dev, (void *)&data_id);
 		break;
 	case VIDIOC_MSM_CSID_IO_CFG32:
 		if (copy_from_user(&data, (void __user *)arg,
@@ -1220,6 +1220,12 @@ static long msm_csid_subdev_ioctl32(struct v4l2_subdev *sd,
 			return -EFAULT;
 		}
 		rc = msm_csid_cmd32(csid_dev, (void *)&data);
+		if (copy_to_user((void __user *)arg, &data,
+			sizeof(data))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(data));
+			return -EFAULT;
+		}
 		break;
 	case MSM_SD_NOTIFY_FREEZE:
 		if (csid_dev->csid_state != CSID_POWER_UP)

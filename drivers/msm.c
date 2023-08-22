@@ -1358,6 +1358,7 @@ static int msm_probe(struct platform_device *pdev)
 	pvdev->vdev->ioctl_ops = &g_msm_ioctl_ops;
 	pvdev->vdev->minor     = -1;
 	pvdev->vdev->vfl_type  = VFL_TYPE_VIDEO;
+	pvdev->vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING;
 	rc = video_register_device(pvdev->vdev,
 		VFL_TYPE_VIDEO, -1);
 	if (WARN_ON(rc < 0))
@@ -1401,6 +1402,32 @@ static int msm_probe(struct platform_device *pdev)
 		goto v4l2_fail;
 	}
 
+	cam_smmu_init_module();
+	msm_buf_mngr_init();
+	msm_cci_init_module();
+	msm_csid_init_module();
+	msm_csiphy_init_module();
+	msm_actuator_init_module();
+	msm_eeprom_init_module();
+	msm_ois_init_module();
+	msm_flash_init_module();
+	msm_ir_led_init_module();
+	msm_ir_cut_init_module();
+	msm_laser_led_init_module();
+	msm_sensor_driver_init();
+	msm_sensor_init_module();
+	msm_vfe48_init_module();
+	msm_vfe47_init_module();
+	msm_vfe46_init_module();
+	msm_vfe44_init_module();
+	msm_vfe40_init_module();
+	msm_vfe_init_module();
+	msm_ispif_init_module();
+	msm_cpp_init_module();
+	msm_jpeg_driver_init();
+	msm_jpegdma_init_module();
+	msm_fd_init_module();
+
 	goto probe_end;
 
 v4l2_fail:
@@ -1440,31 +1467,6 @@ static struct platform_driver msm_driver = {
 
 static int __init msm_init(void)
 {
-	cam_smmu_init_module();
-	msm_buf_mngr_init();
-	msm_cci_init_module();
-	msm_csid_init_module();
-	msm_csiphy_init_module();
-	msm_actuator_init_module();
-	msm_eeprom_init_module();
-	msm_ois_init_module();
-	msm_flash_init_module();
-	msm_ir_led_init_module();
-	msm_ir_cut_init_module();
-	msm_laser_led_init_module();
-	msm_sensor_driver_init();
-	msm_sensor_init_module();
-	msm_vfe48_init_module();
-	msm_vfe47_init_module();
-	msm_vfe46_init_module();
-	msm_vfe44_init_module();
-	msm_vfe40_init_module();
-	msm_vfe_init_module();
-	msm_ispif_init_module();
-	msm_cpp_init_module();
-	msm_jpeg_driver_init();
-	msm_jpegdma_init_module();
-	msm_fd_init_module();
 	return platform_driver_register(&msm_driver);
 }
 

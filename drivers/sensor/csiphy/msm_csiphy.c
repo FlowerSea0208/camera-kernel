@@ -2197,6 +2197,7 @@ static long msm_csiphy_subdev_do_ioctl32(struct v4l2_subdev *sd,
 	struct csiphy_cfg_data csiphy_data;
 	uint32_t subdev_id;
 	struct msm_camera_csi_lane_params csi_lane_params;
+	int rc = -ENOIOCTLCMD;
 
 	switch (cmd) {
 	case VIDIOC_MSM_CSIPHY_IO_CFG32:
@@ -2213,12 +2214,14 @@ static long msm_csiphy_subdev_do_ioctl32(struct v4l2_subdev *sd,
 			compat_ptr(u32->cfg.csiphy_params);
 		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)&csiphy_data);
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&subdev_id, (void __user *)arg,
+		rc = msm_csiphy_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
 			sizeof(subdev_id))) {
-			pr_err("Failed to copy from user");
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
 			return -EFAULT;
 		}
-		return msm_csiphy_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+		return rc;
 	case VIDIOC_MSM_CSIPHY_RELEASE:
 	case MSM_SD_SHUTDOWN:
 		if (copy_from_user(&csi_lane_params, (void __user *)arg,

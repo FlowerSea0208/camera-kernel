@@ -1753,17 +1753,19 @@ static long msm_eeprom_subdev_ioctl32(struct v4l2_subdev *sd,
 	struct msm_eeprom_ctrl_t *e_ctrl = v4l2_get_subdevdata(sd);
 	uint32_t subdev_id;
 	struct msm_eeprom_cfg_data32 cdata;
+	int rc = -ENOIOCTLCMD;
 
 	CDBG("%s E\n", __func__);
 	switch (cmd) {
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&subdev_id, (void __user *)arg,
+		rc = msm_eeprom_get_subdev_id(e_ctrl, &subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
 			sizeof(subdev_id))) {
-			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
 				(void __user *)arg, sizeof(subdev_id));
 			return -EFAULT;
 		}
-		return msm_eeprom_get_subdev_id(e_ctrl, &subdev_id);
+		return rc;
 	case VIDIOC_MSM_EEPROM_CFG32:
 		if (copy_from_user(&cdata, (void __user *)arg,
 			sizeof(cdata))) {
