@@ -638,6 +638,7 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 		}
 	}
 
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 put_ref:
 	for (--i; i >= 0; i--) {
@@ -651,6 +652,7 @@ free_req:
 	req->ctx = NULL;
 	spin_unlock(&ctx->lock);
 
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 }
 
