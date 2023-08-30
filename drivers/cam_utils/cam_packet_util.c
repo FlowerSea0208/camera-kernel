@@ -47,7 +47,10 @@ int cam_packet_util_get_packet_addr(struct cam_packet **packet,
 
 	return rc;
 }
-
+void cam_packet_util_put_packet_addr(uint64_t packet_handle)
+{
+	cam_mem_put_cpu_buf(packet_handle);
+}
 int cam_packet_util_get_cmd_mem_addr(int handle, uint32_t **buf_addr,
 	size_t *len)
 {
@@ -61,6 +64,7 @@ int cam_packet_util_get_cmd_mem_addr(int handle, uint32_t **buf_addr,
 		if (kmd_buf_addr && *len) {
 			*buf_addr = (uint32_t *)kmd_buf_addr;
 		} else {
+			cam_mem_put_cpu_buf(handle);
 			CAM_ERR(CAM_UTIL, "Invalid addr and length :%zd", *len);
 			rc = -ENOMEM;
 		}
