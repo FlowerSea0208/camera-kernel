@@ -1913,6 +1913,7 @@ static int32_t cam_cci_read_bytes(struct v4l2_subdev *sd,
 	reinit_completion(&cci_dev->cci_master_info[master].rd_done);
 	reinit_completion(&cci_dev->cci_master_info[master].th_complete);
 	reinit_completion(&cci_dev->cci_master_info[master].reset_complete);
+	reinit_completion(&cci_dev->cci_master_info[master].rd_done);
 
 	CAM_DBG(CAM_CCI, "Bytes to read %u", read_bytes);
 	do {
