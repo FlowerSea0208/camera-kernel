@@ -1021,6 +1021,8 @@ enum msm_isp_ioctl_cmd_code {
 	MSM_ISP_DUAL_SYNC_CFG,
 	MSM_ISP_DUAL_SYNC_CFG_VER2,
 	MSM_ISP_NANOSEC_TIMESTAMP,
+	MSM_ISP_GET_KSTATE,
+	MSM_ISP_RESET_DROP_RECONFIG,
 };
 
 #define VIDIOC_MSM_VFE_REG_CFG \
@@ -1163,4 +1165,10 @@ enum msm_isp_ioctl_cmd_code {
 	_IOW('V', MSM_ISP_NANOSEC_TIMESTAMP, \
 	struct msm_vfe_nano_sec_timestamp)
 
+#define VIDIOC_MSM_ISP_GET_KSTATE \
+	_IOWR('V', MSM_ISP_GET_KSTATE, \
+	struct isp_kstate)
+
+#define VIDIOC_MSM_ISP_RESET_DROP_RECONFIG \
+	_IO('V', MSM_ISP_RESET_DROP_RECONFIG)
 #endif /* __MSMB_ISP__ */

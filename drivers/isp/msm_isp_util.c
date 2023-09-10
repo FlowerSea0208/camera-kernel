@@ -1092,6 +1092,17 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 		rc = msm_isp_nano_sec_timestamp(vfe_dev, arg);
 		mutex_unlock(&vfe_dev->core_mutex);
 		break;
+	case VIDIOC_MSM_ISP_GET_KSTATE:
+		mutex_lock(&vfe_dev->core_mutex);
+		if (vfe_dev->isp_page == NULL) {
+			pr_err("Invalid ISP PAGE");
+			rc = -EFAULT;
+		} else {
+			memcpy(arg, vfe_dev->isp_page,
+				sizeof(struct isp_kstate));
+		}
+		mutex_unlock(&vfe_dev->core_mutex);
+		break;
 	default:
 		pr_err_ratelimited("%s: Invalid ISP command %x\n", __func__,
 				    cmd);
@@ -1150,6 +1161,13 @@ long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
 		mutex_unlock(&vfe_dev->realtime_mutex);
 		if (copy_to_user((void __user *)arg, &cdata, sizeof(cdata)))
 			rc = -EFAULT;
+		break;
+	}
+	case VIDIOC_MSM_ISP_RESET_DROP_RECONFIG: {
+		mutex_lock(&vfe_dev->core_mutex);
+		vfe_dev->isp_page->drop_reconfig = 0;
+		vfe_dev->isp_page->dual_cam_drop_detected = 0;
+		mutex_unlock(&vfe_dev->core_mutex);
 		break;
 	}
 	default: {
