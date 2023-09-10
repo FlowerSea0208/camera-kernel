@@ -122,6 +122,10 @@ static int msm_jpeg_get_ctrl_cmd32(struct msm_jpeg_ctrl_cmd *ctrl_cmd,
 	void __user  *arg);
 static int msm_jpeg_get_jpeg_buf32(struct msm_jpeg_buf *jpeg_buf,
 	void __user  *arg);
+static int msm_jpeg_put_ctrl_cmd32(struct msm_jpeg_ctrl_cmd *ctrl_cmd,
+	void __user  *arg);
+static int msm_jpeg_put_jpeg_buf32(struct msm_jpeg_buf *jpeg_buf,
+	void __user  *arg);
 #endif
 
 
@@ -333,9 +337,15 @@ static int msm_jpeg_evt_get(struct msm_jpeg_device *pgmn_dev,
 	JPEG_DBG("%s:%d] 0x%08lx %d\n", __func__, __LINE__,
 		(unsigned long) ctrl_cmd.value, ctrl_cmd.len);
 
-	if (copy_to_user(to, &ctrl_cmd, sizeof(ctrl_cmd))) {
-		JPEG_PR_ERR("%s:%d]\n", __func__, __LINE__);
-		return -EFAULT;
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		msm_jpeg_put_ctrl_cmd32(&ctrl_cmd, (void __user *) to);
+#endif
+	} else {
+		if (copy_to_user(to, &ctrl_cmd, sizeof(ctrl_cmd))) {
+			JPEG_PR_ERR("%s:%d]\n", __func__, __LINE__);
+			return -EFAULT;
+		}
 	}
 
 	return 0;
@@ -434,9 +444,15 @@ static int msm_jpeg_output_get(struct msm_jpeg_device *pgmn_dev,
 	JPEG_DBG("%s:%d] 0x%08lx %d\n", __func__, __LINE__,
 		(unsigned long) buf_cmd.vaddr, buf_cmd.y_len);
 
-	if (copy_to_user(to, &buf_cmd, sizeof(buf_cmd))) {
-		JPEG_PR_ERR("%s:%d]", __func__, __LINE__);
-		return -EFAULT;
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		return msm_jpeg_put_jpeg_buf32(&buf_cmd, (void __user *) to);
+#endif
+	} else {
+		if (copy_to_user(to, &buf_cmd, sizeof(buf_cmd))) {
+			JPEG_PR_ERR("%s:%d]", __func__, __LINE__);
+			return -EFAULT;
+		}
 	}
 
 	return 0;
@@ -610,9 +626,15 @@ static int msm_jpeg_input_get(struct msm_jpeg_device *pgmn_dev,
 	JPEG_DBG("%s:%d] 0x%08lx %d\n", __func__, __LINE__,
 		(unsigned long) buf_cmd.vaddr, buf_cmd.y_len);
 
-	if (copy_to_user(to, &buf_cmd, sizeof(buf_cmd))) {
-		JPEG_PR_ERR("%s:%d]\n", __func__, __LINE__);
-		return -EFAULT;
+	if (is_compat_task()) {
+#ifdef CONFIG_COMPAT
+		return msm_jpeg_put_jpeg_buf32(&buf_cmd, (void __user *) to);
+#endif
+	} else {
+		if (copy_to_user(to, &buf_cmd, sizeof(buf_cmd))) {
+			JPEG_PR_ERR("%s:%d]\n", __func__, __LINE__);
+			return -EFAULT;
+		}
 	}
 
 	return 0;
@@ -1314,8 +1336,6 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 	unsigned int cmd, unsigned long arg)
 {
 	int rc = 0;
-	struct msm_jpeg_ctrl_cmd *pctrl_cmd = NULL, ctrl_cmd = {0};
-	struct msm_jpeg_buf jpeg_buf = {0};
 
 	switch (cmd) {
 	case MSM_JPEG_IOCTL_GET_HW_VERSION:
@@ -1333,7 +1353,6 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 
 	case MSM_JPEG_IOCTL_RESET32:
 		rc = msm_jpeg_ioctl_reset(pgmn_dev, (void __user *) arg);
-		kfree(pctrl_cmd);
 		break;
 
 	case MSM_JPEG_IOCTL_STOP:
@@ -1371,11 +1390,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_GET32:
-		rc = msm_jpeg_input_get(pgmn_dev, (void __user *) &jpeg_buf);
-		if (rc < 0)
-			break;
-		rc = msm_jpeg_put_jpeg_buf32(&jpeg_buf, (void __user *) arg);
-
+		rc = msm_jpeg_input_get(pgmn_dev, (void __user *) arg);
 		break;
 
 	case MSM_JPEG_IOCTL_INPUT_GET_UNBLOCK:
@@ -1397,10 +1412,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_GET32:
-		rc = msm_jpeg_output_get(pgmn_dev, (void __user *) &jpeg_buf);
-		if (rc < 0)
-			break;
-		rc = msm_jpeg_put_jpeg_buf32(&jpeg_buf, (void __user *) arg);
+		rc = msm_jpeg_output_get(pgmn_dev, (void __user *) arg);
 		break;
 
 	case MSM_JPEG_IOCTL_OUTPUT_GET_UNBLOCK:
@@ -1412,10 +1424,7 @@ long __msm_jpeg_compat_ioctl(struct msm_jpeg_device *pgmn_dev,
 		break;
 
 	case MSM_JPEG_IOCTL_EVT_GET32:
-		rc = msm_jpeg_evt_get(pgmn_dev, (void __user *) &ctrl_cmd);
-		if (rc < 0)
-			break;
-		msm_jpeg_put_ctrl_cmd32(&ctrl_cmd, (void __user *) arg);
+		rc = msm_jpeg_evt_get(pgmn_dev, (void __user *) arg);
 		break;
 
 	case MSM_JPEG_IOCTL_EVT_GET_UNBLOCK:

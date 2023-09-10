@@ -1086,9 +1086,8 @@ uint32_t msm_camera_update_bus_bw(int id, uint64_t ab, uint64_t ib)
 		return -EINVAL;
 	}
 	if (g_cv[id].num_usecases != 2 ||
-		g_cv[id].num_paths != 1 ||
-		g_cv[id].dyn_vote != true) {
-		pr_err("dynamic update not allowed\n");
+		g_cv[id].num_paths != 1) {
+		pr_err("Invalid params\n");
 		return -EINVAL;
 	}
 
@@ -1103,7 +1102,7 @@ EXPORT_SYMBOL(msm_camera_update_bus_bw);
 uint32_t msm_camera_update_bus_vector(enum cam_bus_client id,
 	int vector_index)
 {
-	if (id >= CAM_BUS_CLIENT_MAX || g_cv[id].dyn_vote == true) {
+	if (id >= CAM_BUS_CLIENT_MAX) {
 		pr_err("Invalid params");
 		return -EINVAL;
 	}
