@@ -1694,11 +1694,14 @@ static int msm_cpp_notify_frame_done(struct cpp_device *cpp_dev,
 	struct msm_device_queue *queue = &cpp_dev->processing_q;
 	struct msm_buf_mngr_info buff_mgr_info;
 	int rc = 0;
+	struct timespec64 ts;
 
 	frame_qcmd = msm_dequeue(queue, list_frame, POP_FRONT);
 	if (frame_qcmd) {
 		processed_frame = frame_qcmd->command;
-		processed_frame->out_time = ktime_to_timespec64(ktime_get());
+		ktime_get_real_ts64(&ts);
+		processed_frame->out_time.tv_sec = ts.tv_sec;
+		processed_frame->out_time.tv_usec = ts.tv_nsec/1000;
 		kfree(frame_qcmd);
 		event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_ATOMIC);
 		if (!event_qcmd) {
@@ -2058,6 +2061,7 @@ static int msm_cpp_send_frame_to_hardware(struct cpp_device *cpp_dev,
 	struct msm_cpp_frame_info_t *process_frame;
 	struct msm_queue_cmd *qcmd = NULL;
 	uint32_t queue_len = 0, fifo_counter = 0;
+	struct timespec64 ts;
 
 	if (cpp_dev->processing_q.len < MAX_CPP_PROCESSING_FRAME) {
 		process_frame = frame_qcmd->command;
@@ -2137,7 +2141,9 @@ static int msm_cpp_send_frame_to_hardware(struct cpp_device *cpp_dev,
 		}
 		msm_cpp_write(MSM_CPP_MSG_ID_TRAILER, cpp_dev->base);
 
-		process_frame->in_time = ktime_to_timespec64(ktime_get());
+		ktime_get_real_ts64(&ts);
+		process_frame->in_time.tv_sec = ts.tv_sec;
+		process_frame->in_time.tv_usec = ts.tv_nsec/1000;
 		rc = 0;
 	} else {
 		pr_err("process queue full. drop frame\n");
@@ -3927,18 +3933,18 @@ static struct msm_cpp_frame_info_t *get_64bit_cpp_frame_from_compat(
 
 	new_frame->timestamp.tv_sec =
 		(unsigned long)new_frame32->timestamp.tv_sec;
-	new_frame->timestamp.tv_nsec =
-		(unsigned long)new_frame32->timestamp.tv_usec * 100;
+	new_frame->timestamp.tv_usec =
+		(unsigned long)new_frame32->timestamp.tv_usec;
 
 	new_frame->in_time.tv_sec =
 		(unsigned long)new_frame32->in_time.tv_sec;
-	new_frame->in_time.tv_nsec =
-		(unsigned long)new_frame32->in_time.tv_usec * 1000;
+	new_frame->in_time.tv_usec =
+		(unsigned long)new_frame32->in_time.tv_usec;
 
 	new_frame->out_time.tv_sec =
 		(unsigned long)new_frame32->out_time.tv_sec;
-	new_frame->out_time.tv_nsec =
-		(unsigned long)new_frame32->out_time.tv_usec * 1000;
+	new_frame->out_time.tv_usec =
+		(unsigned long)new_frame32->out_time.tv_usec;
 
 	new_frame->msg_len = new_frame32->msg_len;
 	new_frame->identity = new_frame32->identity;
@@ -4042,13 +4048,13 @@ static void get_compat_frame_from_64bit(struct msm_cpp_frame_info_t *frame,
 	k32_frame->dst_fd = frame->dst_fd;
 
 	k32_frame->timestamp.tv_sec = (uint32_t)frame->timestamp.tv_sec;
-	k32_frame->timestamp.tv_usec = (uint32_t)(frame->timestamp.tv_nsec/1000);
+	k32_frame->timestamp.tv_usec = (uint32_t)(frame->timestamp.tv_usec);
 
 	k32_frame->in_time.tv_sec = (uint32_t)frame->in_time.tv_sec;
-	k32_frame->in_time.tv_usec = (uint32_t)(frame->in_time.tv_nsec/1000);
+	k32_frame->in_time.tv_usec = (uint32_t)(frame->in_time.tv_usec);
 
 	k32_frame->out_time.tv_sec = (uint32_t)frame->out_time.tv_sec;
-	k32_frame->out_time.tv_usec = (uint32_t)(frame->out_time.tv_nsec/1000);
+	k32_frame->out_time.tv_usec = (uint32_t)(frame->out_time.tv_usec);
 
 	k32_frame->msg_len = frame->msg_len;
 	k32_frame->identity = frame->identity;
@@ -4375,7 +4381,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct v4l2_subdev *sd,
 			&u32_queue_buf->buff_mgr_info.timestamp.tv_sec);
 		get_user(tv_usec,
 			&u32_queue_buf->buff_mgr_info.timestamp.tv_usec);
-		k_queue_buf.buff_mgr_info.timestamp.tv_nsec = tv_usec*1000;
+		k_queue_buf.buff_mgr_info.timestamp.tv_usec = tv_usec;
 
 		kp_ioctl.ioctl_ptr = (__force void __user *)&k_queue_buf;
 		kp_ioctl.len = sizeof(struct msm_pproc_queue_buf_info);

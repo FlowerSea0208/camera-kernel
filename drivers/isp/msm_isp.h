@@ -125,11 +125,11 @@ enum msm_isp_camif_update_state {
 
 struct msm_isp_timestamp {
 	/*Monotonic clock for v4l2 buffer*/
-	struct timespec64 buf_time;
+	struct __kernel_old_timeval buf_time;
 	/*Monotonic clock for VT */
-	struct timespec64 vt_time;
+	struct __kernel_old_timeval vt_time;
 	/*Wall clock for userspace event*/
-	struct timespec64 event_time;
+	struct __kernel_old_timeval event_time;
 	/* event time in nanosec*/
 	uint64_t buf_time_ns;
 };

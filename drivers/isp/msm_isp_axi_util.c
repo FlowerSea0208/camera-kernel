@@ -35,7 +35,7 @@ static void __msm_isp_axi_stream_update(
 
 static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info, struct msm_isp_buffer *buf,
-	struct timespec64 *time_stamp, uint32_t frame_id);
+	struct __kernel_old_timeval *time_stamp, uint32_t frame_id);
 static void msm_isp_free_pending_buffer(
 	struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info,
@@ -872,7 +872,7 @@ static void msm_isp_sync_dual_cam_frame_id(
 	}
 	/* copy highest frame id to the intf based on sof delta */
 	current_time = ts->buf_time.tv_sec * 1000 +
-		ts->buf_time.tv_nsec / 1000000;
+		ts->buf_time.tv_usec / 1000;
 
 	if (current_time > master_time &&
 		(current_time - master_time) > ms_res->sof_delta_threshold) {
@@ -969,9 +969,9 @@ void msm_isp_increment_frame_id(struct vfe_device *vfe_dev,
 		sof_info->frame_id = vfe_dev->axi_data.src_info[
 			frame_src].frame_id;
 		sof_info->timestamp_ms = ts->event_time.tv_sec * 1000 +
-			ts->event_time.tv_nsec / 1000000;
+			ts->event_time.tv_usec / 1000;
 		sof_info->mono_timestamp_ms = ts->buf_time.tv_sec * 1000 +
-			ts->buf_time.tv_nsec / 1000000;
+			ts->buf_time.tv_usec / 1000;
 		spin_unlock_irqrestore(
 			&vfe_dev->common_data->common_dev_data_lock, flags);
 	} else {
@@ -1336,7 +1336,7 @@ void msm_isp_get_avtimer_ts(
 
 	ktime_get_boottime_ts64(&ts);
 	time_stamp->vt_time.tv_sec    = ts.tv_sec;
-	time_stamp->vt_time.tv_nsec   = ts.tv_nsec;
+	time_stamp->vt_time.tv_usec   = ts.tv_nsec/1000;
 }
 #endif
 
@@ -1643,7 +1643,7 @@ static void msm_isp_free_pending_buffer(
 			struct msm_vfe_axi_stream *stream_info,
 			struct msm_isp_timestamp *ts)
 {
-	struct timespec64 *time_stamp;
+	struct __kernel_old_timeval *time_stamp;
 	struct msm_isp_buffer *done_buf = NULL;
 	uint32_t frame_id;
 	int rc;
@@ -2187,7 +2187,7 @@ static int msm_isp_cfg_ping_pong_address(
 
 static void msm_isp_handle_done_buf_frame_id_mismatch(
 	struct vfe_device *vfe_dev, struct msm_vfe_axi_stream *stream_info,
-	struct msm_isp_buffer *buf, struct timespec64 *time_stamp,
+	struct msm_isp_buffer *buf, struct __kernel_old_timeval *time_stamp,
 	uint32_t frame_id)
 {
 	struct msm_isp_event_data error_event;
@@ -2219,7 +2219,7 @@ static void msm_isp_handle_done_buf_frame_id_mismatch(
 
 static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	struct msm_vfe_axi_stream *stream_info, struct msm_isp_buffer *buf,
-	struct timespec64 *time_stamp, uint32_t frame_id)
+	struct __kernel_old_timeval *time_stamp, uint32_t frame_id)
 {
 	int rc;
 	unsigned long flags;
@@ -2840,7 +2840,7 @@ int msm_isp_axi_reset(struct vfe_device *vfe_dev,
 	int vfe_idx;
 	uint32_t pingpong_bit = 0;
 	uint32_t frame_id = 0;
-	struct timespec64 *time_stamp;
+	struct __kernel_old_timeval *time_stamp;
 
 	if (!reset_cmd) {
 		pr_err("%s: NULL pointer reset cmd %pK\n", __func__, reset_cmd);
@@ -4425,7 +4425,7 @@ void msm_isp_process_axi_irq_stream(struct vfe_device *vfe_dev,
 	uint32_t pingpong_bit = 0, i;
 	struct msm_isp_buffer *done_buf = NULL;
 	unsigned long flags;
-	struct timespec64 *time_stamp;
+	struct __kernel_old_timeval *time_stamp;
 	uint32_t frame_id, buf_index = -1;
 	int vfe_idx;
 	struct vfe_device *temp_dev;

@@ -96,7 +96,7 @@ struct msm_isp_buffer {
 	int buf_idx;
 	uint32_t bufq_handle;
 	uint32_t frame_id;
-	struct timespec64 *tv;
+	struct __kernel_old_timeval *tv;
 	/* Indicates whether buffer is used as ping ot pong buffer */
 	uint32_t pingpong_bit;
 	/* Indicates buffer is reconfig due to drop frame */
@@ -162,11 +162,11 @@ struct msm_isp_buf_ops {
 
 	int (*flush_buf)(struct msm_isp_buf_mgr *buf_mgr,
 	uint32_t bufq_handle, enum msm_isp_buffer_flush_t flush_type,
-	struct timespec64 *tv, uint32_t frame_id);
+	struct __kernel_old_timeval *tv, uint32_t frame_id);
 
 	int (*buf_done)(struct msm_isp_buf_mgr *buf_mgr,
 		uint32_t bufq_handle, uint32_t buf_index,
-		struct timespec64 *tv, uint32_t frame_id, uint32_t output_format);
+		struct __kernel_old_timeval *tv, uint32_t frame_id, uint32_t output_format);
 	void (*register_ctx)(struct msm_isp_buf_mgr *buf_mgr,
 		struct device **iommu_ctx1, struct device **iommu_ctx2,
 		int num_iommu_ctx1, int num_iommu_ctx2);
@@ -179,10 +179,10 @@ struct msm_isp_buf_ops {
 		uint32_t bufq_handle);
 	int (*buf_divert)(struct msm_isp_buf_mgr *buf_mgr,
 			uint32_t bufq_handle, uint32_t buf_index,
-			struct timespec64 *tv, uint32_t frame_id);
+			struct __kernel_old_timeval *tv, uint32_t frame_id);
 	int (*buf_err)(struct msm_isp_buf_mgr *buf_mgr,
 		uint32_t bufq_handle, uint32_t buf_index,
-		struct timespec64 *tv, uint32_t frame_id, uint32_t output_format);
+		struct __kernel_old_timeval *tv, uint32_t frame_id, uint32_t output_format);
 };
 
 struct msm_isp_buf_mgr {
