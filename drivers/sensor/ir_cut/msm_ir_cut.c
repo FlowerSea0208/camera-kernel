@@ -512,12 +512,14 @@ static long msm_ir_cut_subdev_do_ioctl32(struct v4l2_subdev *sd,
 		ir_cut_data.cfg_type = u32->cfg_type;
 		return msm_ir_cut_subdev_ioctl(sd, cmd, &ir_cut_data);
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&subdev_id, (void __user *)arg,
+		rc = msm_ir_cut_subdev_ioctl(sd, cmd, &subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
 			sizeof(subdev_id))) {
-			pr_err("Failed to copy from user");
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
 			return -EFAULT;
 		}
-		return msm_ir_cut_subdev_ioctl(sd, cmd, &subdev_id);
+		return rc;
 	default:
 		return msm_ir_cut_subdev_ioctl(sd, cmd, (void *)arg);
 	}

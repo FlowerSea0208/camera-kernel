@@ -865,6 +865,19 @@ static long msm_ois_subdev_do_ioctl32(struct v4l2_subdev *sd,
 		pr_err("%s:failed NULL parameter\n", __func__);
 		return -EINVAL;
 	}
+	if (cmd == VIDIOC_MSM_SENSOR_GET_SUBDEV_ID) {
+		struct msm_ois_ctrl_t *o_ctrl = v4l2_get_subdevdata(sd);
+		uint32_t subdev_id;
+
+		rc = msm_ois_get_subdev_id(o_ctrl, &subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
+			return -EFAULT;
+		}
+		return rc;
+	}
 	if (copy_from_user(&data, (void __user *)arg,
 		sizeof(data))) {
 		pr_err("Failed to copy from user_ptr=%pK size=%zu",

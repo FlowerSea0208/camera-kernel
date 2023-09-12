@@ -69,6 +69,10 @@ void msm_isp_process_error_info(struct vfe_device *vfe_dev);
 int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh);
 int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh);
 long msm_isp_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg);
+#ifdef CONFIG_COMPAT
+long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
+	unsigned int cmd, unsigned long arg);
+#endif
 void msm_isp_fetch_engine_done_notify(struct vfe_device *vfe_dev,
 	struct msm_vfe_fetch_engine_info *fetch_engine_info);
 void msm_isp_print_fourcc_error(const char *origin, uint32_t fourcc_format);

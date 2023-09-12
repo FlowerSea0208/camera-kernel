@@ -1647,15 +1647,15 @@ static long msm_actuator_subdev_do_ioctl32(struct v4l2_subdev *sd,
 	long rc;
 	void *parg = (void *)arg;
 
-	if (copy_from_user(&data, (void __user *)arg,
-		sizeof(data))) {
-		pr_err("Failed to copy from user");
-		return -EFAULT;
-	}
-	u32 = &data;
 	switch (cmd) {
 	case VIDIOC_MSM_ACTUATOR_CFG32:
 		cmd = VIDIOC_MSM_ACTUATOR_CFG;
+		if (copy_from_user(&data, (void __user *)arg,
+			sizeof(data))) {
+			pr_err("Failed to copy from user");
+			return -EFAULT;
+		}
+		u32 = &data;
 		switch (u32->cfgtype) {
 		case CFG_SET_ACTUATOR_INFO:
 			actuator_data.cfgtype = u32->cfgtype;
@@ -1754,6 +1754,7 @@ static long msm_actuator_subdev_do_ioctl32(struct v4l2_subdev *sd,
 			actuator_data.is_af_supported = u32->is_af_supported;
 			memcpy(&actuator_data.cfg.setpos, &(u32->cfg.setpos),
 				sizeof(struct msm_actuator_set_position_t));
+			parg = &actuator_data;
 			break;
 		default:
 			actuator_data.cfgtype = u32->cfgtype;
@@ -1765,11 +1766,6 @@ static long msm_actuator_subdev_do_ioctl32(struct v4l2_subdev *sd,
 		pr_err("%s: invalid cmd 0x%x received\n", __func__, cmd);
 		return -EINVAL;
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&subdev_id, (void __user *)arg,
-			sizeof(subdev_id))) {
-			pr_err("Failed to copy from user");
-			return -EFAULT;
-		}
 		parg = &subdev_id;
 		break;
 	}
@@ -1778,15 +1774,38 @@ static long msm_actuator_subdev_do_ioctl32(struct v4l2_subdev *sd,
 
 	switch (cmd) {
 
+	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
+		if (copy_to_user((void __user *)arg, &subdev_id,
+			sizeof(subdev_id))) {
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
+			return -EFAULT;
+		}
+		return rc;
 	case VIDIOC_MSM_ACTUATOR_CFG:
 
 		switch (u32->cfgtype) {
 
+		case CFG_GET_ACTUATOR_INFO:
+			data.is_af_supported = actuator_data.is_af_supported;
+			data.cfg.cam_name = actuator_data.cfg.cam_name;
+			if (copy_to_user((void __user *)arg, &data,
+				sizeof(data))) {
+				pr_err("Failed to copy to user_ptr=%pK size=%zu",
+					(void __user *)arg, sizeof(subdev_id));
+				return -EFAULT;
+			}
+			return rc;
 		case CFG_SET_DEFAULT_FOCUS:
 		case CFG_MOVE_FOCUS:
-			u32->cfg.move.curr_lens_pos =
-				actuator_data.cfg.move.curr_lens_pos;
-			break;
+			data.cfg.move.curr_lens_pos = actuator_data.cfg.move.curr_lens_pos;
+			if (copy_to_user((void __user *)arg, &data,
+				sizeof(data))) {
+				pr_err("Failed to copy to user_ptr=%pK size=%zu",
+					(void __user *)arg, sizeof(subdev_id));
+				return -EFAULT;
+			}
+			return rc;
 		default:
 			break;
 		}

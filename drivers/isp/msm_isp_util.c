@@ -1102,8 +1102,8 @@ static long msm_isp_ioctl_unlocked(struct v4l2_subdev *sd,
 
 
 #ifdef CONFIG_COMPAT
-static long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
-	unsigned int cmd, void *arg)
+long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
+	unsigned int cmd, unsigned long arg)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
 	long rc = 0;
@@ -1120,39 +1120,78 @@ static long msm_isp_ioctl_compat(struct v4l2_subdev *sd,
 	switch (cmd) {
 	case VIDIOC_MSM_VFE_REG_CFG_COMPAT: {
 		struct msm_vfe_cfg_cmd2 proc_cmd;
+		struct msm_vfe_cfg_cmd2_32 cdata;
 
+		if (copy_from_user(&cdata, (void __user *)arg,
+			sizeof(cdata))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata));
+			return -EFAULT;
+		}
 		mutex_lock(&vfe_dev->realtime_mutex);
-		msm_isp_compat_to_proc_cmd(&proc_cmd,
-			(struct msm_vfe_cfg_cmd2_32 *) arg);
+		msm_isp_compat_to_proc_cmd(&proc_cmd, &cdata);
 		rc = msm_isp_proc_cmd(vfe_dev, &proc_cmd);
 		mutex_unlock(&vfe_dev->realtime_mutex);
+		if (copy_to_user((void __user *)arg, &cdata, sizeof(cdata)))
+			rc = -EFAULT;
 		break;
 	}
 	case VIDIOC_MSM_VFE_REG_LIST_CFG_COMPAT: {
+		struct msm_vfe_cfg_cmd_list_32 cdata;
+
+		if (copy_from_user(&cdata, (void __user *)arg,
+			sizeof(cdata))) {
+			pr_err("Failed to copy from user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata));
+			return -EFAULT;
+		}
 		mutex_lock(&vfe_dev->realtime_mutex);
-		rc = msm_isp_proc_cmd_list(vfe_dev, arg);
+		rc = msm_isp_proc_cmd_list(vfe_dev, &cdata);
 		mutex_unlock(&vfe_dev->realtime_mutex);
+		if (copy_to_user((void __user *)arg, &cdata, sizeof(cdata)))
+			rc = -EFAULT;
 		break;
 	}
-	default:
-		return msm_isp_ioctl_unlocked(sd, cmd, arg);
+	default: {
+		const size_t ioc_size = _IOC_SIZE(cmd);
+		char	sbuf[128];
+		void	*parg = (void *)arg;
+		void    *mbuf = NULL;
+
+		if (_IOC_DIR(cmd) & _IOC_WRITE) {
+			if (ioc_size <= sizeof(sbuf)) {
+				parg = sbuf;
+			} else {
+				/* too big to allocate from stack */
+				mbuf = kmalloc(ioc_size, GFP_KERNEL);
+				if (mbuf == NULL)
+					return -ENOMEM;
+				parg = mbuf;
+			}
+			memset(parg, 0, ioc_size);
+			if (copy_from_user(parg, (void __user *)arg, ioc_size))
+				rc = -EFAULT;
+			else
+				rc = msm_isp_ioctl_unlocked(sd, cmd, (void *)parg);
+
+			if (_IOC_DIR(cmd) & _IOC_READ) {
+				if (copy_to_user((void __user *)arg, parg, ioc_size))
+					rc = -EFAULT;
+			}
+			if (mbuf != NULL)
+				kfree(mbuf);
+		}
+	}
 	}
 
 	return rc;
 }
-
-long msm_isp_ioctl(struct v4l2_subdev *sd,
-	unsigned int cmd, void *arg)
-{
-	return msm_isp_ioctl_compat(sd, cmd, arg);
-}
-#else /* CONFIG_COMPAT */
+#endif /* CONFIG_COMPAT */
 long msm_isp_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
 	return msm_isp_ioctl_unlocked(sd, cmd, arg);
 }
-#endif /* CONFIG_COMPAT */
 
 static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	struct msm_vfe_reg_cfg_cmd *reg_cfg_cmd,
@@ -1582,12 +1621,26 @@ int msm_isp_send_event(struct vfe_device *vfe_dev,
 	struct msm_isp_event_data *event_data)
 {
 	struct v4l2_event isp_event;
+	struct msm_isp_event_data32 event_data32;
 
 	memset(&isp_event, 0, sizeof(struct v4l2_event));
+	memset(&event_data32, 0, sizeof(event_data32));
 	isp_event.id = 0;
 	isp_event.type = event_type;
-	memcpy(&isp_event.u.data[0], event_data,
-		sizeof(struct msm_isp_event_data));
+
+	event_data32.timestamp.tv_sec =
+			event_data->timestamp.tv_sec;
+	event_data32.timestamp.tv_usec =
+			event_data->timestamp.tv_usec;
+	event_data32.mono_timestamp.tv_sec =
+			event_data->mono_timestamp.tv_sec;
+	event_data32.mono_timestamp.tv_usec =
+			event_data->mono_timestamp.tv_usec;
+	event_data32.frame_id = event_data->frame_id;
+	memcpy(&(event_data32.u), &(event_data->u),
+				sizeof(event_data32.u));
+	memcpy(&isp_event.u.data[0], &event_data32,
+		sizeof(event_data32));
 	v4l2_event_queue(vfe_dev->subdev.sd.devnode, &isp_event);
 	return 0;
 }

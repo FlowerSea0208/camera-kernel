@@ -1265,12 +1265,14 @@ static long msm_flash_subdev_do_ioctl32(struct v4l2_subdev *sd,
 		pr_err("invalid cmd 0x%x received\n", cmd);
 		return -EINVAL;
 	case VIDIOC_MSM_SENSOR_GET_SUBDEV_ID:
-		if (copy_from_user(&subdev_id, (void __user *)arg,
+		rc = msm_flash_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+		if (copy_to_user((void __user *)arg, &subdev_id,
 			sizeof(subdev_id))) {
-			pr_err("Failed to copy from user");
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(subdev_id));
 			return -EFAULT;
 		}
-		return msm_flash_subdev_ioctl(sd, cmd, (void *)&subdev_id);
+		return rc;
 	default:
 		return msm_flash_subdev_ioctl(sd, cmd, (void *)arg);
 	}

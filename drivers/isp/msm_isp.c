@@ -442,6 +442,9 @@ static long msm_isp_subdev_do_ioctl(
 
 static struct v4l2_subdev_core_ops msm_vfe_v4l2_subdev_core_ops = {
 	.ioctl = msm_isp_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl32 = msm_isp_ioctl_compat,
+#endif
 	.subscribe_event = msm_isp_subscribe_event,
 	.unsubscribe_event = msm_isp_unsubscribe_event,
 };

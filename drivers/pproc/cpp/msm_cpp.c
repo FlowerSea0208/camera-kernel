@@ -3772,6 +3772,18 @@ STREAM_BUFF_END:
 		}
 		break;
 	}
+	case VIDIOC_MSM_CPP_GET_INST_INFO: {
+		struct msm_cpp_frame_info_t inst_info;
+
+		memset(&inst_info, 0, sizeof(struct msm_cpp_frame_info_t));
+		inst_info.inst_id = 0;
+		if (copy_to_user(
+				(void __user *)ioctl_ptr->ioctl_ptr, &inst_info,
+				sizeof(struct msm_cpp_frame_info_t))) {
+			return -EFAULT;
+		}
+		break;
+	}
 //TODO:NTC vfh
 #if 0
 	case VIDIOC_MSM_CPP_GET_INST_INFO: {
@@ -4225,6 +4237,20 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct v4l2_subdev *sd,
 	case VIDIOC_MSM_CPP_LOAD_FIRMWARE32:
 		cmd = VIDIOC_MSM_CPP_LOAD_FIRMWARE;
 		break;
+	case VIDIOC_MSM_CPP_GET_INST_INFO32:
+	{
+		struct msm_cpp_frame_info32_t inst_info;
+
+		memset(&inst_info, 0, sizeof(struct msm_cpp_frame_info32_t));
+		inst_info.inst_id = 0;
+		if (copy_to_user((void __user *)kp_ioctl.ioctl_ptr,
+			&inst_info, sizeof(struct msm_cpp_frame_info32_t))) {
+			mutex_unlock(&cpp_dev->mutex);
+			return -EFAULT;
+		}
+		cmd = VIDIOC_MSM_CPP_GET_INST_INFO;
+		break;
+	}
 //TODO:NTC
 #if 0
 	case VIDIOC_MSM_CPP_GET_INST_INFO32:
