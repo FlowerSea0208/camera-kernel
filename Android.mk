@@ -17,7 +17,6 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES             :=  \
                                 $(shell find $(LOCAL_PATH)/config -L -type f)      \
                                 $(shell find $(LOCAL_PATH)/drivers -L -type f)     \
-                                $(shell find $(LOCAL_PATH)/dt-bindings -L -type f) \
                                 $(shell find $(LOCAL_PATH)/include -L -type f)     \
                                 $(LOCAL_PATH)/Android.mk \
                                 $(LOCAL_PATH)/board.mk   \
