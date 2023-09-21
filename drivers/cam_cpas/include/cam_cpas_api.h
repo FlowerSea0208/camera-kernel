@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -749,5 +750,17 @@ int cam_cpas_notify_event(const char *identifier_string,
 int cam_cpas_hw_get_camnoc_fill_level_info(
 	uint32_t cpas_version,
 	uint32_t client_handle);
+
+/**
+ * cam_cpas_dump_camnoc_buff_fill_info()
+ *
+ * @brief: API to dump camnoc buffer fill level info
+ *
+ * @client_handle : Client cpas handle
+ *
+ * @return 0 on success
+ *
+ */
+int cam_cpas_dump_camnoc_buff_fill_info(uint32_t client_handle);
 
 #endif /* _CAM_CPAS_API_H_ */
