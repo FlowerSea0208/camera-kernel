@@ -2011,7 +2011,7 @@ static int cam_config_mclk_reg(struct cam_sensor_power_ctrl_t *ctrl,
 int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		struct cam_hw_soc_info *soc_info)
 {
-	int rc = 0, index = 0, no_gpio = 0, ret = 0, num_vreg, j = 0, i = 0;
+	int rc = 0, rc1 = 0, index = 0, no_gpio = 0, ret = 0, num_vreg, j = 0, i = 0;
 	int32_t vreg_idx = -1;
 	struct cam_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_gpio_num_info *gpio_num_info = NULL;
@@ -2274,7 +2274,7 @@ power_up_failed:
 				CAM_DBG(CAM_SENSOR, "Disable Regulator");
 				vreg_idx = power_setting->seq_val;
 
-				rc =  cam_soc_util_regulator_disable(
+				rc1 =  cam_soc_util_regulator_disable(
 					soc_info->rgltr[vreg_idx],
 					soc_info->rgltr_name[vreg_idx],
 					soc_info->rgltr_min_volt[vreg_idx],
@@ -2282,7 +2282,7 @@ power_up_failed:
 					soc_info->rgltr_op_mode[vreg_idx],
 					soc_info->rgltr_delay[vreg_idx]);
 
-				if (rc) {
+				if (rc1) {
 					CAM_ERR(CAM_SENSOR,
 					"Fail to disalbe reg: %s",
 					soc_info->rgltr_name[vreg_idx]);
