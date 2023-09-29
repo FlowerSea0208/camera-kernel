@@ -17,6 +17,9 @@
 #include "cam_req_mgr_dev.h"
 #include "cam_smmu_api.h"
 #include "cam_compat.h"
+#include "cam_cpastop_hw.h"
+
+#define CAM_CPAS_LOG_BUF_LEN      512
 
 static uint cam_min_camnoc_ib_bw;
 module_param(cam_min_camnoc_ib_bw, uint, 0644);
@@ -487,6 +490,46 @@ static int cam_cpas_hw_reg_read(struct cam_hw_info *cpas_hw,
 	*value = reg_value;
 
 	return rc;
+}
+
+static int cam_cpas_hw_dump_camnoc_buff_fill_info(
+	struct cam_hw_info *cpas_hw,
+	uint32_t client_handle)
+{
+	int rc = 0, i;
+	uint32_t val = 0;
+	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
+	struct cam_camnoc_info *camnoc_info =
+		(struct cam_camnoc_info *) cpas_core->camnoc_info;
+	char log_buf[CAM_CPAS_LOG_BUF_LEN] = {0};
+	size_t len = 0;
+
+	if (!camnoc_info) {
+		CAM_ERR(CAM_CPAS, "Invalid camnoc info for hw_version: 0x%x",
+			cpas_hw->soc_info.hw_version);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < camnoc_info->specific_size; i++) {
+		if ((!camnoc_info->specific[i].enable) ||
+			(!camnoc_info->specific[i].maxwr_low.enable))
+			continue;
+
+		rc = cam_cpas_hw_reg_read(cpas_hw, client_handle,
+			CAM_CPAS_REG_CAMNOC,
+			camnoc_info->specific[i].maxwr_low.offset, true, &val);
+		if (rc)
+			break;
+
+		len += scnprintf((log_buf + len), (CAM_CPAS_LOG_BUF_LEN - len),
+			" %s:[%d %d]", camnoc_info->specific[i].port_name,
+			(val & 0x7FF), (val & 0x7F0000) >> 16);
+	}
+
+	CAM_INFO(CAM_CPAS, "CAMNOC Fill level [Queued Pending] %s", log_buf);
+
+	return rc;
+
 }
 
 static int cam_cpas_util_set_camnoc_axi_clk_rate(
@@ -1984,13 +2027,22 @@ static void cam_cpas_update_monitor_array(struct cam_hw_info *cpas_hw,
 	const char *identifier_string, int32_t identifier_value)
 {
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
+	struct cam_camnoc_info *camnoc_info =
+		(struct cam_camnoc_info *) cpas_core->camnoc_info;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
 	struct cam_cpas_private_soc *soc_private =
 		(struct cam_cpas_private_soc *) cpas_hw->soc_info.soc_private;
 	struct cam_cpas_monitor *entry;
 	int iterator;
-	int i;
+	int i, j = 0;
 	int reg_camnoc = cpas_core->regbase_index[CAM_CPAS_REG_CAMNOC];
+	uint32_t val = 0;
+
+	if (!camnoc_info) {
+		CAM_ERR(CAM_CPAS, "Invalid camnoc info for hw_version: 0x%x",
+			cpas_hw->soc_info.hw_version);
+		return;
+	}
 
 	CAM_CPAS_INC_MONITOR_HEAD(&cpas_core->monitor_head, &iterator);
 
@@ -2045,21 +2097,34 @@ static void cam_cpas_update_monitor_array(struct cam_hw_info *cpas_hw,
 		entry->fe_mnoc = cam_io_r_mb(rpmh_base + fe_mnoc_offset);
 		entry->be_ddr = cam_io_r_mb(rpmh_base + be_ddr_offset);
 		entry->be_mnoc = cam_io_r_mb(rpmh_base + be_mnoc_offset);
+
+		CAM_DBG(CAM_CPAS,
+			"fe_ddr=0x%x, fe_mnoc=0x%x, be_ddr=0x%x, be_mnoc=0x%x",
+			entry->fe_ddr, entry->fe_mnoc, entry->be_ddr,
+			entry->be_mnoc);
 	}
 
-	entry->camnoc_fill_level[0] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0xA20);
-	entry->camnoc_fill_level[1] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0x1420);
-	entry->camnoc_fill_level[2] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0x1A20);
+	for (i = 0; i < camnoc_info->specific_size; i++) {
+		if ((!camnoc_info->specific[i].enable) ||
+			(!camnoc_info->specific[i].maxwr_low.enable))
+			continue;
 
-	if (cpas_hw->soc_info.hw_version == CAM_CPAS_TITAN_580_V100) {
-		entry->camnoc_fill_level[3] = cam_io_r_mb(
-			soc_info->reg_map[reg_camnoc].mem_base + 0x7620);
-		entry->camnoc_fill_level[4] = cam_io_r_mb(
-			soc_info->reg_map[reg_camnoc].mem_base + 0x7420);
+		if (j >= CAM_CAMNOC_FILL_LVL_REG_INFO_MAX) {
+			CAM_WARN(CAM_CPAS,
+				"CPAS monitor reg info buffer full, max : %d",
+				j);
+			break;
+		}
+
+		entry->camnoc_port_name[j] = camnoc_info->specific[i].port_name;
+		val = cam_io_r_mb(soc_info->reg_map[reg_camnoc].mem_base +
+			camnoc_info->specific[i].maxwr_low.offset);
+		entry->camnoc_fill_level[j] = val;
+		j++;
 	}
+
+	entry->num_camnoc_lvl_regs = j;
+
 }
 
 static void cam_cpas_dump_monitor_array(
@@ -2071,6 +2136,8 @@ static void cam_cpas_dump_monitor_array(
 	uint64_t ms, tmp, hrs, min, sec;
 	struct cam_cpas_monitor *entry;
 	struct timespec64 curr_timestamp;
+	char log_buf[CAM_CPAS_LOG_BUF_LEN];
+	size_t len;
 
 	if (!cpas_core->full_state_dump)
 		return;
@@ -2088,7 +2155,6 @@ static void cam_cpas_dump_monitor_array(
 		div_u64_rem(state_head + 1,
 			CAM_CPAS_MONITOR_MAX_ENTRIES, &oldest_entry);
 	}
-
 
 	ktime_get_real_ts64(&curr_timestamp);
 	tmp = curr_timestamp.tv_sec;
@@ -2110,6 +2176,8 @@ static void cam_cpas_dump_monitor_array(
 		sec = do_div(tmp, 60);
 		min = do_div(tmp, 60);
 		hrs = do_div(tmp, 24);
+		log_buf[0] = '\0';
+		len = 0;
 
 		CAM_INFO(CAM_CPAS,
 			"**** %llu:%llu:%llu.%llu : Index[%d] Identifier[%s][%d] camnoc=%lld, ahb=%d",
@@ -2134,18 +2202,14 @@ static void cam_cpas_dump_monitor_array(
 				entry->be_ddr, entry->be_mnoc);
 		}
 
-		CAM_INFO(CAM_CPAS,
-			"CAMNOC REG[Queued Pending] linear[%d %d] rdi0_wr[%d %d] ubwc_stats0[%d %d] ubwc_stats1[%d %d] rdi1_wr[%d %d]",
-			(entry->camnoc_fill_level[0] & 0x7FF),
-			(entry->camnoc_fill_level[0] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[1] & 0x7FF),
-			(entry->camnoc_fill_level[1] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[2] & 0x7FF),
-			(entry->camnoc_fill_level[2] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[3] & 0x7FF),
-			(entry->camnoc_fill_level[3] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[4] & 0x7FF),
-			(entry->camnoc_fill_level[4] & 0x7F0000) >> 16);
+		for (j = 0; j < entry->num_camnoc_lvl_regs; j++) {
+			len += scnprintf((log_buf + len),
+				(CAM_CPAS_LOG_BUF_LEN - len), " %s:[%d %d]",
+				entry->camnoc_port_name[j],
+				(entry->camnoc_fill_level[j] & 0x7FF),
+				(entry->camnoc_fill_level[j] & 0x7F0000) >> 16);
+		}
+		CAM_INFO(CAM_CPAS, "CAMNOC REG[Queued Pending] %s", log_buf);
 
 		index = (index + 1) % CAM_CPAS_MONITOR_MAX_ENTRIES;
 	}
@@ -2323,6 +2387,20 @@ static int cam_cpas_hw_process_cmd(void *hw_priv,
 
 		selection_mask = (uint32_t *)cmd_args;
 		rc = cam_cpas_select_qos(hw_priv, *selection_mask);
+		break;
+	}
+	case CAM_CPAS_HW_CMD_DUMP_BUFF_FILL_INFO: {
+		uint32_t *client_handle;
+
+		if (sizeof(uint32_t) != arg_size) {
+			CAM_ERR(CAM_CPAS, "cmd_type %d, size mismatch %d",
+				cmd_type, arg_size);
+			break;
+		}
+
+		client_handle = (uint32_t *)cmd_args;
+		rc = cam_cpas_hw_dump_camnoc_buff_fill_info(hw_priv,
+			*client_handle);
 		break;
 	}
 	default:

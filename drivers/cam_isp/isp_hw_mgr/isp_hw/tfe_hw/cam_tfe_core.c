@@ -353,10 +353,7 @@ static void cam_tfe_log_error_irq_status(
 	CAM_INFO(CAM_ISP, "Top debug [0]:0x%x [1]:0x%x [2]:0x%x [3]:0x%x",
 		val_0, val_1, val_2, val_3);
 
-	cam_cpas_reg_read(soc_private->cpas_handle,
-		CAM_CPAS_REG_CAMNOC, 0x20, true, &val_0);
-	CAM_INFO(CAM_ISP, "tfe_niu_MaxWr_Low offset 0x20 val 0x%x",
-		val_0);
+	cam_cpas_dump_camnoc_buff_fill_info(soc_private->cpas_handle);
 
 	val_0 = cam_io_r(mem_base  +
 		top_priv->common_data.common_reg->perf_pixel_count);
