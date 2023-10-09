@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_CAM_ISP_H__
@@ -112,6 +112,8 @@
 #define CAM_ISP_IFE0_LITE_HW     0x4
 #define CAM_ISP_IFE1_LITE_HW     0x8
 #define CAM_ISP_IFE2_LITE_HW     0x10
+#define CAM_ISP_IFE3_LITE_HW     0x20
+#define CAM_ISP_IFE4_LITE_HW     0x40
 
 #define CAM_ISP_PXL_PATH          0x1
 #define CAM_ISP_PPP_PATH          0x2
