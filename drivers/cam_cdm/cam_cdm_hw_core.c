@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -1256,6 +1256,8 @@ static void cam_hw_cdm_work(struct work_struct *work)
 			mutex_unlock(&core->bl_fifo[fifo_idx]
 					.fifo_lock);
 			mutex_unlock(&cdm_hw->hw_mutex);
+			kfree(payload);
+			payload = NULL;
 			return;
 		}
 
