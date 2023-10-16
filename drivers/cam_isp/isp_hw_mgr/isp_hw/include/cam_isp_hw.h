@@ -220,6 +220,8 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_DRV_CONFIG,
 	CAM_ISP_HW_CMD_DYNAMIC_CLOCK_UPDATE,
 	CAM_ISP_HW_CMD_SET_SYNC_HW_IDX,
+	CAM_ISP_HW_CMD_BUS_WM_DISABLE,
+	CAM_ISP_HW_CMD_BUFFER_ALIGNMENT_UPDATE,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -399,11 +401,13 @@ struct cam_isp_hw_get_wm_update {
  * @Brief:           Get the out resource id for given mid
  *
  * @mid:             Mid number of hw outport numb
+ * @pid:             Pid number associated with mid
  * @out_res_id:      Out resource id
  *
  */
 struct cam_isp_hw_get_res_for_mid {
 	uint32_t                       mid;
+	uint32_t                       pid;
 	uint32_t                       out_res_id;
 };
 

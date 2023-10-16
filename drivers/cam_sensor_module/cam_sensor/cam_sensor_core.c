@@ -558,8 +558,11 @@ static int32_t cam_sensor_pkt_parse(struct cam_sensor_ctrl_t *s_ctrl,
 		i2c_reg_settings->request_id =
 			csl_packet->header.request_id;
 	}
+	cam_mem_put_cpu_buf(config.packet_handle);
+	return rc;
 
 end:
+	cam_mem_put_cpu_buf(config.packet_handle);
 	return rc;
 }
 
@@ -641,8 +644,8 @@ int32_t cam_sensor_update_i2c_info(struct cam_cmd_i2c_info *i2c_info,
 		cci_client->retries = 3;
 		cci_client->id_map = 0;
 		cci_client->i2c_freq_mode = i2c_info->i2c_freq_mode;
-		CAM_DBG(CAM_SENSOR, " Master: %d sid: %d freq_mode: %d",
-			cci_client->cci_i2c_master, i2c_info->slave_addr,
+		CAM_DBG(CAM_SENSOR, "CCI: %d Master: %d slave_addr: 0x%x freq_mode: %d",
+			cci_client->cci_device, cci_client->cci_i2c_master, i2c_info->slave_addr,
 			i2c_info->i2c_freq_mode);
 	}
 
@@ -885,9 +888,14 @@ int32_t cam_handle_mem_ptr(uint64_t handle, uint32_t cmd,
 				"Failed to parse the command Buffer Header");
 			goto end;
 		}
+		cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 	}
 
+	cam_mem_put_cpu_buf(handle);
+	return rc;
+
 end:
+	cam_mem_put_cpu_buf(handle);
 	return rc;
 }
 
@@ -2062,7 +2070,7 @@ int32_t cam_sensor_flush_request(struct cam_req_mgr_flush_request *flush_req)
 		 * before EOF, so we need to stream off the sensor during flush
 		 * for VFPS usecase.
 		 */
-		if (s_ctrl->stream_off_after_eof && s_ctrl->is_stopped_by_user) {
+		if (s_ctrl->stream_off_after_eof) {
 			cam_sensor_stream_off(s_ctrl);
 			s_ctrl->is_stopped_by_user = false;
 		}
