@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -757,8 +758,9 @@ static int cam_cpastop_poweron(struct cam_hw_info *cpas_hw)
 	cam_cpastop_reset_irq(cpas_hw);
 	for (i = 0; i < camnoc_info->specific_size; i++) {
 		if (camnoc_info->specific[i].enable) {
-			CAM_DBG(CAM_CPAS, "Updating QoS settings for %d",
-				camnoc_info->specific[i].port_type);
+			CAM_DBG(CAM_CPAS, "Updating QoS settings for %d %s",
+				camnoc_info->specific[i].port_type,
+				camnoc_info->specific[i].port_name);
 			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].priority_lut_low);
 			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
@@ -883,6 +885,7 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 {
 	int rc = 0;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
+	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
 	qchannel_info = NULL;
 
 	CAM_DBG(CAM_CPAS,
@@ -966,6 +969,7 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		break;
 	}
 
+	cpas_core->camnoc_info = camnoc_info;
 	return 0;
 }
 
