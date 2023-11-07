@@ -1373,6 +1373,9 @@ static int32_t cam_cci_i2c_write(struct v4l2_subdev *sd,
 		c_ctrl->cci_info->sid, c_ctrl->cci_info->retries,
 		c_ctrl->cci_info->id_map);
 
+	if (master >= MASTER_MAX)
+		master = NUM_MASTERS - 1;
+
 	mutex_lock(&cci_dev->cci_master_info[master].mutex);
 	if (cci_dev->cci_master_info[master].is_first_req) {
 		cci_dev->cci_master_info[master].is_first_req = false;
