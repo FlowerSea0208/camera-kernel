@@ -1,5 +1,6 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
+load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 def _define_module(target, variant):
     tv = "{}_{}".format(target, variant)
@@ -244,7 +245,7 @@ def _define_module(target, variant):
     )
 
     copy_to_dist_dir(
-        name = "{}_camera_dist".format(tv),
+        name = "{}_camera_dist".format(target),
         data = [":{}_camera".format(tv)],
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
@@ -254,5 +255,5 @@ def _define_module(target, variant):
     )
 
 def define_camera_module():
-    _define_module("blair", "gki")
-    _define_module("blair", "consolidate")
+	for (t, v) in get_all_variants():
+		_define_module(t, v)

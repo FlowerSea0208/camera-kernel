@@ -34,6 +34,10 @@ ifeq ($(CONFIG_ARCH_BLAIR), y)
 include $(CAMERA_KERNEL_ROOT)/config/blair.mk
 endif
 
+ifeq ($(CONFIG_ARCH_PITTI), y)
+include $(CAMERA_KERNEL_ROOT)/config/pitti.mk
+endif
+
 ifeq ($(CONFIG_ARCH_HOLI), y)
 include $(CAMERA_KERNEL_ROOT)/config/holi.mk
 endif
