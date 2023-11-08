@@ -48,6 +48,9 @@
 #define CAM_FLASH_PACKET_OPCODE_NON_REALTIME_SET_OPS 2
 #define CAM_FLASH_PACKET_OPCODE_STREAM_OFF           3
 
+#define QUERY_CURRENT 1
+#define QUERY_CURRENT_VAL (1 << 2)
+
 struct cam_flash_ctrl;
 
 enum cam_flash_switch_trigger_ops {
