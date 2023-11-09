@@ -314,7 +314,7 @@ static int init_sequence(struct cam_sensor_ctrl_t *s_ctrl)
 	for (i = 0; i < ARRAY_SIZE(i2c_write_sequence); i++) {
 		rc = i2c_write_array(s_ctrl, &i2c_write[i]);
 		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "init sequence %d", i);
+			CAM_ERR(CAM_SENSOR, "serdes init sequence error %d", i);
 			goto error;
 		}
 	}
@@ -326,6 +326,7 @@ error:
 static int cam_sensor_serdes_init(void *data)
 {
 	int32_t rc = 0;
+	int32_t rc_init = 0;
 	char boot_marker[40];
 	struct cam_bchip_ctrl_t *b_ctrl = (struct cam_bchip_ctrl_t *)data;
 
@@ -346,11 +347,18 @@ static int cam_sensor_serdes_init(void *data)
 		goto error;
 	}
 
-	init_sequence(b_ctrl->s_ctrl);
+        //even if init sequence fail, let it powerdown sensor
+	rc_init = init_sequence(b_ctrl->s_ctrl);
 
 	rc = sensor_powerdown(b_ctrl->s_ctrl);
 	if (rc) {
 		CAM_ERR(CAM_SENSOR, "Bridgechip%d Powerdown Failed",
+			b_ctrl->s_ctrl->soc_info.index);
+		goto error;
+	}
+
+	if (rc_init < 0) {
+		CAM_ERR(CAM_SENSOR, "Bridgechip%d Init Sequence Failed",
 			b_ctrl->s_ctrl->soc_info.index);
 		goto error;
 	}
