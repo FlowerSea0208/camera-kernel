@@ -55,7 +55,8 @@ int cam_flash_led_prepare(struct led_trigger *trigger, int options,
 #endif
 		if (rc) {
 			CAM_ERR(CAM_FLASH,
-				"Regulator enable failed rc = %d", rc);
+				"Regulator enable failed rc = %d cmd = %d",
+                                rc, cmd);
 			return rc;
 		}
 	}
