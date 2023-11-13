@@ -714,7 +714,7 @@ static int lt6911_fw_read_back(struct cam_sensor_ctrl_t *s_ctrl, u8 *buff, int s
 		addr += 32;
 	}
 
-	if(rest_data != 0) {
+	if((rest_data > 0) && (rest_data < 32)) {
 		memset(page_data, 0x0, rest_data);
 		rc = lt6911_flash_read_addr_set(s_ctrl, addr);
 		if (rc < 0)
