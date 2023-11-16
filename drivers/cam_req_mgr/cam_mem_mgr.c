@@ -577,7 +577,7 @@ static int cam_mem_util_get_dma_buf(size_t len,
 
 	if (try_heap) {
 		*buf = dma_heap_buffer_alloc(try_heap, len, O_RDWR, 0);
-		if (IS_ERR_OR_NULL(*buf)) {
+		if (IS_ERR(*buf)) {
 			CAM_WARN(CAM_MEM,
 				"Failed in allocating from try heap, heap=%pK, len=%zu, err=%d",
 				try_heap, len, PTR_ERR(*buf));
@@ -587,7 +587,7 @@ static int cam_mem_util_get_dma_buf(size_t len,
 
 	if (*buf == NULL) {
 		*buf = dma_heap_buffer_alloc(heap, len, O_RDWR, 0);
-		if (IS_ERR_OR_NULL(*buf)) {
+		if (IS_ERR(*buf)) {
 			rc = PTR_ERR(*buf);
 			CAM_ERR(CAM_MEM,
 				"Failed in allocating from heap, heap=%pK, len=%zu, err=%d",
@@ -893,6 +893,12 @@ int cam_mem_mgr_alloc_and_map(struct cam_mem_mgr_alloc_cmd_v2 *cmd)
 		CAM_ERR(CAM_MEM,
 			"Ion Alloc failed, len=%llu, align=%llu, flags=0x%x, num_hdl=%d",
 			cmd->len, cmd->align, cmd->flags, cmd->num_hdl);
+		cam_mem_mgr_print_tbl();
+		return rc;
+	}
+	if (!dmabuf) {
+		CAM_ERR(CAM_MEM,
+			"Ion Alloc return NULL dmabuf! fd=%d, len=%d", fd, len);
 		cam_mem_mgr_print_tbl();
 		return rc;
 	}
@@ -1486,6 +1492,9 @@ int cam_mem_mgr_request_mem(struct cam_mem_mgr_request_desc *inp,
 	if (rc) {
 		CAM_ERR(CAM_MEM, "ION alloc failed for shared buffer");
 		goto ion_fail;
+	} else if (!buf) {
+		CAM_ERR(CAM_MEM, "ION alloc returned NULL buffer");
+		goto ion_fail;
 	} else {
 		CAM_DBG(CAM_MEM, "Got dma_buf = %pK", buf);
 	}
@@ -1662,6 +1671,9 @@ int cam_mem_mgr_reserve_memory_region(struct cam_mem_mgr_request_desc *inp,
 
 	if (rc) {
 		CAM_ERR(CAM_MEM, "ION alloc failed for sec heap buffer");
+		goto ion_fail;
+	} else if (!buf) {
+		CAM_ERR(CAM_MEM, "ION alloc returned NULL buffer");
 		goto ion_fail;
 	} else {
 		CAM_DBG(CAM_MEM, "Got dma_buf = %pK", buf);
