@@ -43,6 +43,7 @@
 #define CCI_TIMEOUT msecs_to_jiffies(1500)
 #define NUM_QUEUES 2
 
+#define NUM_MASTERS 2
 #define MSM_CCI_WRITE_DATA_PAYLOAD_SIZE_11 11
 #define BURST_MIN_FREE_SIZE 8
 
