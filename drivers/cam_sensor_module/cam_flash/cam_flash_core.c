@@ -20,10 +20,15 @@ int cam_flash_led_prepare(struct led_trigger *trigger, int options,
 	int *max_current, bool is_wled)
 {
 	int rc = 0;
+	int cmd = 0;
 
 	if (is_wled) {
 #if IS_REACHABLE(CONFIG_BACKLIGHT_QCOM_SPMI_WLED)
-		rc = wled_flash_led_prepare(trigger, options, max_current);
+
+	if (options == QUERY_CURRENT) {
+		cmd = QUERY_CURRENT_VAL;
+	}
+		rc = wled_flash_led_prepare(trigger, cmd, max_current);
 		if (rc) {
 			CAM_ERR(CAM_FLASH, "enable reg failed: rc: %d",
 				rc);
@@ -34,13 +39,24 @@ int cam_flash_led_prepare(struct led_trigger *trigger, int options,
 #endif
 	} else {
 #if IS_REACHABLE(CONFIG_LEDS_QPNP_FLASH_V2)
-		rc = qpnp_flash_led_prepare(trigger, options, max_current);
+
+		if (options == QUERY_CURRENT) {
+			cmd = QUERY_CURRENT_VAL;
+		}
+
+		rc = qpnp_flash_led_prepare(trigger, cmd, max_current);
 #elif IS_REACHABLE(CONFIG_LEDS_QTI_FLASH)
-		rc = qti_flash_led_prepare(trigger, options, max_current);
+
+		if (options == QUERY_CURRENT) {
+			cmd = QUERY_CURRENT_VAL;
+		}
+
+		rc = qti_flash_led_prepare(trigger, cmd, max_current);
 #endif
 		if (rc) {
 			CAM_ERR(CAM_FLASH,
-				"Regulator enable failed rc = %d", rc);
+				"Regulator enable failed rc = %d cmd = %d",
+                                rc, cmd);
 			return rc;
 		}
 	}
@@ -1738,7 +1754,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 				(struct cam_flash_query_curr *)cmd_buf;
 
 			rc = cam_flash_led_prepare(fctrl->switch_trigger,
-				QUERY_MAX_AVAIL_CURRENT, &query_curr_ma,
+				QUERY_CURRENT, &query_curr_ma,
 				soc_private->is_wled_flash);
 
 			CAM_DBG(CAM_FLASH, "query_curr_ma = %d",
