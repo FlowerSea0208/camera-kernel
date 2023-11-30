@@ -1773,7 +1773,14 @@ static long msm_eeprom_subdev_ioctl32(struct v4l2_subdev *sd,
 				(void __user *)arg, sizeof(cdata));
 			return -EFAULT;
 		}
-		return msm_eeprom_config32(e_ctrl, &cdata);
+		rc = msm_eeprom_config32(e_ctrl, &cdata);
+		if (copy_to_user((void __user *)arg, &cdata,
+			sizeof(cdata))) {
+			pr_err("Failed to copy to user_ptr=%pK size=%zu",
+				(void __user *)arg, sizeof(cdata));
+			return -EFAULT;
+		}
+		return rc;
 	default:
 		return -ENOIOCTLCMD;
 	}
