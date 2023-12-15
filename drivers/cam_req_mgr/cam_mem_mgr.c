@@ -274,6 +274,11 @@ static int32_t cam_mem_get_slot(void)
 	int32_t idx;
 
 	mutex_lock(&tbl.m_lock);
+	if (!tbl.bitmap) {
+		CAM_ERR(CAM_MEM, "crm is closing and mem deinit");
+		mutex_unlock(&tbl.m_lock);
+		return -EINVAL;
+	}
 	idx = find_first_zero_bit(tbl.bitmap, tbl.bits);
 	if (idx >= CAM_MEM_BUFQ_MAX || idx <= 0) {
 		mutex_unlock(&tbl.m_lock);
@@ -292,6 +297,11 @@ static int32_t cam_mem_get_slot(void)
 static void cam_mem_put_slot(int32_t idx)
 {
 	mutex_lock(&tbl.m_lock);
+	if (!tbl.bitmap) {
+		CAM_ERR(CAM_MEM, "crm is closing and mem deinit");
+		mutex_unlock(&tbl.m_lock);
+		return;
+	}
 	mutex_lock(&tbl.bufq[idx].q_lock);
 	tbl.bufq[idx].active = false;
 	tbl.bufq[idx].is_internal = false;
@@ -326,15 +336,18 @@ int cam_mem_get_io_buf(int32_t buf_handle, int32_t mmu_handle,
 
 	mutex_lock(&tbl.bufq[idx].q_lock);
 	if (buf_handle != tbl.bufq[idx].buf_handle) {
-		CAM_ERR(CAM_MEM, "buf handle mismatch %x %x",
-			buf_handle, tbl.bufq[idx].buf_handle);
+		CAM_ERR(CAM_MEM, "buf handle mismatch 0x%x 0x%x mmu handle 0x%x fd %d i_ino %lu",
+			buf_handle, tbl.bufq[idx].buf_handle, mmu_handle, tbl.bufq[idx].fd,
+			tbl.bufq[idx].i_ino);
 		rc = -EINVAL;
 		goto handle_mismatch;
 	}
 
 	if (!iova_ptr || !len_ptr) {
-		CAM_ERR(CAM_MEM, "Error: Input pointers are invalid iova %s len_ptr %s",
-			CAM_IS_NULL_TO_STR(iova_ptr), CAM_IS_NULL_TO_STR(len_ptr));
+		CAM_ERR(CAM_MEM, "Error: Input pointers are invalid iova %s len_ptr %s"
+			"mmu handle 0x%x fd %d i_ino %lu", CAM_IS_NULL_TO_STR(iova_ptr),
+			CAM_IS_NULL_TO_STR(len_ptr), mmu_handle, tbl.bufq[idx].fd,
+			tbl.bufq[idx].i_ino);
 		rc = -EINVAL;
 		goto handle_mismatch;
 	}
@@ -353,18 +366,18 @@ int cam_mem_get_io_buf(int32_t buf_handle, int32_t mmu_handle,
 		}
 	}
 
-	if (NULL == iova_ptr) {
+	if (0 == *iova_ptr) {
 		CAM_ERR(CAM_MEM,
 			"Invalid iova_ptr handle:0x%x fd:%d i_ino:%lu len_ptr:%zu",
-			mmu_handle, tbl.bufq[idx].fd, tbl.bufq[idx].i_ino,
-			*len_ptr);
+			mmu_handle, tbl.bufq[idx].fd, tbl.bufq[idx].i_ino, *len_ptr);
 		rc = -EINVAL;
 	}
 
-handle_mismatch:
 	CAM_DBG(CAM_MEM,
 		"handle:0x%x fd:%d i_ino:%lu iova_ptr:0x%llx len_ptr:%llu",
-		mmu_handle, tbl.bufq[idx].fd, tbl.bufq[idx].i_ino, iova_ptr, *len_ptr);
+		mmu_handle, tbl.bufq[idx].fd, tbl.bufq[idx].i_ino, *iova_ptr, *len_ptr);
+
+handle_mismatch:
 	mutex_unlock(&tbl.bufq[idx].q_lock);
 	return rc;
 }
@@ -442,7 +455,11 @@ int cam_mem_mgr_cache_ops(struct cam_mem_cache_ops_cmd *cmd)
 		return -EINVAL;
 
 	mutex_lock(&tbl.m_lock);
-
+	if (!tbl.bitmap) {
+		CAM_ERR(CAM_MEM, "crm is closing and mem deinit");
+		mutex_unlock(&tbl.m_lock);
+		return -EINVAL;
+	}
 	if (!test_bit(idx, tbl.bitmap)) {
 		CAM_ERR(CAM_MEM, "Buffer at idx=%d is already unmapped,",
 			idx);
@@ -1527,6 +1544,11 @@ static void cam_mem_util_unmap(struct kref *kref)
 	memset(&tbl.bufq[idx].timestamp, 0, sizeof(struct timespec64));
 	mutex_unlock(&tbl.bufq[idx].q_lock);
 	mutex_destroy(&tbl.bufq[idx].q_lock);
+	if (!tbl.bitmap) {
+		CAM_ERR(CAM_MEM, "crm is closing and mem deinit");
+		mutex_unlock(&tbl.m_lock);
+		return;
+	}
 	clear_bit(idx, tbl.bitmap);
 	mutex_unlock(&tbl.m_lock);
 
