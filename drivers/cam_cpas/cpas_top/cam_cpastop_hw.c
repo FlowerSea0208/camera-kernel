@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -22,6 +22,7 @@
 #include "cpastop_v175_101.h"
 #include "cpastop_v175_120.h"
 #include "cpastop_v175_130.h"
+#include "cpastop_v346_100.h"
 #include "cpastop_v480_100.h"
 #include "cpastop_v480_custom.h"
 #include "cpastop_v580_100.h"
@@ -155,6 +156,15 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 	},
+	/* for camera_346 */
+	{
+		CAM_CPAS_TITAN_346_V100,
+		0,
+		0,
+		0,
+		0,
+		0,
+	},
 };
 
 static int cam_cpas_translate_camera_cpas_version_id(
@@ -208,6 +218,9 @@ static int cam_cpas_translate_camera_cpas_version_id(
 
 	case CAM_CPAS_CAMERA_VERSION_165:
 		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_165;
+		break;
+	case CAM_CPAS_CAMERA_VERSION_346:
+		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_346;
 		break;
 
 	default:
@@ -922,6 +935,10 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		break;
 	case CAM_CPAS_TITAN_150_V100:
 		camnoc_info = &cam150_cpas100_camnoc_info;
+		break;
+	case CAM_CPAS_TITAN_346_V100:
+		camnoc_info = &cam346_cpas100_camnoc_info;
+		qchannel_info = &cam346_cpas100_qchannel_info;
 		break;
 	case CAM_CPAS_TITAN_480_V100:
 		camnoc_info = &cam480_cpas100_camnoc_info;
