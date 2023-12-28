@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -2067,6 +2067,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 	long                             time_left;
 	uint32_t                         seq_min_volt = 0;
 	uint32_t                         seq_max_volt = 0;
+	uint32_t                    enabled_mclk_cnt  = 0;
 
 	CAM_DBG(CAM_SENSOR, "Enter");
 	if (!ctrl) {
@@ -2172,6 +2173,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 						"Failed in clk enable %d", i);
 					break;
 				}
+				enabled_mclk_cnt++;
 			}
 
 			if (rc < 0) {
@@ -2285,6 +2287,11 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		else if (power_setting->delay)
 			usleep_range(power_setting->delay * 1000,
 				(power_setting->delay * 1000) + 1000);
+	}
+
+	if (enabled_mclk_cnt == 0) {
+		CAM_INFO(CAM_SENSOR, "No MCLK is enabled");
+		soc_info->num_clk = 0;
 	}
 
 	if (i3c_probe_status) {
