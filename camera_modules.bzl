@@ -255,5 +255,5 @@ def _define_module(target, variant):
     )
 
 def define_camera_module():
-	for (t, v) in get_all_variants():
-		_define_module(t, v)
+    for (t, v) in get_all_variants():
+        define_module(t, v)
