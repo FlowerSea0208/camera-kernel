@@ -120,7 +120,7 @@ static struct cam_camnoc_specific
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0xE48, /* CDM_SAFELUT_LOW */
-			.value = 0x0,
+			.value = 0x0000FFFF,
 		},
 		.ubwc_ctl = {
 			.enable = false,
@@ -137,7 +137,7 @@ static struct cam_camnoc_specific
 			.masked_value = 0,
 			/* TFE_PRIORITYLUT_LOW */
 			.offset = 0x30,
-			.value = 0x44443333,
+			.value = 0x66665533,
 		},
 		.priority_lut_high = {
 			.enable = true,
@@ -146,7 +146,7 @@ static struct cam_camnoc_specific
 			.masked_value = 0,
 			/* TFE_PRIORITYLUT_HIGH */
 			.offset = 0x34,
-			.value = 0x66665555,
+			.value = 0x66666666,
 		},
 		.urgency = {
 			.enable = true,
@@ -161,7 +161,7 @@ static struct cam_camnoc_specific
 			.is_fuse_based = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.offset = 0x40, /* TFE_DANGERLUT_LOW */
-			.value = 0xffff0000,
+			.value = 0xFFFF0000,
 		},
 		.safe_lut = {
 			.enable = true,
@@ -198,7 +198,7 @@ static struct cam_camnoc_specific
 			.masked_value = 0,
 			/* TFE_PRIORITYLUT_LOW */
 			.offset = 0x4030,
-			.value = 0x55554433,
+			.value = 0x66665533,
 		},
 		.priority_lut_high = {
 			.enable = true,
@@ -207,7 +207,7 @@ static struct cam_camnoc_specific
 			.masked_value = 0,
 			/* TFE_PRIORITYLUT_HIGH */
 			.offset = 0x4034,
-			.value = 0x66666655,
+			.value = 0x66666666,
 		},
 		.urgency = {
 			.enable = true,
@@ -222,14 +222,14 @@ static struct cam_camnoc_specific
 			.is_fuse_based = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.offset = 0x4040, /* TFE_DANGERLUT_LOW */
-			.value = 0xffff0000,
+			.value = 0xFFFF0000,
 		},
 		.safe_lut = {
 			.enable = true,
 			.is_fuse_based = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.offset = 0x4048, /* TFE_SAFELUT_LOW */
-			.value = 0x00000003,
+			.value = 0x3,
 		},
 		.maxwr_low = {
 			.enable = true,
@@ -270,14 +270,14 @@ static struct cam_camnoc_specific
 			.is_fuse_based = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.offset = 0x440, /* OPE_DANGERLUT_LOW */
-			.value = 0xFFFFFF00,
+			.value = 0x0,
 		},
 		.safe_lut = {
 			.enable = false,
 			.is_fuse_based = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.offset = 0x448, /* OPE_SAFELUT_LOW */
-			.value = 0xF,
+			.value = 0x0000FFFF,
 		},
 		.ubwc_ctl = {
 			/*
