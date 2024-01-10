@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_COMPAT_H_
@@ -123,5 +123,7 @@ void cam_eeprom_spi_driver_remove(struct spi_device *sdev);
 #else
 static int32_t cam_eeprom_spi_driver_remove(struct spi_device *sdev);
 #endif
+
+int cam_get_subpart_info(uint32_t *part_info, uint32_t max_num_cam);
 
 #endif /* _CAM_COMPAT_H_ */

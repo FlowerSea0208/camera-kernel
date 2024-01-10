@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -18,6 +18,7 @@
 #include "cam_isp_hw.h"
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_vfe_hw_intf.h"
+#include "cam_sfe_hw_intf.h"
 #include "cam_isp_packet_parser.h"
 #include "cam_ife_hw_mgr.h"
 #include "cam_cdm_intf_api.h"
@@ -52,6 +53,9 @@ static uint32_t blob_type_hw_cmd_map[CAM_ISP_GENERIC_BLOB_TYPE_MAX] = {
 };
 
 static struct cam_ife_hw_mgr g_ife_hw_mgr;
+
+static uint32_t g_num_ife_available, g_num_ife_lite_available, g_num_sfe_available;
+static uint32_t g_num_ife_functional, g_num_ife_lite_functional, g_num_sfe_functional;
 
 static uint32_t max_ife_out_res;
 
@@ -1552,6 +1556,38 @@ static int cam_convert_hw_idx_to_ife_hw_num(int hw_idx)
 	}
 
 	return rc;
+}
+
+static inline void cam_ife_mgr_count_functional_sfe(void)
+{
+	int i;
+
+	g_num_sfe_functional = 0;
+
+	for (i = 0; i < CAM_SFE_HW_NUM_MAX; i++) {
+		if (g_ife_hw_mgr.sfe_devices[i])
+			g_num_sfe_functional++;
+	}
+	CAM_DBG(CAM_ISP, "counted %u functional SFEs", g_num_sfe_functional);
+}
+
+static inline void cam_ife_mgr_count_functional_ife(void)
+{
+	int i;
+
+	g_num_ife_functional = 0;
+	g_num_ife_lite_functional = 0;
+
+	for (i = 0; i < CAM_IFE_HW_NUM_MAX; i++) {
+		if (g_ife_hw_mgr.ife_devices[i]) {
+			if (g_ife_hw_mgr.ife_dev_caps[i].is_lite)
+				g_num_ife_lite_functional++;
+			else
+				g_num_ife_functional++;
+		}
+	}
+	CAM_DBG(CAM_ISP, "counted functional %d IFE and %d IFE lite", g_num_ife_functional,
+		g_num_ife_lite_functional);
 }
 
 static int cam_convert_rdi_out_res_id_to_src(int res_id)
@@ -8428,6 +8464,27 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 		*iommu_hdl = g_ife_hw_mgr.mgr_common.img_iommu_hdl;
 
 	cam_ife_hw_mgr_debug_register();
+	cam_ife_mgr_count_functional_ife();
+	cam_ife_mgr_count_functional_sfe();
+
+	cam_vfe_get_num_ifes(&g_num_ife_available);
+	rc = cam_cpas_prepare_subpart_info(CAM_IFE_HW_IDX, g_num_ife_available,
+		g_num_ife_functional);
+	if (rc)
+		CAM_ERR(CAM_ISP, "Failed to populate num_ifes, rc: %d", rc);
+
+	cam_vfe_get_num_ife_lites(&g_num_ife_lite_available);
+	rc = cam_cpas_prepare_subpart_info(CAM_IFE_LITE_HW_IDX, g_num_ife_lite_available,
+		g_num_ife_lite_functional);
+	if (rc)
+		CAM_ERR(CAM_ISP, "Failed to populate num_ife_lites, rc: %d", rc);
+
+	cam_sfe_get_num_hws(&g_num_sfe_available);
+	rc = cam_cpas_prepare_subpart_info(CAM_SFE_HW_IDX, g_num_sfe_available,
+		g_num_sfe_functional);
+	if (rc)
+		CAM_ERR(CAM_ISP, "Failed to populate num_sfes, rc: %d", rc);
+
 	CAM_DBG(CAM_ISP, "Exit");
 
 	return 0;
