@@ -507,6 +507,11 @@ static int cam_csiphy_update_secure_info(struct csiphy_device *csiphy_dev, int32
 	}
 
 	switch (cpas_version) {
+	case CAM_CPAS_TITAN_640_V200:
+	case CAM_CPAS_TITAN_770_V100:
+		bit_offset_bet_phys_in_cp_ctrl =
+			CAM_CSIPHY_MAX_DPHY_LANES + CAM_CSIPHY_MAX_CPHY_LANES + 1;
+		break;
 	case CAM_CPAS_TITAN_580_V100:
 	case CAM_CPAS_TITAN_680_V100:
 	case CAM_CPAS_TITAN_780_V100:
@@ -659,7 +664,6 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 	uintptr_t generic_ptr;
 	uint32_t *cmd_buf = NULL;
 	size_t len;
-
 	rc = cam_mem_get_cpu_buf(cmd_desc->mem_handle,
 		&generic_ptr, &len);
 	if (rc < 0) {
@@ -673,6 +677,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 	index = cam_csiphy_get_instance_offset(csiphy_dev, dev_handle);
 	if (index < 0 || index >= csiphy_dev->session_max_device_support) {
 		CAM_ERR(CAM_CSIPHY, "index in invalid: %d", index);
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 
@@ -684,6 +689,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 			CAM_ERR(CAM_CSIPHY,
 				"Not enough buffer provided for cam_csiphy_info");
 			rc = -EINVAL;
+			cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 			return rc;
 		}
 
@@ -693,6 +699,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 		if (rc) {
 			CAM_ERR(CAM_CSIPHY, "Wrong configuration lane_cnt: %u",
 				cam_cmd_csiphy_info_v2->lane_cnt);
+			cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 			return rc;
 		}
 
@@ -721,6 +728,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 			CAM_ERR(CAM_CSIPHY,
 				"Not enough buffer provided for cam_csiphy_info");
 			rc = -EINVAL;
+			cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 			return rc;
 		}
 
@@ -730,6 +738,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 		if (rc) {
 			CAM_ERR(CAM_CSIPHY, "Wrong configuration lane_cnt: %u",
 				cam_cmd_csiphy_info->lane_cnt);
+			cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 			return rc;
 		}
 
@@ -763,6 +772,7 @@ static int __cam_csiphy_parse_lane_info_cmd_buf(
 			"Cannot support %s combo mode with differnt preamble settings",
 			(csiphy_dev->csiphy_info[index].csiphy_3phase ?
 			"CPHY" : "DPHY"));
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 
@@ -955,6 +965,7 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 		CAM_ERR(CAM_CSIPHY,
 			"Inval cam_packet strut size: %zu, len_of_buff: %zu",
 			 sizeof(struct cam_packet), len);
+		cam_mem_put_cpu_buf(cfg_dev->packet_handle);
 		rc = -EINVAL;
 		return rc;
 	}
@@ -966,6 +977,7 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 	if (cam_packet_util_validate_packet(csl_packet,
 		remain_len)) {
 		CAM_ERR(CAM_CSIPHY, "Invalid packet params");
+		cam_mem_put_cpu_buf(cfg_dev->packet_handle);
 		rc = -EINVAL;
 		return rc;
 	}
@@ -976,6 +988,7 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 			csl_packet->cmd_buf_offset / 4);
 	else {
 		CAM_ERR(CAM_CSIPHY, "num_cmd_buffer = %d", csl_packet->num_cmd_buf);
+		cam_mem_put_cpu_buf(cfg_dev->packet_handle);
 		rc = -EINVAL;
 		return rc;
 	}
@@ -985,8 +998,10 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 
 	for (i = 0; i < csl_packet->num_cmd_buf; i++) {
 		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
-		if (rc)
+		if (rc) {
+			cam_mem_put_cpu_buf(cfg_dev->packet_handle);
 			return rc;
+		}
 
 		cmd_buf_type = cmd_desc[i].meta_data;
 

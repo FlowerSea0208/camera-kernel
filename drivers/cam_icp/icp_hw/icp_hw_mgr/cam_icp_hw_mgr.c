@@ -4628,7 +4628,7 @@ static int cam_icp_mgr_device_init(struct cam_icp_hw_mgr *hw_mgr)
 hw_dev_deinit:
 	for (; i >= 0; i--) {
 		dev_info = &hw_mgr->dev_info[i];
-		j = (j == -1) ? dev_info->hw_dev_cnt : (j - 1);
+		j = (j == -1) ? (dev_info->hw_dev_cnt - 1) : (j - 1);
 		for (; j >= 0; j--) {
 			dev_intf = dev_info->dev_intf[j];
 			dev_intf->hw_ops.deinit(dev_intf->hw_priv, NULL, 0);
@@ -5983,6 +5983,10 @@ static int cam_icp_process_generic_cmd_buffer(
 	cmd_desc = (struct cam_cmd_buf_desc *)
 		((uint32_t *) &packet->payload + packet->cmd_buf_offset/4);
 	for (i = 0; i < packet->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		if (!cmd_desc[i].length)
 			continue;
 
@@ -6105,6 +6109,10 @@ static int cam_icp_mgr_config_stream_settings(
 
 	cmd_desc = (struct cam_cmd_buf_desc *)
 		((uint32_t *) &packet->payload + packet->cmd_buf_offset/4);
+
+	rc = cam_packet_util_validate_cmd_desc(cmd_desc);
+	if (rc)
+		goto end;
 
 	if (!cmd_desc[0].length ||
 		cmd_desc[0].meta_data != CAM_ICP_CMD_META_GENERIC_BLOB) {

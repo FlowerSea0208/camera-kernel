@@ -207,6 +207,7 @@ struct cam_vfe_bus_ver3_vfe_out_data {
 	bool                             mc_based;
 	bool                             cntxt_cfg_except;
 	uint32_t                         dst_hw_ctxt_id_mask;
+	uint64_t                         pid_mask;
 };
 
 struct cam_vfe_bus_ver3_priv {
@@ -1703,9 +1704,10 @@ static int cam_vfe_bus_ver3_handle_comp_done_bottom_half(
 	uint32_t                              *cam_ife_irq_regs;
 	uint32_t                               status_0;
 
-	if (!evt_payload)
+	if (!evt_payload || !rsrc_data) {
+		CAM_ERR(CAM_ISP, "Either evt_payload or rsrc_data is invalid");
 		return rc;
-
+	}
 	if (rsrc_data->is_dual && (!rsrc_data->is_master)) {
 		CAM_ERR(CAM_ISP, "VFE:%u Invalid comp_grp:%u is_master:%u",
 			rsrc_data->common_data->core_index, rsrc_data->comp_grp_type,
@@ -2305,6 +2307,11 @@ static int cam_vfe_bus_ver3_handle_vfe_out_done_bottom_half(
 	uint32_t                               evt_id = 0;
 	uint32_t                               comp_grp_id = 0;
 
+	if (!rsrc_data) {
+		CAM_ERR(CAM_ISP, "Invalid rsrc data pointer, returning from bottom half");
+		return rc;
+	}
+
 	rc = cam_vfe_bus_ver3_handle_comp_done_bottom_half(
 		rsrc_data, evt_payload_priv, &comp_grp_id);
 	CAM_DBG(CAM_ISP, "VFE:%u out_type:0x%x comp_grp_id:%d rc:%d",
@@ -2413,6 +2420,8 @@ static int cam_vfe_bus_ver3_init_vfe_out_resource(uint32_t  index,
 			return rc;
 		}
 	}
+
+	rsrc_data->pid_mask = ver3_hw_info->vfe_out_hw_info[index].pid_mask;
 
 	vfe_out->start = cam_vfe_bus_ver3_start_vfe_out;
 	vfe_out->stop = cam_vfe_bus_ver3_stop_vfe_out;
@@ -4346,7 +4355,9 @@ static int cam_vfe_bus_get_res_for_mid(
 	struct cam_vfe_bus_ver3_vfe_out_data   *out_data = NULL;
 	struct cam_isp_hw_get_cmd_update       *cmd_update = cmd_args;
 	struct cam_isp_hw_get_res_for_mid       *get_res = NULL;
+	uint32_t num_mid = 0, port_mid[CAM_VFE_BUS_VER3_VFE_OUT_MAX] = {0};
 	int i, j;
+	bool pid_found = false;
 
 	get_res = (struct cam_isp_hw_get_res_for_mid *)cmd_update->data;
 	if (!get_res) {
@@ -4364,11 +4375,22 @@ static int cam_vfe_bus_get_res_for_mid(
 
 		for (j = 0; j < out_data->num_mid; j++) {
 			if (out_data->mid[j] == get_res->mid)
-				goto end;
+				port_mid[num_mid++] = i;
 		}
 	}
 
-	if (i == bus_priv->num_out) {
+	for (i = 0; i < num_mid; i++) {
+		out_data = (struct cam_vfe_bus_ver3_vfe_out_data   *)
+			bus_priv->vfe_out[i].res_priv;
+		get_res->out_res_id = bus_priv->vfe_out[port_mid[i]].res_id;
+		if (out_data->pid_mask & (1 << get_res->pid)) {
+			get_res->out_res_id = bus_priv->vfe_out[port_mid[i]].res_id;
+			pid_found = true;
+			goto end;
+		}
+	}
+
+	if (!num_mid) {
 		CAM_ERR(CAM_ISP,
 			"VFE:%u mid:%d does not match with any out resource",
 			bus_priv->common_data.core_index, get_res->mid);
@@ -4377,9 +4399,9 @@ static int cam_vfe_bus_get_res_for_mid(
 	}
 
 end:
-	CAM_INFO(CAM_ISP, "VFE:%u match mid :%d  out resource:0x%x found",
-		bus_priv->common_data.core_index, get_res->mid, bus_priv->vfe_out[i].res_id);
-	get_res->out_res_id = bus_priv->vfe_out[i].res_id;
+	CAM_INFO(CAM_ISP, "VFE:%u match mid :%d  out resource:0x%x found, is pid found %d",
+		bus_priv->common_data.core_index, get_res->mid, bus_priv->vfe_out[i].res_id,
+		 pid_found);
 	return 0;
 }
 
@@ -4387,6 +4409,41 @@ static int __cam_vfe_bus_ver3_process_cmd(void *priv,
 	uint32_t cmd_type, void *cmd_args, uint32_t arg_size)
 {
 	return cam_vfe_bus_ver3_process_cmd(priv, cmd_type, cmd_args, arg_size);
+}
+
+static uint32_t cam_vfe_bus_ver3_get_last_consumed_addr(
+	struct cam_vfe_bus_ver3_priv *bus_priv,
+	uint32_t res_type)
+{
+	uint32_t                                  last_consumed_addr = 0;
+	struct cam_isp_resource_node             *rsrc_node = NULL;
+	struct cam_vfe_bus_ver3_vfe_out_data     *rsrc_data = NULL;
+	struct cam_vfe_bus_ver3_wm_resource_data *wm_rsrc_data = NULL;
+	enum cam_vfe_bus_ver3_vfe_out_type        res_id;
+	uint32_t                                  outmap_index =
+		CAM_VFE_BUS_VER3_VFE_OUT_MAX;
+
+	res_id = cam_vfe_bus_ver3_get_out_res_id_and_index(bus_priv,
+		res_type, &outmap_index);
+	if ((res_id >= CAM_VFE_BUS_VER3_VFE_OUT_MAX) ||
+		(outmap_index >= bus_priv->num_out)) {
+		CAM_WARN(CAM_ISP,
+			"target does not support req res id :0x%x outtype:%d index:%d",
+			res_type, res_id, outmap_index);
+		return 0;
+	}
+
+	rsrc_node = &bus_priv->vfe_out[outmap_index];
+	rsrc_data = rsrc_node->res_priv;
+	wm_rsrc_data = rsrc_data->wm_res[PLANE_Y].res_priv;
+	last_consumed_addr = cam_io_r_mb(
+		wm_rsrc_data->common_data->mem_base +
+		wm_rsrc_data->hw_regs->addr_status_0);
+
+	CAM_DBG(CAM_ISP, "VFE:%u res_type:0x%x res_id:0x%x last_consumed_addr:0x%x",
+		bus_priv->common_data.core_index, res_type, res_id, last_consumed_addr);
+
+	return last_consumed_addr;
 }
 
 static int cam_vfe_bus_ver3_process_cmd(
@@ -4397,7 +4454,7 @@ static int cam_vfe_bus_ver3_process_cmd(
 	struct cam_vfe_bus_ver3_priv		 *bus_priv;
 	uint32_t top_mask_0 = 0;
 	struct cam_isp_hw_cap *vfe_bus_cap;
-
+	struct cam_isp_hw_done_event_data *done;
 
 	if (!priv || !cmd_args) {
 		CAM_ERR_RATE_LIMIT(CAM_ISP, "Invalid input arguments");
@@ -4476,6 +4533,14 @@ static int cam_vfe_bus_ver3_process_cmd(
 		vfe_bus_cap->max_out_res_type = bus_priv->max_out_res;
 		vfe_bus_cap->support_consumed_addr =
 			bus_priv->common_data.support_consumed_addr;
+		break;
+	case CAM_ISP_HW_CMD_GET_LAST_CONSUMED_ADDR:
+		bus_priv = (struct cam_vfe_bus_ver3_priv  *) priv;
+		done = (struct cam_isp_hw_done_event_data *) cmd_args;
+		done->last_consumed_addr = cam_vfe_bus_ver3_get_last_consumed_addr(
+			bus_priv, done->resource_handle);
+		if (done->last_consumed_addr)
+			rc = 0;
 		break;
 	case CAM_ISP_HW_CMD_IFE_DEBUG_CFG: {
 		struct cam_vfe_generic_debug_config *debug_cfg;

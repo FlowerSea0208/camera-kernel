@@ -318,6 +318,10 @@ int cam_isp_add_command_buffers(
 		split_id, prepare->packet->num_cmd_buf);
 
 	for (i = 0; i < prepare->packet->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		num_ent = prepare->num_hw_update_entries;
 		if (!cmd_desc[i].length)
 			continue;
@@ -530,6 +534,10 @@ int cam_sfe_add_command_buffers(
 		split_id, prepare->packet->num_cmd_buf);
 
 	for (i = 0; i < prepare->packet->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		num_ent = prepare->num_hw_update_entries;
 		if (!cmd_desc[i].length)
 			continue;
@@ -1234,12 +1242,13 @@ int cam_isp_add_reg_update(
 	struct list_head                     *res_list_isp_src,
 	uint32_t                              base_idx,
 	struct cam_kmd_buf_info              *kmd_buf_info,
-	bool                                  combine)
+	bool                                  combine,
+	void                                 *priv_data)
 {
 	int rc = -EINVAL;
-	struct cam_isp_resource_node         *res;
-	struct cam_isp_hw_mgr_res            *hw_mgr_res;
-	struct cam_isp_hw_get_cmd_update      get_regup;
+	struct cam_isp_resource_node            *res;
+	struct cam_isp_hw_mgr_res               *hw_mgr_res;
+	struct cam_isp_hw_get_cmd_update         get_regup;
 	uint32_t kmd_buf_remain_size, i, reg_update_size;
 
 	/* Max one hw entries required for each base */
@@ -1284,6 +1293,8 @@ int cam_isp_add_reg_update(
 			get_regup.cmd.size = kmd_buf_remain_size;
 			get_regup.cmd_type = CAM_ISP_HW_CMD_GET_REG_UPDATE;
 			get_regup.res = res;
+
+			get_regup.data = priv_data;
 
 			rc = res->hw_intf->hw_ops.process_cmd(
 				res->hw_intf->hw_priv,
@@ -1591,6 +1602,10 @@ int cam_isp_add_csid_command_buffers(
 		split_id, prepare->packet->num_cmd_buf);
 
 	for (i = 0; i < prepare->packet->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		num_ent = prepare->num_hw_update_entries;
 		if (!cmd_desc[i].length)
 			continue;
@@ -1889,6 +1904,10 @@ int cam_isp_get_cmd_buf_count(
 			prepare->packet->cmd_buf_offset);
 
 	for (i = 0; i < prepare->packet->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		if (!cmd_desc[i].length)
 			continue;
 

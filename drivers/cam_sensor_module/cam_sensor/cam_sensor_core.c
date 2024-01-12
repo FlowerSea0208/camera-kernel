@@ -854,6 +854,10 @@ int32_t cam_handle_mem_ptr(uint64_t handle, uint32_t cmd,
 	CAM_DBG(CAM_SENSOR, "Received Header opcode: %u", probe_ver);
 
 	for (i = 0; i < pkt->num_cmd_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+		if (rc)
+			return rc;
+
 		if (!(cmd_desc[i].length))
 			continue;
 		rc = cam_mem_get_cpu_buf(cmd_desc[i].mem_handle,
@@ -866,6 +870,7 @@ int32_t cam_handle_mem_ptr(uint64_t handle, uint32_t cmd,
 		if (cmd_desc[i].offset >= len) {
 			CAM_ERR(CAM_SENSOR,
 				"offset past length of buffer");
+			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 			rc = -EINVAL;
 			goto end;
 		}
@@ -873,6 +878,7 @@ int32_t cam_handle_mem_ptr(uint64_t handle, uint32_t cmd,
 		if (cmd_desc[i].length > remain_len) {
 			CAM_ERR(CAM_SENSOR,
 				"Not enough buffer provided for cmd");
+			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 			rc = -EINVAL;
 			goto end;
 		}
@@ -886,6 +892,7 @@ int32_t cam_handle_mem_ptr(uint64_t handle, uint32_t cmd,
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
 				"Failed to parse the command Buffer Header");
+			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 			goto end;
 		}
 		cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
@@ -988,6 +995,9 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 			 slave_info);
 		return -EINVAL;
 	}
+
+	if (s_ctrl->hw_no_ops)
+		return rc;
 
 	rc = camera_io_dev_read(
 		&(s_ctrl->io_master_info),
@@ -1510,9 +1520,10 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		}
 
 		if (s_ctrl->i2c_data.read_settings.is_settings_valid) {
-			rc = cam_sensor_i2c_read_data(
-				&s_ctrl->i2c_data.read_settings,
-				&s_ctrl->io_master_info);
+			if (!s_ctrl->hw_no_ops)
+				rc = cam_sensor_i2c_read_data(
+					&s_ctrl->i2c_data.read_settings,
+					&s_ctrl->io_master_info);
 			if (rc < 0) {
 				CAM_ERR(CAM_SENSOR, "%s: cannot read data: %d",
 					s_ctrl->sensor_name, rc);
@@ -1618,6 +1629,10 @@ int cam_sensor_establish_link(struct cam_req_mgr_core_dev_link_setup *link)
 int cam_sensor_power(struct v4l2_subdev *sd, int on)
 {
 	struct cam_sensor_ctrl_t *s_ctrl = v4l2_get_subdevdata(sd);
+	if (!s_ctrl) {
+		CAM_ERR(CAM_SENSOR, "s_ctrl ptr is NULL");
+		return -EINVAL;
+	}
 
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
 	if (!on && s_ctrl->sensor_state == CAM_SENSOR_START) {
@@ -1631,7 +1646,7 @@ int cam_sensor_power(struct v4l2_subdev *sd, int on)
 
 int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 {
-	int rc;
+	int rc = 0;
 	struct cam_sensor_power_ctrl_t *power_info;
 	struct cam_camera_slave_info   *slave_info;
 	struct cam_hw_soc_info         *soc_info = &s_ctrl->soc_info;
@@ -1641,6 +1656,9 @@ int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_ERR(CAM_SENSOR, "failed: %pK", s_ctrl);
 		return -EINVAL;
 	}
+
+	if (s_ctrl->hw_no_ops)
+		return rc;
 
 	power_info = &s_ctrl->sensordata->power_info;
 	slave_info = &(s_ctrl->sensordata->slave_info);
@@ -1705,6 +1723,9 @@ int cam_sensor_power_down(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_ERR(CAM_SENSOR, "failed: s_ctrl %pK", s_ctrl);
 		return -EINVAL;
 	}
+
+	if (s_ctrl->hw_no_ops)
+		return rc;
 
 	power_info = &s_ctrl->sensordata->power_info;
 	soc_info = &s_ctrl->soc_info;
@@ -1796,9 +1817,10 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		if (i2c_set->is_settings_valid == 1) {
 			list_for_each_entry(i2c_list,
 				&(i2c_set->list_head), list) {
-				rc = cam_sensor_i2c_modes_util(
-					&(s_ctrl->io_master_info),
-					i2c_list);
+				if (!s_ctrl->hw_no_ops)
+					rc = cam_sensor_i2c_modes_util(
+						&(s_ctrl->io_master_info),
+						i2c_list);
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 						"Failed to apply settings: %d",
@@ -1828,9 +1850,10 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 			i2c_set[offset].request_id == req_id) {
 			list_for_each_entry(i2c_list,
 				&(i2c_set[offset].list_head), list) {
-				rc = cam_sensor_i2c_modes_util(
-					&(s_ctrl->io_master_info),
-					i2c_list);
+				if (!s_ctrl->hw_no_ops)
+					rc = cam_sensor_i2c_modes_util(
+						&(s_ctrl->io_master_info),
+						i2c_list);
 				if (rc < 0) {
 					CAM_ERR(CAM_SENSOR,
 						"Failed to apply settings: %d",
