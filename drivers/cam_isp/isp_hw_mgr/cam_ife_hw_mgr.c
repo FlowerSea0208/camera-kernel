@@ -5248,6 +5248,16 @@ static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 	CAM_DBG(CAM_ISP, "Enter...ctx id:%d",
 		ctx->ctx_index);
 
+	if (hw_mgr_ctx->in_ports) {
+		for (i = 0; i < hw_mgr_ctx->num_in_ports; i++) {
+			kfree(hw_mgr_ctx->in_ports[i].data);
+			hw_mgr_ctx->in_ports[i].data = NULL;
+		}
+
+		kfree(hw_mgr_ctx->in_ports);
+		hw_mgr_ctx->in_ports = NULL;
+	}
+
 	if (ctx->init_done)
 		cam_ife_hw_mgr_deinit_hw(hw_mgr_ctx);
 
