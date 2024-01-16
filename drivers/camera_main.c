@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/build_bug.h>
@@ -26,6 +26,7 @@
 #include "cam_ois_dev.h"
 #include "cam_tpg_dev.h"
 #include "cam_flash_dev.h"
+#include "cam_hdmi_bdg_core.h"
 
 #include "cam_icp_v1_dev.h"
 #include "cam_icp_v2_dev.h"
@@ -119,6 +120,7 @@ static const struct camera_submodule_component camera_sensor[] = {
 	{&cam_eeprom_driver_init, &cam_eeprom_driver_exit},
 	{&cam_ois_driver_init, &cam_ois_driver_exit},
 	{&cam_flash_init_module, &cam_flash_exit_module},
+	{&hdmi_bdg_irq_handler_init, &hdmi_bdg_irq_handler_exit},
 #endif
 };
 

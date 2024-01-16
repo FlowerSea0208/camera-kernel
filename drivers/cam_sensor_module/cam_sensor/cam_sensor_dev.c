@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_sensor_dev.h"
@@ -556,12 +556,14 @@ struct platform_driver cam_sensor_platform_driver = {
 
 static const struct of_device_id cam_sensor_i2c_driver_dt_match[] = {
 	{.compatible = "qcom,cam-i2c-sensor"},
+	{.compatible = "lt6911uxc"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, cam_sensor_i2c_driver_dt_match);
 
 static const struct i2c_device_id i2c_id[] = {
 	{SENSOR_DRIVER_I2C, (kernel_ulong_t)NULL},
+	{"lt6911uxc", (kernel_ulong_t)NULL},
 	{ }
 };
 
