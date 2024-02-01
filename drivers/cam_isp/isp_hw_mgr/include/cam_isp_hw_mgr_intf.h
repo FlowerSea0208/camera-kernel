@@ -373,6 +373,7 @@ enum cam_isp_hw_mgr_command {
 	CAM_ISP_HW_MGR_GET_SOF_TS,
 	CAM_ISP_HW_MGR_DUMP_STREAM_INFO,
 	CAM_ISP_HW_MGR_CMD_CHECK_START_OFFLINE,
+	CAM_ISP_HW_MGR_CMD_FLUSH_OFFLINE,
 	CAM_ISP_HW_MGR_CMD_MAX,
 };
 
@@ -402,6 +403,7 @@ struct cam_isp_hw_cmd_args {
 		uint32_t                      ctx_type;
 		uint32_t                      packet_op_code;
 		uint64_t                      last_cdm_done;
+		int64_t                       req_id;
 		struct {
 			uint64_t                      curr;
 			uint64_t                      prev;
