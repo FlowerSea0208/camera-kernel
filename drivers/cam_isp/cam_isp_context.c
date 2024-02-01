@@ -2586,6 +2586,19 @@ static int __cam_isp_ctx_schedule_apply_req(
 	return rc;
 }
 
+static int __cam_isp_ctx_offline_eof_in_activated_state(
+	struct cam_isp_context *ctx_isp, void *evt_data)
+{
+	int rc;
+
+	//rc = __cam_isp_ctx_schedule_apply_req_offline(ctx_isp);
+	rc = __cam_isp_ctx_schedule_apply_req(ctx_isp);
+
+	if (ctx_isp->offline_context)
+		__cam_isp_ctx_schedule_start_offline(ctx_isp);
+	return rc;
+}
+
 static int __cam_isp_ctx_offline_epoch_in_activated_state(
 	struct cam_isp_context *ctx_isp, void *evt_data)
 {
@@ -2614,10 +2627,10 @@ static int __cam_isp_ctx_offline_epoch_in_activated_state(
 		}
 	}
 
-	rc = __cam_isp_ctx_schedule_apply_req(ctx_isp);
+	////rc = __cam_isp_ctx_schedule_apply_req(ctx_isp);
 
-	if (ctx_isp->offline_context)
-		__cam_isp_ctx_schedule_start_offline(ctx_isp);
+	////if (ctx_isp->offline_context)
+	////	__cam_isp_ctx_schedule_start_offline(ctx_isp);
 
 	/*
 	 * If no valid request, wait for RUP shutter posted after buf done
@@ -2630,7 +2643,7 @@ static int __cam_isp_ctx_offline_epoch_in_activated_state(
 		CAM_ISP_STATE_CHANGE_TRIGGER_EPOCH,
 		request_id);
 
-	return rc;
+	return 0;
 }
 
 static int __cam_isp_ctx_reg_upd_in_epoch_bubble_state(
@@ -4344,7 +4357,7 @@ static struct cam_isp_ctx_irq_ops
 			__cam_isp_ctx_sof_in_activated_state,
 			NULL,
 			__cam_isp_ctx_offline_epoch_in_activated_state,
-			NULL,
+			__cam_isp_ctx_offline_eof_in_activated_state,,
 			__cam_isp_ctx_buf_done_in_epoch,
 		},
 	},

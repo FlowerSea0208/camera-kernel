@@ -12263,7 +12263,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		((!ctx->flags.is_offline) || atomic_read(&ctx->ctx_state) == CAM_IFE_HW_STATE_STARTING)) {
 		if ((!prepare->num_reg_dump_buf) || (prepare->num_reg_dump_buf >
 			CAM_REG_DUMP_MAX_BUF_ENTRIES))
-			goto end;
+			goto offline;
 
 		/* Copy reg dump buf desc for error/flush cases */
 		if (!ctx->num_reg_dump_buf) {
@@ -12277,7 +12277,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 
 		/* Per req reg dump */
 		cam_ife_mgr_check_for_per_request_reg_dump(prepare, prepare_hw_data);
-		goto end;
+		goto offline;
 	} else {
 		cam_ife_mgr_check_for_per_request_reg_dump(prepare, prepare_hw_data);
 	}
@@ -12297,6 +12297,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		goto end;
 	}
 
+offline:
 	/* add go_cmd for offline context */
 	if (prepare->num_out_map_entries &&
 		prepare->num_in_map_entries &&
