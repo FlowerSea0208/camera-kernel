@@ -12193,7 +12193,8 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 				(CAM_ISP_IFE_OUT_RES_BASE + max_ife_out_res),
 				fill_ife_fence,
 				CAM_ISP_HW_TYPE_VFE, &frame_header_info,
-				&check_for_scratch);
+				&check_for_scratch,
+				hw_mgr_ctx->unpacker_fmt);
 		else if (ctx->base[i].hw_type == CAM_ISP_HW_TYPE_SFE)
 			rc = cam_isp_add_io_buffers(
 				hw_mgr->mgr_common.img_iommu_hdl,
@@ -12205,7 +12206,8 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 				(CAM_ISP_SFE_OUT_RES_BASE + max_sfe_out_res),
 				fill_sfe_fence,
 				CAM_ISP_HW_TYPE_SFE, &frame_header_info,
-				&check_for_scratch);
+				&check_for_scratch,
+				hw_mgr_ctx->unpacker_fmt);
 		if (rc) {
 			CAM_ERR(CAM_ISP,
 				"Failed in io buffers, i=%d, rc=%d hw_type=%s",
@@ -15736,6 +15738,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 
 	if (ife_mgr_ctx->concr_ctx->flags.is_offline) {
 		ife_mgr_ctx->is_offline = true;
+		ife_mgr_ctx->unpacker_fmt = ife_mgr_ctx->bw_data.format;
 		allocated = false;
 		ctx_idx =
 			atomic_read(&ife_hw_mgr->num_acquired_offline_ctx);

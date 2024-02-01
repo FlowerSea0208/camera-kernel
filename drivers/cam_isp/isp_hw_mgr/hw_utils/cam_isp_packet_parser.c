@@ -789,7 +789,8 @@ int cam_isp_add_io_buffers(
 	bool                                     fill_fence,
 	enum cam_isp_hw_type                     hw_type,
 	struct cam_isp_frame_header_info        *frame_header_info,
-	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg)
+	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg,
+	uint32_t                                 unpacker_fmt)
 {
 	int                                 rc = 0;
 	dma_addr_t                          io_addr[CAM_PACKET_MAX_PLANES];
@@ -1210,6 +1211,7 @@ int cam_isp_add_io_buffers(
 			bus_rd_update.image_buf = io_addr;
 			bus_rd_update.num_buf   = plane_id;
 			bus_rd_update.io_cfg    = &io_cfg[i];
+			bus_rd_update.unpacker_fmt = unpacker_fmt;
 			update_buf.cmd.size = kmd_buf_remain_size;
 			update_buf.use_scratch_cfg = false;
 			update_buf.rm_update = &bus_rd_update;
