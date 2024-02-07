@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef CAMERA_MAIN_H
@@ -27,7 +28,7 @@ extern struct platform_driver isp_driver;
 #ifdef CONFIG_SPECTRA_TFE
 extern struct platform_driver cam_csid_ppi100_driver;
 extern struct platform_driver cam_tfe_driver;
-extern struct platform_driver cam_tfe_csid530_driver;
+extern struct platform_driver cam_tfe_csid_driver;
 #endif
 #ifdef CONFIG_SPECTRA_SENSOR
 extern struct platform_driver cam_res_mgr_driver;
@@ -85,7 +86,7 @@ static struct platform_driver *const cam_component_drivers[] = {
 #ifdef CONFIG_SPECTRA_TFE
 	&cam_csid_ppi100_driver,
 	&cam_tfe_driver,
-	&cam_tfe_csid530_driver,
+	&cam_tfe_csid_driver,
 #endif
 #ifdef CONFIG_SPECTRA_ISP
 	&cam_top_tpg_driver,

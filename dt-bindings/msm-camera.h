@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __MSM_CAMERA_H
@@ -93,7 +93,10 @@
 #define CAM_CPAS_SHDR_FUSE     7
 #define CAM_CPAS_CSIPHY_FUSE   8
 #define CAM_CPAS_RT_OT_FUSE    9
-#define CAM_CPAS_FUSE_FEATURE_MAX 10
+#define CAM_CPAS_SFE_FUSE      10
+#define CAM_CPAS_CUSTOM_FUSE   11
+#define CAM_CPAS_CAM_FUSE      12
+#define CAM_CPAS_FUSE_FEATURE_MAX 13
 
 /* Flash type*/
 #define CAM_FLASH_TYPE_PMIC 0

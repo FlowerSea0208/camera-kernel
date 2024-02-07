@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/build_bug.h>
@@ -56,7 +56,7 @@
 
 #include "cam_top_tpg.h"
 #include "cam_tfe_dev.h"
-#include "cam_tfe_csid530.h"
+#include "cam_tfe_csid_dev.h"
 #include "cam_csid_ppi100.h"
 #include "camera_main.h"
 
@@ -88,7 +88,7 @@ static const struct camera_submodule_component camera_tfe[] = {
 #ifdef CONFIG_SPECTRA_TFE
 	{&cam_csid_ppi100_init_module, &cam_csid_ppi100_exit_module},
 	{&cam_tfe_init_module, &cam_tfe_exit_module},
-	{&cam_tfe_csid530_init_module, &cam_tfe_csid530_exit_module},
+	{&cam_tfe_csid_init_module, &cam_tfe_csid_exit_module},
 #endif
 };
 

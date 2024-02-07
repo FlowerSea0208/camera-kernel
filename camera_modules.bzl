@@ -213,7 +213,7 @@ def _define_module(target, variant):
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/tfe_csid_hw/cam_tfe_csid_dev.c",
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/tfe_csid_hw/cam_tfe_csid_soc.c",
                     "drivers/cam_isp/isp_hw_mgr/isp_hw/tfe_csid_hw/cam_tfe_csid_core.c",
-                    "drivers/cam_isp/isp_hw_mgr/isp_hw/tfe_csid_hw/cam_tfe_csid530.c",
+                    "drivers/cam_isp/isp_hw_mgr/isp_hw/tfe_csid_hw/cam_tfe_csid.c",
                     "drivers/cam_isp/isp_hw_mgr/cam_tfe_hw_mgr.c",
                 ],
             },
@@ -255,5 +255,5 @@ def _define_module(target, variant):
     )
 
 def define_camera_module():
-	for (t, v) in get_all_variants():
-		_define_module(t, v)
+    for (t, v) in get_all_variants():
+        define_module(t, v)
