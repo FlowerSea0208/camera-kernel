@@ -245,7 +245,7 @@ def _define_module(target, variant):
     )
 
     copy_to_dist_dir(
-        name = "{}_camera_dist".format(target),
+        name = "{}_camera_dist".format(tv),
         data = [":{}_camera".format(tv)],
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
@@ -256,4 +256,4 @@ def _define_module(target, variant):
 
 def define_camera_module():
     for (t, v) in get_all_variants():
-        define_module(t, v)
+        _define_module(t, v)
