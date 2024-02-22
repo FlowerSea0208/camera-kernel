@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/uaccess.h>
@@ -811,6 +811,7 @@ static int32_t cam_ope_process_request_timer(void *priv, void *data)
 		sizeof(struct cam_axi_per_path_bw_vote));
 	ctx_data->clk_info.curr_fc = 0;
 	ctx_data->clk_info.base_clk = 0;
+	ctx_data->clk_info.num_paths = 0;
 
 	clk_update.axi_vote.num_paths = clk_info->num_paths;
 	memcpy(&clk_update.axi_vote.axi_path[0],
@@ -1490,6 +1491,8 @@ static bool cam_ope_update_bw_v2(struct cam_ope_hw_mgr *hw_mgr,
 
 	ctx_data->clk_info.num_paths =
 		cam_ope_mgr_calculate_num_path(clk_info, ctx_data);
+	if (ctx_data->clk_info.num_paths > clk_info->num_paths)
+		ctx_data->clk_info.num_paths = clk_info->num_paths;
 
 	memcpy(&ctx_data->clk_info.axi_path[0],
 		&clk_info->axi_path[0],
