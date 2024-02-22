@@ -31,7 +31,9 @@
 
 #include <linux/msm_ion.h>
 #include <linux/iommu.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 #include <linux/ion.h>
+#endif
 #include <linux/qcom_scm.h>
 
 #else
@@ -91,37 +93,37 @@ int cam_eeprom_spi_driver_remove_common(struct spi_device *sdev);
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 void cam_actuator_driver_i2c_remove(struct i2c_client *client);
 #else
-static int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client);
+int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client);
 #endif
 
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 void cam_eeprom_i2c_driver_remove(struct i2c_client *client);
 #else
-static int32_t cam_eeprom_i2c_driver_remove(struct i2c_client *client);
+int32_t cam_eeprom_i2c_driver_remove(struct i2c_client *client);
 #endif
 
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 void cam_flash_i2c_driver_remove(struct i2c_client *client);
 #else
-static int32_t cam_flash_i2c_driver_remove(struct i2c_client *client);
+int32_t cam_flash_i2c_driver_remove(struct i2c_client *client);
 #endif
 
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 void cam_ois_i2c_driver_remove(struct i2c_client *client);
 #else
-static int32_t cam_ois_i2c_driver_remove(struct i2c_client *client);
+int32_t cam_ois_i2c_driver_remove(struct i2c_client *client);
 #endif
 
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 void cam_sensor_driver_i2c_remove(struct i2c_client *client);
 #else
-static int32_t cam_sensor_driver_i2c_remove(struct i2c_client *client);
+int32_t cam_sensor_driver_i2c_remove(struct i2c_client *client);
 #endif
 
 #if KERNEL_VERSION(5, 18, 0) <= LINUX_VERSION_CODE
 void cam_eeprom_spi_driver_remove(struct spi_device *sdev);
 #else
-static int32_t cam_eeprom_spi_driver_remove(struct spi_device *sdev);
+int32_t cam_eeprom_spi_driver_remove(struct spi_device *sdev);
 #endif
 
 int cam_get_subpart_info(uint32_t *part_info, uint32_t max_num_cam);

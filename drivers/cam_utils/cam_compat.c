@@ -464,7 +464,7 @@ void cam_actuator_driver_i2c_remove(struct i2c_client *client)
 	return;
 }
 #else
-static int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client)
+int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client)
 {
 	int rc = 0;
 
@@ -482,7 +482,7 @@ void cam_sensor_driver_i2c_remove(struct i2c_client *client)
 	return;
 }
 #else
-static int cam_sensor_driver_i2c_remove(struct i2c_client *client)
+int32_t cam_sensor_driver_i2c_remove(struct i2c_client *client)
 {
 	int rc = 0;
 
@@ -500,7 +500,7 @@ void cam_flash_i2c_driver_remove(struct i2c_client *client)
 	return;
 }
 #else
-static int32_t cam_flash_i2c_driver_remove(struct i2c_client *client)
+int32_t cam_flash_i2c_driver_remove(struct i2c_client *client)
 {
 	int rc = 0;
 
@@ -518,7 +518,7 @@ void cam_eeprom_i2c_driver_remove(struct i2c_client *client)
 	return;
 }
 #else
-static int cam_eeprom_i2c_driver_remove(struct i2c_client *client)
+int32_t cam_eeprom_i2c_driver_remove(struct i2c_client *client)
 {
 	int rc = 0;
 
@@ -536,7 +536,7 @@ void cam_ois_i2c_driver_remove(struct i2c_client *client)
 	return;
 }
 #else
-static int cam_ois_i2c_driver_remove(struct i2c_client *client)
+int32_t cam_ois_i2c_driver_remove(struct i2c_client *client)
 {
 	int rc = 0;
 
@@ -554,7 +554,7 @@ void cam_eeprom_spi_driver_remove(struct spi_device *sdev)
 	return;
 }
 #else
-static int32_t cam_eeprom_spi_driver_remove(struct spi_device *sdev)
+int32_t cam_eeprom_spi_driver_remove(struct spi_device *sdev)
 {
 	int rc = 0;
 

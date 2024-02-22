@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -441,15 +441,15 @@ int32_t cam_sensor_update_slave_info(struct cam_cmd_probe *probe_info,
 	s_ctrl->sensordata->slave_info.sensor_id_mask =
 		probe_info->data_mask;
 	/*
-         * Userspace passes the first 8 bit pipeline delay
-         * and last 8 bit slave address in reserved field.
+         * Userspace passes the last 8 bit pipeline delay
+         * and first 8 bit slave address in reserved field.
          */
 	s_ctrl->pipeline_delay =
-		(probe_info->reserved >> 8) & 0xFF;
+		(probe_info->reserved & 0xFF);
 
 	s_ctrl->sensor_probe_addr_type =  probe_info->addr_type;
 	s_ctrl->sensor_probe_data_type =  probe_info->data_type;
-	s_ctrl->probe_sensor_slave_addr = ( probe_info->reserved & 0xFF );
+	s_ctrl->probe_sensor_slave_addr = (probe_info->reserved >> 8) & 0xFF;
 	CAM_DBG(CAM_SENSOR,
 		"Sensor Addr: 0x%x sensor_id: 0x%x sensor_mask: 0x%x sensor_pipeline_delay:0x%x probe_sensor_slave_addr:0x%x",
 		s_ctrl->sensordata->slave_info.sensor_id_reg_addr,
