@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -203,11 +203,11 @@ static int32_t cam_csiphy_update_secure_info(
 	switch (csiphy_dev->hw_version) {
 	case CSIPHY_VERSION_V201:
 	case CSIPHY_VERSION_V125:
+	case CSIPHY_VERSION_V123:
 		phy_mask_len =
 		CAM_CSIPHY_MAX_DPHY_LANES + CAM_CSIPHY_MAX_CPHY_LANES + 1;
 		break;
 	case CSIPHY_VERSION_V121:
-	case CSIPHY_VERSION_V123:
 	case CSIPHY_VERSION_V124:
 		phy_mask_len =
 		(csiphy_dev->soc_info.index < MAX_PHY_MSK_PER_REG) ?
