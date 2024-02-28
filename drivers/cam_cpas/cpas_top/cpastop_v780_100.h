@@ -937,7 +937,7 @@ static struct cam_camnoc_specific
 			.access_type = CAM_REG_TYPE_READ_WRITE,
 			.masked_value = 0,
 			.offset = 0x6E38, /* IPE_0_RD : NOC_NRT_4_NIU_URGENCY_LOW */
-			.value = 0x6,
+			.value = 0x3,
 		},
 		.danger_lut = {
 			.enable = false,
