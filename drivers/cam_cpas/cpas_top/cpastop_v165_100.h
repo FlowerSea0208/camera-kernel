@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
  #ifndef _CPASTOP_V165_100_H_
@@ -201,6 +202,7 @@ static struct cam_camnoc_specific
 	cam_cpas_v165_100_camnoc_specific[] = {
 	{
 		.port_type = CAM_CAMNOC_CDM,
+		.port_name = "CDM",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = false,
@@ -250,6 +252,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_IFE01234_RDI_WRITE,
+		.port_name = "IFE01234_RDI_WR",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -299,6 +302,13 @@ static struct cam_camnoc_specific
 			 */
 			.enable = false,
 		},
+		.maxwr_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x3620, /* IFE01234_RDI_MAXWR_LOW */
+			.value = 0x0,
+		},
 		.qosgen_mainctl = {
 			.enable = true,
 			.is_fuse_based = true,
@@ -326,6 +336,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_IFE01_NRDI_WRITE,
+		.port_name = "IFE01_NRDI_WR",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -382,6 +393,13 @@ static struct cam_camnoc_specific
 			.offset = 0x3B88, /* IFE01_NRDI_ENCCTL_LOW */
 			.value = 1,
 		},
+		.maxwr_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x3A20, /* IFE01_MAXWR_LOW */
+			.value = 0x0,
+		},
 		.qosgen_mainctl = {
 			.enable = true,
 			.is_fuse_based = true,
@@ -409,6 +427,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_IFE2_NRDI_WRITE,
+		.port_name = "IFE2_NRDI_WR",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -465,6 +484,13 @@ static struct cam_camnoc_specific
 			.offset = 0x5588, /* IFE2_NRDI_ENCCTL_LOW */
 			.value = 0,
 		},
+		.maxwr_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x5420, /* IFE2_MAXWR_LOW */
+			.value = 0x0,
+		},
 		.qosgen_mainctl = {
 			.enable = true,
 			.is_fuse_based = true,
@@ -492,6 +518,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_IPE_BPS_LRME_READ,
+		.port_name = "IPE_BPS_LRME_RD",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = false,
@@ -553,6 +580,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_IPE_BPS_LRME_WRITE,
+		.port_name = "IPE_BPS_LRME_WR",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -611,9 +639,17 @@ static struct cam_camnoc_specific
 			.offset = 0x2B88, /* IPE_BPS_LRME_WR_ENCCTL_LOW */
 			.value = 0,
 		},
+		.maxwr_low = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x2A20, /* IBL_WR_MAXWR_LOW */
+			.value = 0x0,
+		},
 	},
 	{
 		.port_type = CAM_CAMNOC_JPEG,
+		.port_name = "JPEG",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -661,10 +697,18 @@ static struct cam_camnoc_specific
 			.enable = false,
 			.is_fuse_based = false,
 		},
+		.maxwr_low = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x2620, /* JPEG_MAXWR_LOW */
+			.value = 0x0,
+		},
 	},
 	{
 		/*SidebandManager_main_SidebandManager_FlagOutSet0_Low*/
 		.port_type = CAM_CAMNOC_ICP,
+		.port_name = "ICP",
 		.enable = false,
 		.flag_out_set0_low = {
 			.enable = true,

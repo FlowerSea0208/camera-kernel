@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_IFE_HW_MGR_H_
@@ -10,6 +11,7 @@
 #include <linux/time.h>
 #include "cam_isp_hw_mgr.h"
 #include "cam_vfe_hw_intf.h"
+#include "cam_sfe_hw_intf.h"
 #include "cam_ife_csid_hw_intf.h"
 #include "cam_top_tpg_hw_intf.h"
 #include "cam_tasklet_util.h"
@@ -168,6 +170,7 @@ struct cam_ife_hw_mgr_ctx {
  *                         HW manager during the initialization.
  * @ife_devices:           IFE device instances array. This will be filled by
  *                         HW layer during initialization
+ * @sfe_devices:           SFE device instance array
  * @ctx_mutex:             mutex for the hw context pool
  * @free_ctx_list:         free hw context list
  * @used_ctx_list:         used hw context list
@@ -186,6 +189,7 @@ struct cam_ife_hw_mgr {
 	struct cam_hw_intf            *tpg_devices[CAM_TOP_TPG_HW_NUM_MAX];
 	struct cam_hw_intf            *csid_devices[CAM_IFE_CSID_HW_NUM_MAX];
 	struct cam_isp_hw_intf_data   *ife_devices[CAM_IFE_HW_NUM_MAX];
+	struct cam_isp_hw_intf_data   *sfe_devices[CAM_SFE_HW_NUM_MAX];
 	struct cam_soc_reg_map        *cdm_reg_map[CAM_IFE_HW_NUM_MAX];
 
 	struct mutex                   ctx_mutex;

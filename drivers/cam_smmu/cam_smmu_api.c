@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -15,7 +16,6 @@
 #include <linux/workqueue.h>
 #include <linux/genalloc.h>
 #include <linux/debugfs.h>
-#include <linux/dma-iommu.h>
 
 #include <soc/qcom/secure_buffer.h>
 
@@ -27,6 +27,7 @@
 #include "camera_main.h"
 #include "cam_trace.h"
 #include "cam_common_util.h"
+#include "cam_compat.h"
 
 #define SHARED_MEM_POOL_GRANULARITY 16
 
@@ -133,7 +134,6 @@ struct cam_context_bank_info {
 	bool is_fw_allocated;
 	bool is_secheap_allocated;
 	bool is_qdss_allocated;
-	bool stall_disable;
 
 	struct scratch_mapping scratch_map;
 	struct gen_pool *shared_mem_pool;
@@ -479,8 +479,7 @@ static void cam_smmu_page_fault_work(struct work_struct *work)
 	int idx;
 	struct cam_smmu_work_payload *payload;
 	uint32_t buf_info;
-	struct iommu_fault_ids fault_ids = {0, 0, 0};
-	struct cam_smmu_pf_info  pf_info;
+	struct cam_smmu_pf_info pf_info;
 
 	mutex_lock(&iommu_cb_set.payload_list_lock);
 	if (list_empty(&iommu_cb_set.payload_list)) {
@@ -495,13 +494,7 @@ static void cam_smmu_page_fault_work(struct work_struct *work)
 	list_del(&payload->list);
 	mutex_unlock(&iommu_cb_set.payload_list_lock);
 
-
-	if ((iommu_get_fault_ids(payload->domain, &fault_ids)))
-		CAM_ERR(CAM_SMMU,
-			"Error: Can not get smmu fault ids");
-
-	CAM_ERR(CAM_SMMU, "smmu fault ids bid:%d pid:%d mid:%d",
-		fault_ids.bid, fault_ids.pid, fault_ids.mid);
+	cam_check_iommu_faults(payload->domain, &pf_info);
 
 	/* Dereference the payload to call the handler */
 	idx = payload->idx;
@@ -514,9 +507,6 @@ static void cam_smmu_page_fault_work(struct work_struct *work)
 	pf_info.iova  = payload->iova;
 	pf_info.flags = payload->flags;
 	pf_info.buf_info = buf_info;
-	pf_info.bid = fault_ids.bid;
-	pf_info.pid = fault_ids.pid;
-	pf_info.mid = fault_ids.mid;
 
 	for (j = 0; j < CAM_SMMU_CB_MAX; j++) {
 		if ((iommu_cb_set.cb_info[idx].handler[j])) {
@@ -1912,10 +1902,12 @@ int cam_smmu_reserve_sec_heap(int32_t smmu_hdl,
 	size = iommu_map_sg(iommu_cb_set.cb_info[idx].domain,
 		sec_heap_iova,
 		secheap_buf->table->sgl,
-		secheap_buf->table->nents,
+		secheap_buf->table->orig_nents,
 		prot);
 	if (size != sec_heap_iova_len) {
-		CAM_ERR(CAM_SMMU, "IOMMU mapping failed");
+		CAM_ERR(CAM_SMMU,
+			"IOMMU mapping failed size=%zu, sec_heap_iova_len=%zu",
+			size, sec_heap_iova_len);
 		goto err_unmap_sg;
 	}
 
@@ -2061,7 +2053,7 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 		if (iommu_cb_set.force_cache_allocs)
 			prot |= IOMMU_CACHE;
 
-		size = iommu_map_sg(domain, iova, table->sgl, table->nents,
+		size = iommu_map_sg(domain, iova, table->sgl, table->orig_nents,
 				prot);
 
 		if (size < 0) {
@@ -2103,8 +2095,9 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 	}
 
 	CAM_DBG(CAM_SMMU,
-		"iova=%pK, region_id=%d, paddr=%pK, len=%d, dma_map_attrs=%d",
-		iova, region_id, *paddr_ptr, *len_ptr, attach->dma_map_attrs);
+		"iova=%pK, region_id=%d, paddr=0x%x, len=%d, dma_map_attrs=%d",
+		iova, region_id, (uint64_t)*paddr_ptr, *len_ptr,
+		attach->dma_map_attrs);
 
 	if (iommu_cb_set.map_profile_enable) {
 		CAM_GET_TIMESTAMP(ts2);
@@ -2151,7 +2144,8 @@ static int cam_smmu_map_buffer_validate(struct dma_buf *buf,
 		rc = -ENOSPC;
 		goto err_alloc;
 	}
-	CAM_DBG(CAM_SMMU, "idx=%d, dma_buf=%pK, dev=%pK, paddr=%pK, len=%u",
+
+	CAM_DBG(CAM_SMMU, "idx=%d, dma_buf=%pK, dev=%pK, paddr=0x%x, len=%u",
 		idx, buf, (void *)iommu_cb_set.cb_info[idx].dev,
 		(void *)*paddr_ptr, (unsigned int)*len_ptr);
 
@@ -2264,7 +2258,7 @@ static int cam_smmu_unmap_buf_and_remove_from_list(
 		mapping_info);
 
 	CAM_DBG(CAM_SMMU,
-		"region_id=%d, paddr=%pK, len=%d, dma_map_attrs=%d",
+		"region_id=%d, paddr=0x%x, len=%d, dma_map_attrs=%d",
 		mapping_info->region_id, mapping_info->paddr, mapping_info->len,
 		mapping_info->attach->dma_map_attrs);
 
@@ -3643,8 +3637,6 @@ static int cam_smmu_setup_cb(struct cam_context_bank_info *cb,
 	struct device *dev)
 {
 	int rc = 0;
-	int32_t stall_disable = 1;
-	int32_t hupcf = 1;
 
 	if (!cb || !dev) {
 		CAM_ERR(CAM_SMMU, "Error: invalid input params");
@@ -3705,31 +3697,11 @@ static int cam_smmu_setup_cb(struct cam_context_bank_info *cb,
 			goto end;
 		}
 
-		iommu_dma_enable_best_fit_algo(dev);
-
-		if (cb->discard_iova_start)
-			iommu_dma_reserve_iova(dev, cb->discard_iova_start,
+		/* Enable custom iommu features, if applicable */
+		cam_smmu_util_iommu_custom(dev, cb->discard_iova_start,
 				cb->discard_iova_len);
 
 		cb->state = CAM_SMMU_ATTACH;
-
-		if (cb->stall_disable) {
-			if (iommu_domain_set_attr(cb->domain,
-				DOMAIN_ATTR_FAULT_MODEL_NO_STALL,
-				&stall_disable) < 0) {
-				CAM_ERR(CAM_SMMU,
-					"Error: failed to set cb stall disable for node: %s",
-					cb->name[0]);
-			}
-
-			if (iommu_domain_set_attr(cb->domain,
-				DOMAIN_ATTR_FAULT_MODEL_HUPCF,
-				&hupcf) < 0) {
-				CAM_ERR(CAM_SMMU,
-					"Error: failed to set attribute HUPCF for node: %s",
-					cb->name[0]);
-			}
-		}
 	} else {
 		CAM_ERR(CAM_SMMU, "Context bank does not have IO region");
 		rc = -ENODEV;
@@ -4068,9 +4040,6 @@ static int cam_populate_smmu_context_banks(struct device *dev,
 	cb->num_shared_hdl = of_property_count_strings(dev->of_node,
 		"cam-smmu-label");
 
-	cb->stall_disable =
-		of_property_read_bool(dev->of_node, "stall-disable");
-
 	if (cb->num_shared_hdl >
 		CAM_SMMU_SHARED_HDL_MAX) {
 		CAM_ERR(CAM_CDM, "Invalid count of client names count=%d",
@@ -4182,16 +4151,11 @@ static int cam_smmu_create_debug_fs(void)
 	/* Store parent inode for cleanup in caller */
 	iommu_cb_set.dentry = dbgfileptr;
 
-	dbgfileptr = debugfs_create_bool("cb_dump_enable", 0644,
+	debugfs_create_bool("cb_dump_enable", 0644,
 		iommu_cb_set.dentry, &iommu_cb_set.cb_dump_enable);
-	dbgfileptr = debugfs_create_bool("map_profile_enable", 0644,
+	debugfs_create_bool("map_profile_enable", 0644,
 		iommu_cb_set.dentry, &iommu_cb_set.map_profile_enable);
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_SMMU, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
+
 end:
 	return rc;
 }

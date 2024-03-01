@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -12,6 +13,7 @@
 #include "cam_debug_util.h"
 #include "cam_cx_ipeak.h"
 #include "cam_mem_mgr.h"
+#include "cam_compat.h"
 
 static char supported_clk_info[256];
 
@@ -205,16 +207,11 @@ static int cam_soc_util_create_clk_lvl_debugfs(struct cam_hw_soc_info *soc_info)
 	/* Store parent inode for cleanup in caller */
 	soc_info->dentry = dbgfileptr;
 
-	dbgfileptr = debugfs_create_file("clk_lvl_options", 0444,
+	debugfs_create_file("clk_lvl_options", 0444,
 		soc_info->dentry, soc_info, &cam_soc_util_clk_lvl_options);
-	dbgfileptr = debugfs_create_file("clk_lvl_control", 0644,
+	debugfs_create_file("clk_lvl_control", 0644,
 		soc_info->dentry, soc_info, &cam_soc_util_clk_lvl_control);
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_UTIL, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
+
 end:
 	return rc;
 }
@@ -345,12 +342,12 @@ int cam_soc_util_irq_enable(struct cam_hw_soc_info *soc_info)
 		return -EINVAL;
 	}
 
-	if (!soc_info->irq_line) {
+	if (soc_info->irq_num < 0) {
 		CAM_ERR(CAM_UTIL, "No IRQ line available");
 		return -ENODEV;
 	}
 
-	enable_irq(soc_info->irq_line->start);
+	enable_irq(soc_info->irq_num);
 
 	return 0;
 }
@@ -362,12 +359,12 @@ int cam_soc_util_irq_disable(struct cam_hw_soc_info *soc_info)
 		return -EINVAL;
 	}
 
-	if (!soc_info->irq_line) {
+	if (soc_info->irq_num < 0) {
 		CAM_ERR(CAM_UTIL, "No IRQ line available");
 		return -ENODEV;
 	}
 
-	disable_irq(soc_info->irq_line->start);
+	disable_irq(soc_info->irq_num);
 
 	return 0;
 }
@@ -1361,12 +1358,9 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 			soc_info->dev_name);
 		rc = 0;
 	} else {
-		soc_info->irq_line =
-			platform_get_resource_byname(soc_info->pdev,
-			IORESOURCE_IRQ, soc_info->irq_name);
-		if (!soc_info->irq_line) {
-			CAM_ERR(CAM_UTIL, "no irq resource");
-			rc = -ENODEV;
+		rc = cam_compat_util_get_irq(soc_info);
+		if (rc < 0) {
+			CAM_ERR(CAM_UTIL, "get irq resource failed rc=%d", rc);
 			return rc;
 		}
 	}
@@ -1653,8 +1647,8 @@ int cam_soc_util_request_platform_resource(
 			goto put_regulator;
 	}
 
-	if (soc_info->irq_line) {
-		rc = devm_request_irq(soc_info->dev, soc_info->irq_line->start,
+	if (soc_info->irq_num > 0) {
+		rc = devm_request_irq(soc_info->dev, soc_info->irq_num,
 			handler, IRQF_TRIGGER_RISING,
 			soc_info->irq_name, irq_data);
 		if (rc) {
@@ -1662,7 +1656,7 @@ int cam_soc_util_request_platform_resource(
 			rc = -EBUSY;
 			goto put_regulator;
 		}
-		disable_irq(soc_info->irq_line->start);
+		disable_irq(soc_info->irq_num);
 		soc_info->irq_data = irq_data;
 	}
 
@@ -1703,10 +1697,10 @@ put_clk:
 		}
 	}
 
-	if (soc_info->irq_line) {
-		disable_irq(soc_info->irq_line->start);
+	if (soc_info->irq_num > 0) {
+		disable_irq(soc_info->irq_num);
 		devm_free_irq(soc_info->dev,
-			soc_info->irq_line->start, irq_data);
+			soc_info->irq_num, irq_data);
 	}
 
 put_regulator:
@@ -1762,10 +1756,10 @@ int cam_soc_util_release_platform_resource(struct cam_hw_soc_info *soc_info)
 		soc_info->reg_map[i].size = 0;
 	}
 
-	if (soc_info->irq_line) {
-		disable_irq(soc_info->irq_line->start);
+	if (soc_info->irq_num > 0) {
+		disable_irq(soc_info->irq_num);
 		devm_free_irq(soc_info->dev,
-			soc_info->irq_line->start, soc_info->irq_data);
+			soc_info->irq_num, soc_info->irq_data);
 	}
 
 	if (soc_info->pinctrl_info.pinctrl)
@@ -2082,8 +2076,7 @@ static int cam_soc_util_dump_dmi_reg_range_user_buf(
 		CAM_ERR(CAM_UTIL,
 			"Invalid input args soc_info: %pK, dump_args: %pK",
 			soc_info, dump_args);
-		rc = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
 
 	if (dmi_read->num_pre_writes > CAM_REG_DUMP_DMI_CONFIG_MAX ||
@@ -2091,15 +2084,14 @@ static int cam_soc_util_dump_dmi_reg_range_user_buf(
 		CAM_ERR(CAM_UTIL,
 			"Invalid number of requested writes, pre: %d post: %d",
 			dmi_read->num_pre_writes, dmi_read->num_post_writes);
-		rc = -EINVAL;
-		goto end;
+		return -EINVAL;
 	}
 
 	rc = cam_mem_get_cpu_buf(dump_args->buf_handle, &cpu_addr, &buf_len);
 	if (rc) {
 		CAM_ERR(CAM_UTIL, "Invalid handle %u rc %d",
 			dump_args->buf_handle, rc);
-		goto end;
+		return -EINVAL;
 	}
 
 	if (buf_len <= dump_args->offset) {
@@ -2185,6 +2177,8 @@ static int cam_soc_util_dump_dmi_reg_range_user_buf(
 		sizeof(struct cam_hw_soc_dump_header);
 
 end:
+	if (dump_args)
+		cam_mem_put_cpu_buf(dump_args->buf_handle);
 	return rc;
 }
 
@@ -2209,13 +2203,13 @@ static int cam_soc_util_dump_cont_reg_range_user_buf(
 			"Invalid input args soc_info: %pK, dump_out_buffer: %pK reg_read: %pK",
 			soc_info, dump_args, reg_read);
 		rc = -EINVAL;
-		goto end;
+		return rc;
 	}
 	rc = cam_mem_get_cpu_buf(dump_args->buf_handle, &cpu_addr, &buf_len);
 	if (rc) {
 		CAM_ERR(CAM_UTIL, "Invalid handle %u rc %d",
 			dump_args->buf_handle, rc);
-		goto end;
+		return rc;
 	}
 	if (buf_len <= dump_args->offset) {
 		CAM_WARN(CAM_UTIL, "Dump offset overshoot %zu %zu",
@@ -2265,6 +2259,8 @@ static int cam_soc_util_dump_cont_reg_range_user_buf(
 	dump_args->offset +=  hdr->size +
 		sizeof(struct cam_hw_soc_dump_header);
 end:
+	if (dump_args)
+		cam_mem_put_cpu_buf(dump_args->buf_handle);
 	return rc;
 }
 
@@ -2356,6 +2352,8 @@ int cam_soc_util_reg_dump_to_cmd_buf(void *ctx,
 	if (rc || !cpu_addr || (buf_size == 0)) {
 		CAM_ERR(CAM_UTIL, "Failed in Get cpu addr, rc=%d, cpu_addr=%pK",
 			rc, (void *)cpu_addr);
+		if (rc)
+			return rc;
 		goto end;
 	}
 
@@ -2557,6 +2555,7 @@ int cam_soc_util_reg_dump_to_cmd_buf(void *ctx,
 	}
 
 end:
+	cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 	return rc;
 }
 

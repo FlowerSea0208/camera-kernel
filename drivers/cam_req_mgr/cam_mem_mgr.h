@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_MEM_MGR_H_
@@ -8,6 +9,9 @@
 
 #include <linux/mutex.h>
 #include <linux/dma-buf.h>
+#if IS_REACHABLE(CONFIG_DMABUF_HEAPS)
+#include <linux/dma-heap.h>
+#endif
 #include <media/cam_req_mgr.h>
 #include "cam_mem_mgr_api.h"
 
@@ -26,21 +30,24 @@ enum cam_smmu_mapping_client {
 /**
  * struct cam_mem_buf_queue
  *
- * @dma_buf:     pointer to the allocated dma_buf in the table
- * @q_lock:      mutex lock for buffer
- * @hdls:        list of mapped handles
- * @num_hdl:     number of handles
- * @fd:          file descriptor of buffer
- * @buf_handle:  unique handle for buffer
- * @align:       alignment for allocation
- * @len:         size of buffer
- * @flags:       attributes of buffer
- * @vaddr:       IOVA of buffer
- * @kmdvaddr:    Kernel virtual address
- * @active:      state of the buffer
- * @is_imported: Flag indicating if buffer is imported from an FD in user space
- * @is_internal: Flag indicating kernel allocated buffer
- * @timestamp:   Timestamp at which this entry in tbl was made
+ * @dma_buf:        pointer to the allocated dma_buf in the table
+ * @q_lock:         mutex lock for buffer
+ * @hdls:           list of mapped handles
+ * @num_hdl:        number of handles
+ * @fd:             file descriptor of buffer
+ * @buf_handle:     unique handle for buffer
+ * @align:          alignment for allocation
+ * @len:            size of buffer
+ * @flags:          attributes of buffer
+ * @vaddr:          IOVA of buffer
+ * @kmdvaddr:       Kernel virtual address
+ * @active:         state of the buffer
+ * @is_imported:    Flag indicating if buffer is imported from an FD in user space
+ * @is_internal:    Flag indicating kernel allocated buffer
+ * @timestamp:      Timestamp at which this entry in tbl was made
+ * @krefcount:      Reference counter to track whether the buffer is
+ *                  mapped and in use
+ * @smmu_mapping_client: Client buffer (User or kernel)
  */
 struct cam_mem_buf_queue {
 	struct dma_buf *dma_buf;
@@ -58,6 +65,8 @@ struct cam_mem_buf_queue {
 	bool is_imported;
 	bool is_internal;
 	struct timespec64 timestamp;
+	struct kref krefcount;
+	enum cam_smmu_mapping_client smmu_mapping_client;
 };
 
 /**
@@ -81,6 +90,14 @@ struct cam_mem_table {
 	bool alloc_profile_enable;
 	size_t dbg_buf_idx;
 	bool force_cache_allocs;
+#if IS_REACHABLE(CONFIG_DMABUF_HEAPS)
+	struct dma_heap *system_heap;
+	struct dma_heap *system_uncached_heap;
+	struct dma_heap *camera_heap;
+	struct dma_heap *camera_uncached_heap;
+	struct dma_heap *secure_display_heap;
+#endif
+
 };
 
 /**
@@ -90,7 +107,7 @@ struct cam_mem_table {
  *
  * @return Status of operation. Negative in case of error. Zero otherwise.
  */
-int cam_mem_mgr_alloc_and_map(struct cam_mem_mgr_alloc_cmd *cmd);
+int cam_mem_mgr_alloc_and_map(struct cam_mem_mgr_alloc_cmd_v2 *cmd);
 
 /**
  * @brief: Releases a buffer reference
@@ -108,7 +125,7 @@ int cam_mem_mgr_release(struct cam_mem_mgr_release_cmd *cmd);
  *
  * @return Status of operation. Negative in case of error. Zero otherwise.
  */
-int cam_mem_mgr_map(struct cam_mem_mgr_map_cmd *cmd);
+int cam_mem_mgr_map(struct cam_mem_mgr_map_cmd_v2 *cmd);
 
 /**
  * @brief: Perform cache ops on the buffer

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -35,9 +36,9 @@ struct cam_vfe_mux_rdi_data {
 	struct list_head                      free_payload_list;
 	spinlock_t                            spin_lock;
 
-	enum cam_isp_hw_sync_mode          sync_mode;
-	struct timeval                     sof_ts;
-	struct timeval                     error_ts;
+	enum cam_isp_hw_sync_mode             sync_mode;
+	struct timespec64                     sof_ts;
+	struct timespec64                     error_ts;
 };
 
 static int cam_vfe_rdi_get_evt_payload(
@@ -199,8 +200,8 @@ static int cam_vfe_rdi_err_irq_top_half(
 	if (error_flag) {
 		rdi_priv->error_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		rdi_priv->error_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		rdi_priv->error_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 	}
 
 	for (i = 0; i < th_payload->num_registers; i++)
@@ -361,9 +362,9 @@ static int cam_vfe_rdi_resource_start(
 	}
 
 	rsrc_data->sof_ts.tv_sec = 0;
-	rsrc_data->sof_ts.tv_usec = 0;
+	rsrc_data->sof_ts.tv_nsec = 0;
 	rsrc_data->error_ts.tv_sec = 0;
-	rsrc_data->error_ts.tv_usec = 0;
+	rsrc_data->error_ts.tv_nsec = 0;
 
 	CAM_DBG(CAM_ISP, "Start RDI %d",
 		rdi_res->res_id - CAM_ISP_HW_VFE_IN_RDI0);
@@ -506,8 +507,8 @@ static int cam_vfe_rdi_handle_irq_bottom_half(void *handler_priv,
 		CAM_DBG(CAM_ISP, "Received SOF");
 		rdi_priv->sof_ts.tv_sec =
 			payload->ts.mono_time.tv_sec;
-		rdi_priv->sof_ts.tv_usec =
-			payload->ts.mono_time.tv_usec;
+		rdi_priv->sof_ts.tv_nsec =
+			payload->ts.mono_time.tv_nsec;
 		if (rdi_priv->event_cb)
 			rdi_priv->event_cb(rdi_priv->priv,
 				CAM_ISP_HW_EVENT_SOF, (void *)&evt_info);
@@ -544,9 +545,9 @@ static int cam_vfe_rdi_handle_irq_bottom_half(void *handler_priv,
 		CAM_INFO(CAM_ISP,
 			"ERROR time %lld:%lld SOF %lld:%lld",
 			rdi_priv->error_ts.tv_sec,
-			rdi_priv->error_ts.tv_usec,
+			rdi_priv->error_ts.tv_nsec,
 			rdi_priv->sof_ts.tv_sec,
-			rdi_priv->sof_ts.tv_usec);
+			rdi_priv->sof_ts.tv_nsec);
 
 		if (irq_rdi_status &
 			rdi_priv->rdi_irq_status->rdi0_overflow_mask) {

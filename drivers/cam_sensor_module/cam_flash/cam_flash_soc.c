@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include "cam_flash_soc.h"
 #include "cam_res_mgr_api.h"
-#include <dt-bindings/msm/msm-camera.h>
+#include <dt-bindings/msm-camera.h>
 
 void cam_flash_put_source_node_data(struct cam_flash_ctrl *fctrl)
 {
@@ -139,7 +140,7 @@ static int32_t cam_get_source_node_info(
 			if (soc_private->is_wled_flash) {
 				rc = cam_flash_led_prepare(
 					fctrl->flash_trigger[i],
-					QUERY_MAX_AVAIL_CURRENT,
+					QUERY_CURRENT,
 					&soc_private->flash_max_current[i],
 					true);
 				if (rc) {
@@ -230,7 +231,7 @@ static int32_t cam_get_source_node_info(
 			if (soc_private->is_wled_flash) {
 				rc = cam_flash_led_prepare(
 					fctrl->torch_trigger[i],
-					QUERY_MAX_AVAIL_CURRENT,
+					QUERY_CURRENT,
 					&soc_private->torch_max_current[i],
 					true);
 				if (rc) {

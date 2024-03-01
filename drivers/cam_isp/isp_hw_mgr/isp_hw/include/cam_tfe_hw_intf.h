@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_TFE_HW_INTF_H_
@@ -238,6 +239,15 @@ struct cam_tfe_irq_evt_payload {
 	bool                       enable_reg_dump;
 	struct cam_isp_timestamp   ts;
 };
+
+/*
+ * cam_tfe_get_num_tfe_hws()
+ *
+ * @brief:         Gets number of TFEs
+ *
+ * @num_tfes:      Fills number of TFES in the address passed
+ */
+void cam_tfe_get_num_tfe_hws(uint32_t *num_tfes);
 
 /*
  * cam_tfe_hw_init()

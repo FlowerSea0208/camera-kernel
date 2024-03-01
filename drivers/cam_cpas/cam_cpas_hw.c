@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/device.h>
@@ -15,6 +16,10 @@
 #include "cam_cpas_soc.h"
 #include "cam_req_mgr_dev.h"
 #include "cam_smmu_api.h"
+#include "cam_compat.h"
+#include "cam_cpastop_hw.h"
+
+#define CAM_CPAS_LOG_BUF_LEN      512
 
 static uint cam_min_camnoc_ib_bw;
 module_param(cam_min_camnoc_ib_bw, uint, 0644);
@@ -23,6 +28,24 @@ static void cam_cpas_update_monitor_array(struct cam_hw_info *cpas_hw,
 	const char *identifier_string, int32_t identifier_value);
 static void cam_cpas_dump_monitor_array(
 	struct cam_cpas *cpas_core);
+
+static struct cam_cpas_subpart_info g_cam_cpas_camera_subpart_info = {
+	.num_bits = 8,
+	/*
+	 * Below fuse indexing is based on software fuse definition which is in SMEM and provided
+	 * by XBL team.
+	 */
+	.hw_bitmap_mask = {
+		{CAM_CPAS_CAM_FUSE, BIT(0)},
+		{CAM_CPAS_ISP_FUSE, BIT(0)},
+		{CAM_CPAS_ISP_FUSE, BIT(1)},
+		{CAM_CPAS_ISP_FUSE, BIT(2)},
+		{CAM_CPAS_SFE_FUSE, BIT(0)},
+		{CAM_CPAS_SFE_FUSE, BIT(1)},
+		{CAM_CPAS_SFE_FUSE, BIT(2)},
+		{CAM_CPAS_CUSTOM_FUSE, BIT(0)},
+	}
+};
 
 static void cam_cpas_process_bw_overrides(
 	struct cam_cpas_bus_client *bus_client, uint64_t *ab, uint64_t *ib,
@@ -485,6 +508,46 @@ static int cam_cpas_hw_reg_read(struct cam_hw_info *cpas_hw,
 	*value = reg_value;
 
 	return rc;
+}
+
+static int cam_cpas_hw_dump_camnoc_buff_fill_info(
+	struct cam_hw_info *cpas_hw,
+	uint32_t client_handle)
+{
+	int rc = 0, i;
+	uint32_t val = 0;
+	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
+	struct cam_camnoc_info *camnoc_info =
+		(struct cam_camnoc_info *) cpas_core->camnoc_info;
+	char log_buf[CAM_CPAS_LOG_BUF_LEN] = {0};
+	size_t len = 0;
+
+	if (!camnoc_info) {
+		CAM_ERR(CAM_CPAS, "Invalid camnoc info for hw_version: 0x%x",
+			cpas_hw->soc_info.hw_version);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < camnoc_info->specific_size; i++) {
+		if ((!camnoc_info->specific[i].enable) ||
+			(!camnoc_info->specific[i].maxwr_low.enable))
+			continue;
+
+		rc = cam_cpas_hw_reg_read(cpas_hw, client_handle,
+			CAM_CPAS_REG_CAMNOC,
+			camnoc_info->specific[i].maxwr_low.offset, true, &val);
+		if (rc)
+			break;
+
+		len += scnprintf((log_buf + len), (CAM_CPAS_LOG_BUF_LEN - len),
+			" %s:[%d %d]", camnoc_info->specific[i].port_name,
+			(val & 0x7FF), (val & 0x7F0000) >> 16);
+	}
+
+	CAM_INFO(CAM_CPAS, "CAMNOC Fill level [Queued Pending] %s", log_buf);
+
+	return rc;
+
 }
 
 static int cam_cpas_util_set_camnoc_axi_clk_rate(
@@ -1127,7 +1190,7 @@ static int cam_cpas_hw_update_axi_vote(struct cam_hw_info *cpas_hw,
 	cam_cpas_update_monitor_array(cpas_hw, "CPAS AXI post-update",
 		client_indx);
 unlock_client:
-	kzfree(axi_vote);
+	cam_free_clear((void *)axi_vote);
 	axi_vote = NULL;
 	mutex_unlock(&cpas_core->client_mutex[client_indx]);
 	mutex_unlock(&cpas_hw->hw_mutex);
@@ -1857,8 +1920,7 @@ static int cam_cpas_hw_get_hw_info(void *hw_priv,
 		cpas_hw->soc_info.soc_private;
 
 	hw_caps->fuse_info = soc_private->fuse_info;
-	CAM_INFO(CAM_CPAS, "fuse info->num_fuses %d",
-		hw_caps->fuse_info.num_fuses);
+	CAM_DBG(CAM_CPAS, "fuse info->num_fuses %d", hw_caps->fuse_info.num_fuses);
 
 	return 0;
 }
@@ -1982,13 +2044,22 @@ static void cam_cpas_update_monitor_array(struct cam_hw_info *cpas_hw,
 	const char *identifier_string, int32_t identifier_value)
 {
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
+	struct cam_camnoc_info *camnoc_info =
+		(struct cam_camnoc_info *) cpas_core->camnoc_info;
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
 	struct cam_cpas_private_soc *soc_private =
 		(struct cam_cpas_private_soc *) cpas_hw->soc_info.soc_private;
 	struct cam_cpas_monitor *entry;
 	int iterator;
-	int i;
+	int i, j = 0;
 	int reg_camnoc = cpas_core->regbase_index[CAM_CPAS_REG_CAMNOC];
+	uint32_t val = 0;
+
+	if (!camnoc_info) {
+		CAM_ERR(CAM_CPAS, "Invalid camnoc info for hw_version: 0x%x",
+			cpas_hw->soc_info.hw_version);
+		return;
+	}
 
 	CAM_CPAS_INC_MONITOR_HEAD(&cpas_core->monitor_head, &iterator);
 
@@ -2043,21 +2114,34 @@ static void cam_cpas_update_monitor_array(struct cam_hw_info *cpas_hw,
 		entry->fe_mnoc = cam_io_r_mb(rpmh_base + fe_mnoc_offset);
 		entry->be_ddr = cam_io_r_mb(rpmh_base + be_ddr_offset);
 		entry->be_mnoc = cam_io_r_mb(rpmh_base + be_mnoc_offset);
+
+		CAM_DBG(CAM_CPAS,
+			"fe_ddr=0x%x, fe_mnoc=0x%x, be_ddr=0x%x, be_mnoc=0x%x",
+			entry->fe_ddr, entry->fe_mnoc, entry->be_ddr,
+			entry->be_mnoc);
 	}
 
-	entry->camnoc_fill_level[0] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0xA20);
-	entry->camnoc_fill_level[1] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0x1420);
-	entry->camnoc_fill_level[2] = cam_io_r_mb(
-		soc_info->reg_map[reg_camnoc].mem_base + 0x1A20);
+	for (i = 0; i < camnoc_info->specific_size; i++) {
+		if ((!camnoc_info->specific[i].enable) ||
+			(!camnoc_info->specific[i].maxwr_low.enable))
+			continue;
 
-	if (cpas_hw->soc_info.hw_version == CAM_CPAS_TITAN_580_V100) {
-		entry->camnoc_fill_level[3] = cam_io_r_mb(
-			soc_info->reg_map[reg_camnoc].mem_base + 0x7620);
-		entry->camnoc_fill_level[4] = cam_io_r_mb(
-			soc_info->reg_map[reg_camnoc].mem_base + 0x7420);
+		if (j >= CAM_CAMNOC_FILL_LVL_REG_INFO_MAX) {
+			CAM_WARN(CAM_CPAS,
+				"CPAS monitor reg info buffer full, max : %d",
+				j);
+			break;
+		}
+
+		entry->camnoc_port_name[j] = camnoc_info->specific[i].port_name;
+		val = cam_io_r_mb(soc_info->reg_map[reg_camnoc].mem_base +
+			camnoc_info->specific[i].maxwr_low.offset);
+		entry->camnoc_fill_level[j] = val;
+		j++;
 	}
+
+	entry->num_camnoc_lvl_regs = j;
+
 }
 
 static void cam_cpas_dump_monitor_array(
@@ -2069,6 +2153,8 @@ static void cam_cpas_dump_monitor_array(
 	uint64_t ms, tmp, hrs, min, sec;
 	struct cam_cpas_monitor *entry;
 	struct timespec64 curr_timestamp;
+	char log_buf[CAM_CPAS_LOG_BUF_LEN];
+	size_t len;
 
 	if (!cpas_core->full_state_dump)
 		return;
@@ -2086,7 +2172,6 @@ static void cam_cpas_dump_monitor_array(
 		div_u64_rem(state_head + 1,
 			CAM_CPAS_MONITOR_MAX_ENTRIES, &oldest_entry);
 	}
-
 
 	ktime_get_real_ts64(&curr_timestamp);
 	tmp = curr_timestamp.tv_sec;
@@ -2108,6 +2193,8 @@ static void cam_cpas_dump_monitor_array(
 		sec = do_div(tmp, 60);
 		min = do_div(tmp, 60);
 		hrs = do_div(tmp, 24);
+		log_buf[0] = '\0';
+		len = 0;
 
 		CAM_INFO(CAM_CPAS,
 			"**** %llu:%llu:%llu.%llu : Index[%d] Identifier[%s][%d] camnoc=%lld, ahb=%d",
@@ -2132,18 +2219,14 @@ static void cam_cpas_dump_monitor_array(
 				entry->be_ddr, entry->be_mnoc);
 		}
 
-		CAM_INFO(CAM_CPAS,
-			"CAMNOC REG[Queued Pending] linear[%d %d] rdi0_wr[%d %d] ubwc_stats0[%d %d] ubwc_stats1[%d %d] rdi1_wr[%d %d]",
-			(entry->camnoc_fill_level[0] & 0x7FF),
-			(entry->camnoc_fill_level[0] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[1] & 0x7FF),
-			(entry->camnoc_fill_level[1] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[2] & 0x7FF),
-			(entry->camnoc_fill_level[2] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[3] & 0x7FF),
-			(entry->camnoc_fill_level[3] & 0x7F0000) >> 16,
-			(entry->camnoc_fill_level[4] & 0x7FF),
-			(entry->camnoc_fill_level[4] & 0x7F0000) >> 16);
+		for (j = 0; j < entry->num_camnoc_lvl_regs; j++) {
+			len += scnprintf((log_buf + len),
+				(CAM_CPAS_LOG_BUF_LEN - len), " %s:[%d %d]",
+				entry->camnoc_port_name[j],
+				(entry->camnoc_fill_level[j] & 0x7FF),
+				(entry->camnoc_fill_level[j] & 0x7F0000) >> 16);
+		}
+		CAM_INFO(CAM_CPAS, "CAMNOC REG[Queued Pending] %s", log_buf);
 
 		index = (index + 1) % CAM_CPAS_MONITOR_MAX_ENTRIES;
 	}
@@ -2323,6 +2406,20 @@ static int cam_cpas_hw_process_cmd(void *hw_priv,
 		rc = cam_cpas_select_qos(hw_priv, *selection_mask);
 		break;
 	}
+	case CAM_CPAS_HW_CMD_DUMP_BUFF_FILL_INFO: {
+		uint32_t *client_handle;
+
+		if (sizeof(uint32_t) != arg_size) {
+			CAM_ERR(CAM_CPAS, "cmd_type %d, size mismatch %d",
+				cmd_type, arg_size);
+			break;
+		}
+
+		client_handle = (uint32_t *)cmd_args;
+		rc = cam_cpas_hw_dump_camnoc_buff_fill_info(hw_priv,
+			*client_handle);
+		break;
+	}
 	default:
 		CAM_ERR(CAM_CPAS, "CPAS HW command not valid =%d", cmd_type);
 		break;
@@ -2403,19 +2500,125 @@ static int cam_cpas_util_create_debugfs(struct cam_cpas *cpas_core)
 	/* Store parent inode for cleanup in caller */
 	cpas_core->dentry = dbgfileptr;
 
-	dbgfileptr = debugfs_create_bool("ahb_bus_scaling_disable", 0644,
+	debugfs_create_bool("ahb_bus_scaling_disable", 0644,
 		cpas_core->dentry, &cpas_core->ahb_bus_scaling_disable);
 
-	dbgfileptr = debugfs_create_bool("full_state_dump", 0644,
+	debugfs_create_bool("full_state_dump", 0644,
 		cpas_core->dentry, &cpas_core->full_state_dump);
 
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_CPAS, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
 end:
+	return rc;
+}
+
+static struct cam_hw_info *cam_cpas_kobj_to_cpas_hw(struct kobject *kobj)
+{
+	return container_of(kobj, struct cam_cpas_kobj_map, base_kobj)->cpas_hw;
+}
+
+static ssize_t cam_cpas_sysfs_get_subparts_info(struct kobject *kobj, struct kobj_attribute *attr,
+	char *buf)
+{
+	int len = 0;
+	struct cam_hw_info *cpas_hw = cam_cpas_kobj_to_cpas_hw(kobj);
+	struct cam_cpas_private_soc *soc_private = NULL;
+	struct cam_cpas_sysfs_info *sysfs_info = NULL;
+
+	mutex_lock(&cpas_hw->hw_mutex);
+	soc_private = (struct cam_cpas_private_soc *) cpas_hw->soc_info.soc_private;
+	sysfs_info  = &soc_private->sysfs_info;
+
+	len += scnprintf(buf, PAGE_SIZE, "num_ifes: 0x%x, 0x%x\nnum_ife_lites: 0x%x, 0x%x\n"
+		"num_sfes: 0x%x, 0x%x\nnum_custom: 0x%x, 0x%x\n",
+		sysfs_info->num_ifes[CAM_CPAS_AVAILABLE_NUM_SUBPARTS],
+		sysfs_info->num_ifes[CAM_CPAS_FUNCTIONAL_NUM_SUBPARTS],
+		sysfs_info->num_ife_lites[CAM_CPAS_AVAILABLE_NUM_SUBPARTS],
+		sysfs_info->num_ife_lites[CAM_CPAS_FUNCTIONAL_NUM_SUBPARTS],
+		sysfs_info->num_sfes[CAM_CPAS_AVAILABLE_NUM_SUBPARTS],
+		sysfs_info->num_sfes[CAM_CPAS_FUNCTIONAL_NUM_SUBPARTS],
+		sysfs_info->num_custom[CAM_CPAS_AVAILABLE_NUM_SUBPARTS],
+		sysfs_info->num_custom[CAM_CPAS_FUNCTIONAL_NUM_SUBPARTS]);
+	/*
+	 * subparts_info sysfs string looks like below.
+	 * num_ifes: 0x3, 0x3 (If all IFEs are available)/0x2 (If 1 IFE is unavailable)
+	 * num_ife_lites: 0x2, 0x2
+	 * num_sfes: 0x3, 0x3 (If all SFEs are available)/0x2 (If 1 SFE is unavailable)
+	 * num_custom: 0x0, 0x0
+	 */
+
+	if (len >= PAGE_SIZE) {
+		CAM_ERR(CAM_CPAS, "camera subparts info sysfs string is truncated, len: %d", len);
+		mutex_unlock(&cpas_hw->hw_mutex);
+		return -EOVERFLOW;
+	}
+
+	mutex_unlock(&cpas_hw->hw_mutex);
+	return len;
+}
+
+static struct kobj_attribute cam_subparts_info_attribute = __ATTR(subparts_info, 0444,
+	cam_cpas_sysfs_get_subparts_info, NULL);
+
+static void cam_cpas_hw_kobj_release(struct kobject *kobj)
+{
+	CAM_DBG(CAM_CPAS, "Release kobj");
+	kfree(container_of(kobj, struct cam_cpas_kobj_map, base_kobj));
+}
+
+static struct kobj_type kobj_cam_cpas_hw_type = {
+	.release = cam_cpas_hw_kobj_release,
+	.sysfs_ops = &kobj_sysfs_ops
+};
+
+static void cam_cpas_remove_sysfs(struct cam_hw_info *cpas_hw)
+{
+	struct cam_cpas_private_soc *soc_private = NULL;
+
+	mutex_lock(&cpas_hw->hw_mutex);
+	soc_private = (struct cam_cpas_private_soc *) cpas_hw->soc_info.soc_private;
+
+	sysfs_remove_file(soc_private->sysfs_info.kobj, &cam_subparts_info_attribute.attr);
+	kobject_put(soc_private->sysfs_info.kobj);
+	mutex_unlock(&cpas_hw->hw_mutex);
+}
+
+static int cam_cpas_create_sysfs(struct cam_hw_info *cpas_hw)
+{
+	int rc = 0;
+	struct cam_cpas_kobj_map *kobj_camera = NULL;
+	struct cam_cpas_private_soc *soc_private = NULL;
+
+	mutex_lock(&cpas_hw->hw_mutex);
+	soc_private = (struct cam_cpas_private_soc *) cpas_hw->soc_info.soc_private;
+
+	kobj_camera = kzalloc(sizeof(*kobj_camera), GFP_KERNEL);
+	if (!kobj_camera) {
+		CAM_ERR(CAM_CPAS, "failed to allocate memory for kobj_camera");
+		mutex_unlock(&cpas_hw->hw_mutex);
+		return -ENOMEM;
+	}
+
+	kobject_init(&kobj_camera->base_kobj, &kobj_cam_cpas_hw_type);
+	kobj_camera->cpas_hw = cpas_hw;
+	soc_private->sysfs_info.kobj = &kobj_camera->base_kobj;
+
+	rc = kobject_add(&kobj_camera->base_kobj, kernel_kobj, "%s", "camera");
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "failed to add camera entry in sysfs");
+		goto end;
+	}
+
+	/* sysfs file is created in /sys/kernel/camera */
+	rc = sysfs_create_file(&kobj_camera->base_kobj, &cam_subparts_info_attribute.attr);
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "failed to create subparts_info file, rc: %d", rc);
+		goto end;
+	}
+
+	mutex_unlock(&cpas_hw->hw_mutex);
+	return 0;
+end:
+	kobject_put(&kobj_camera->base_kobj);
+	mutex_unlock(&cpas_hw->hw_mutex);
 	return rc;
 }
 
@@ -2498,6 +2701,13 @@ int cam_cpas_hw_probe(struct platform_device *pdev,
 
 	soc_private = (struct cam_cpas_private_soc *)
 		cpas_hw->soc_info.soc_private;
+
+	rc = cam_cpas_create_sysfs(cpas_hw);
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "Failed to create sysfs entries, rc: %d", rc);
+		goto sysfs_fail;
+	}
+
 	cpas_core->num_clients = soc_private->num_clients;
 	atomic_set(&cpas_core->irq_count, 0);
 	init_waitqueue_head(&cpas_core->irq_count_wq);
@@ -2556,6 +2766,14 @@ int cam_cpas_hw_probe(struct platform_device *pdev,
 	if (rc)
 		goto disable_soc_res;
 
+	cpas_core->cam_subpart_info = &g_cam_cpas_camera_subpart_info;
+
+	rc = cam_get_subpart_info(&soc_private->part_info, CAM_CPAS_CAMERA_INSTANCES);
+	if (rc) {
+		CAM_ERR(CAM_CPAS, "Failed to get subpart_info, rc = %d", rc);
+		goto disable_soc_res;
+	}
+
 	rc = cam_cpas_soc_disable_resources(&cpas_hw->soc_info, true, true);
 	if (rc) {
 		CAM_ERR(CAM_CPAS, "failed in soc_disable_resources, rc=%d", rc);
@@ -2583,6 +2801,8 @@ client_cleanup:
 	cam_cpas_util_client_cleanup(cpas_hw);
 	cam_cpas_node_tree_cleanup(cpas_core, cpas_hw->soc_info.soc_private);
 deinit_platform_res:
+	cam_cpas_remove_sysfs(cpas_hw);
+sysfs_fail:
 	cam_cpas_soc_deinit_resources(&cpas_hw->soc_info);
 release_workq:
 	flush_workqueue(cpas_core->work_queue);
@@ -2614,6 +2834,7 @@ int cam_cpas_hw_remove(struct cam_hw_intf *cpas_hw_intf)
 		return -EINVAL;
 	}
 
+	cam_cpas_remove_sysfs(cpas_hw);
 	cam_cpas_util_axi_cleanup(cpas_core, &cpas_hw->soc_info);
 	cam_cpas_node_tree_cleanup(cpas_core, cpas_hw->soc_info.soc_private);
 	cam_cpas_util_unregister_bus_client(&cpas_core->ahb_bus_client);

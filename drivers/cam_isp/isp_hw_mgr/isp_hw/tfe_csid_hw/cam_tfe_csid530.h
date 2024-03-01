@@ -1,12 +1,15 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_TFE_CSID_530_H_
 #define _CAM_TFE_CSID_530_H_
 
 #include "cam_tfe_csid_core.h"
+
+#define CAM_TFE_CSID_VERSION_V530                 0x50030000
 
 static struct cam_tfe_csid_pxl_reg_offset  cam_tfe_csid_530_ipp_reg_offset = {
 	.csid_pxl_irq_status_addr            = 0x30,
@@ -221,7 +224,9 @@ static struct cam_tfe_csid_reg_offset cam_tfe_csid_530_reg_offset = {
 		},
 };
 
-int cam_tfe_csid530_init_module(void);
-void cam_tfe_csid530_exit_module(void);
+static struct cam_tfe_csid_hw_info cam_tfe_csid530_hw_info = {
+	.csid_reg = &cam_tfe_csid_530_reg_offset,
+	.hw_dts_version = CAM_TFE_CSID_VERSION_V530,
+};
 
 #endif /*_CAM_TFE_CSID_530_H_ */
