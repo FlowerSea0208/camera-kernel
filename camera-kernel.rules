@@ -1,0 +1,1 @@
+SUBSYSTEM=="hdmi_bdg_irq_handler", KERNEL=="hdmi_bdg_irq_handler", OWNER="system", GROUP="system", MODE="0644"
