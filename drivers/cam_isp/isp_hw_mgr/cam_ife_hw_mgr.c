@@ -4616,7 +4616,8 @@ static int cam_ife_mgr_acquire_hw_for_offline_ctx(
 	if ((!in_port->ipp_count && !in_port->lcr_count) ||
 		!in_port->ife_rd_count) {
 		CAM_ERR(CAM_ISP,
-			"Invalid %d BUS RD %d PIX %d LCR ports for FE ctx");
+			"Invalid %d BUS RD %d PIX %d LCR ports for FE ctx",
+			in_port->ife_rd_count, in_port->ipp_count, in_port->lcr_count);
 		return -EINVAL;
 	}
 
@@ -11760,19 +11761,35 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 	if (prepare->num_out_map_entries &&
 		prepare->num_in_map_entries &&
 		ctx->flags.is_offline) {
-		if (ctx->ctx_type != CAM_IFE_CTX_TYPE_SFE)
-			rc = cam_isp_add_go_cmd(prepare, &ctx->res_list_ife_in_rd,
-				ctx->base[i].idx, &prepare_hw_data->kmd_cmd_buff_info);
-		else
-			rc = cam_isp_add_csid_offline_cmd(prepare,
-				&ctx->res_list_ife_csid,
-				ctx->base[i].idx, &prepare_hw_data->kmd_cmd_buff_info);
-		if (rc)
-			CAM_ERR(CAM_ISP,
-				"Add %s GO_CMD faled i: %d, idx: %d, rc: %d",
-				(ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE ?
-				"CSID" : "IFE RD"),
-				i, ctx->base[i].idx, rc);
+		if (ctx->ctx_type != CAM_IFE_CTX_TYPE_SFE) {
+			for (i = 0; i < ctx->num_base; i++) {
+				rc = cam_isp_add_go_cmd(prepare,
+						&ctx->res_list_ife_in_rd,
+						ctx->base[i].idx,
+						&prepare_hw_data->kmd_cmd_buff_info);
+
+				if (rc)
+					CAM_ERR(CAM_ISP,
+						"Add %s GO_CMD failed i: %d, idx: %d, rc: %d",
+						(ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE ?
+						"CSID" : "IFE RD"),
+						i, ctx->base[i].idx, rc);
+			}
+		} else {
+			for (i = 0; i < ctx->num_base; i++) {
+				rc = cam_isp_add_csid_offline_cmd(prepare,
+						&ctx->res_list_ife_csid,
+						ctx->base[i].idx,
+						&prepare_hw_data->kmd_cmd_buff_info);
+
+				if (rc)
+					CAM_ERR(CAM_ISP,
+						"Add %s CSID GO_CMD failed i: %d, idx: %d, rc: %d",
+						(ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE ?
+						"CSID" : "IFE RD"),
+						i, ctx->base[i].idx, rc);
+			}
+		}
 	}
 
 	if (prepare_hw_data->kmd_cmd_buff_info.size <=
