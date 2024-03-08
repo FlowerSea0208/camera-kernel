@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_LINUX_CAM_REQ_MGR_H
@@ -10,7 +11,7 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 #include <linux/media.h>
-#include <camera/media/cam_defs.h>
+#include <media/cam_defs.h>
 
 #define CAM_REQ_MGR_VNODE_NAME "cam-req-mgr-devnode"
 
@@ -62,6 +63,10 @@
 /* Link control operations */
 #define CAM_REQ_MGR_LINK_ACTIVATE               0
 #define CAM_REQ_MGR_LINK_DEACTIVATE             1
+
+/* DMA buffer name length */
+#define CAM_DMA_BUF_NAME_LEN                    128
+#define CAM_REQ_MGR_ALLOC_BUF_WITH_NAME         1
 
 /**
  * Request Manager : flush_type
@@ -267,6 +272,8 @@ struct cam_req_mgr_link_control {
 #define CAM_REQ_MGR_LINK_CONTROL                (CAM_COMMON_OPCODE_MAX + 13)
 #define CAM_REQ_MGR_LINK_V2                     (CAM_COMMON_OPCODE_MAX + 14)
 #define CAM_REQ_MGR_REQUEST_DUMP                (CAM_COMMON_OPCODE_MAX + 15)
+#define CAM_REQ_MGR_ALLOC_BUF_V2                (CAM_COMMON_OPCODE_MAX + 18)
+#define CAM_REQ_MGR_MAP_BUF_V2                  (CAM_COMMON_OPCODE_MAX + 19)
 
 /* end of cam_req_mgr opcodes */
 
@@ -378,6 +385,37 @@ struct cam_mem_mgr_alloc_cmd {
 };
 
 /**
+ * struct cam_mem_mgr_alloc_cmd_v2
+ * @version: Struct version
+ * @num_hdl: number of handles
+ * @mmu_hdls: array of mmu handles
+ * @len: size of buffer to allocate
+ * @align: alignment of the buffer
+ * @vmids: reserved
+ * @buf_name: DMA buffer name
+ * @flags: flags of the buffer
+ * @num_valid_params: Valid number of params being used
+ * @valid_param_mask: Mask to indicate the field types in params
+ * @params: Additional params
+ * @out: out params
+ */
+/* CAM_REQ_MGR_ALLOC_BUF_V2 */
+struct cam_mem_mgr_alloc_cmd_v2 {
+	__u32                           version;
+	__u32                           num_hdl;
+	__s32                           mmu_hdls[CAM_MEM_MMU_MAX_HANDLE];
+	__u64                           len;
+	__u64                           align;
+	__u64                           vmids;
+	char                            buf_name[CAM_DMA_BUF_NAME_LEN];
+	__u32                           flags;
+	__u32                           num_valid_params;
+	__u32                           valid_param_mask;
+	__s32                           params[5];
+	struct cam_mem_alloc_out_params out;
+};
+
+/**
  * struct cam_mem_mgr_map_cmd
  * @mmu_hdls: array of mmu handles
  * @num_hdl: number of handles
@@ -394,6 +432,36 @@ struct cam_mem_mgr_map_cmd {
 	__u32                         flags;
 	__s32                         fd;
 	__u32                         reserved;
+	struct cam_mem_map_out_params out;
+};
+
+/**
+ * struct cam_mem_mgr_map_cmd_v2
+ * @version: Struct version
+ * @fd: output buffer file descriptor
+ * @mmu_hdls: array of mmu handles
+ * @num_hdl: number of handles
+ * @flags: flags of the buffer
+ * @vmids: reserved
+ * @buf_name: DMA buffer name
+ * @num_valid_params: Valid number of params being used
+ * @valid_param_mask: Mask to indicate the field types in params
+ * @params: Additional params
+ * @out: out params
+ */
+
+/* CAM_REQ_MGR_MAP_BUF_V2 */
+struct cam_mem_mgr_map_cmd_v2 {
+	__u32                         version;
+	__s32                         fd;
+	__s32                         mmu_hdls[CAM_MEM_MMU_MAX_HANDLE];
+	__u32                         num_hdl;
+	__u32                         flags;
+	__u64                         vmids;
+	char                          buf_name[CAM_DMA_BUF_NAME_LEN];
+	__u32                         num_valid_params;
+	__u32                         valid_param_mask;
+	__s32                         params[4];
 	struct cam_mem_map_out_params out;
 };
 

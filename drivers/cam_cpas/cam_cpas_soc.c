@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/device.h>
@@ -466,8 +467,6 @@ static int cam_cpas_parse_node_tree(struct cam_cpas *cpas_core,
 	return 0;
 }
 
-
-
 int cam_cpas_get_hw_features(struct platform_device *pdev,
 	struct cam_cpas_private_soc *soc_private)
 {
@@ -485,8 +484,7 @@ int cam_cpas_get_hw_features(struct platform_device *pdev,
 	CAM_DBG(CAM_CPAS, "fuse info elements count %d", count);
 
 	if (count <= 0) {
-		CAM_INFO(CAM_CPAS, "No or invalid fuse entries count: %d",
-			count);
+		CAM_DBG(CAM_CPAS, "No or invalid fuse entries count: %d", count);
 		goto end;
 	} else if (count%5 != 0) {
 		CAM_INFO(CAM_CPAS, "fuse entries should be multiple of 5 %d",
@@ -953,7 +951,7 @@ int cam_cpas_soc_init_resources(struct cam_hw_soc_info *soc_info,
 		return rc;
 	}
 
-	if (soc_info->irq_line && !irq_handler) {
+	if ((soc_info->irq_num > 0) && !irq_handler) {
 		CAM_ERR(CAM_CPAS, "Invalid IRQ handler");
 		return -EINVAL;
 	}

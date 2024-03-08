@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -10,7 +11,7 @@
 #include <media/cam_defs.h>
 
 #include <media/cam_req_mgr.h>
-#include <dt-bindings/msm/msm-camera.h>
+#include <dt-bindings/msm-camera.h>
 
 #include "cam_isp_hw_mgr_intf.h"
 #include "cam_ife_csid_core.h"
@@ -21,7 +22,6 @@
 #include "cam_cpas_api.h"
 #include "cam_subdev.h"
 #include "cam_tasklet_util.h"
-#include "dt-bindings/msm/msm-camera.h"
 
 /* Timeout value in msec */
 #define IFE_CSID_TIMEOUT                               1000
@@ -375,8 +375,8 @@ static int cam_ife_match_vc_dt_pair(int32_t *vc, uint32_t *dt,
 		return -EINVAL;
 	}
 
-	if ((camera_hw_version != CAM_CPAS_TITAN_480_V100) ||
-		(camera_hw_version != CAM_CPAS_TITAN_580_V100) ||
+	if ((camera_hw_version != CAM_CPAS_TITAN_480_V100) &&
+		(camera_hw_version != CAM_CPAS_TITAN_580_V100) &&
 		(camera_hw_version != CAM_CPAS_TITAN_570_V200))
 		num_valid_vc_dt = 1;
 
@@ -385,6 +385,7 @@ static int cam_ife_match_vc_dt_pair(int32_t *vc, uint32_t *dt,
 		if (vc[1] != cid_data->vc1 ||
 			dt[1] != cid_data->dt1)
 			return -EINVAL;
+		fallthrough;
 	case 1:
 		if (vc[0] != cid_data->vc ||
 			dt[0] != cid_data->dt)
@@ -1174,7 +1175,7 @@ int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 	/* CSID  CSI2 v2.0 supports 31 vc */
 	if (reserve->sync_mode >= CAM_ISP_HW_SYNC_MAX) {
 		CAM_ERR(CAM_ISP, "CSID: %d Sync Mode: %d",
-			reserve->sync_mode);
+			csid_hw->hw_intf->hw_idx, reserve->sync_mode);
 		return -EINVAL;
 	}
 
@@ -5100,7 +5101,7 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 			csi2_reg->csid_csi2_rx_captured_long_pkt_0_addr);
 
 			CAM_ERR_RATE_LIMIT(CAM_ISP,
-				"CSID:%d MMAPPED_VC_DT: VC:%d DT:%d mapped to more than 1 csid paths",
+				"CSID:%d MMAPPED_VC_DT: VC:%d DT:%d WC:%d mapped to more than 1 csid paths",
 				csid_hw->hw_intf->hw_idx, (val >> 22),
 				((val >> 16) & 0x3F), (val & 0xFFFF));
 		}

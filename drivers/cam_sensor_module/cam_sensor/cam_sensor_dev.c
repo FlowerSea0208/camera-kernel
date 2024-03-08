@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_sensor_dev.h"
@@ -8,6 +9,7 @@
 #include "cam_sensor_soc.h"
 #include "cam_sensor_core.h"
 #include "camera_main.h"
+#include "cam_compat.h"
 
 static int cam_sensor_subdev_close_internal(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh)
@@ -215,6 +217,8 @@ static int32_t cam_sensor_driver_i2c_probe(struct i2c_client *client,
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.config_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamon_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamoff_settings.list_head));
+	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_unlock_settings.list_head));
+	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_lock_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.read_settings.list_head));
 
 	for (i = 0; i < MAX_PER_FRAME_ARRAY; i++) {
@@ -305,6 +309,8 @@ static int cam_sensor_component_bind(struct device *dev,
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.config_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamon_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.streamoff_settings.list_head));
+	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_unlock_settings.list_head));
+	INIT_LIST_HEAD(&(s_ctrl->i2c_data.reg_bank_lock_settings.list_head));
 	INIT_LIST_HEAD(&(s_ctrl->i2c_data.read_settings.list_head));
 
 	for (i = 0; i < MAX_PER_FRAME_ARRAY; i++) {
@@ -378,23 +384,31 @@ static int cam_sensor_platform_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int cam_sensor_driver_i2c_remove(struct i2c_client *client)
+int cam_sensor_driver_i2c_remove_common(struct i2c_client *client)
 {
-	int                        i;
-	struct cam_sensor_ctrl_t  *s_ctrl = i2c_get_clientdata(client);
+
+	int i;
 	struct cam_hw_soc_info    *soc_info;
+	int rc = 0;
+	struct cam_sensor_ctrl_t  *s_ctrl = i2c_get_clientdata(client);
 
 	if (!s_ctrl) {
 		CAM_ERR(CAM_SENSOR, "sensor device is NULL");
-		return 0;
+		rc = -EINVAL;
+		return rc;
 	}
 
 	CAM_DBG(CAM_SENSOR, "i2c remove invoked");
 	mutex_lock(&(s_ctrl->cam_sensor_mutex));
 	cam_sensor_shutdown(s_ctrl);
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
-	cam_unregister_subdev(&(s_ctrl->v4l2_dev_str));
+	rc = cam_unregister_subdev(&(s_ctrl->v4l2_dev_str));
+
+	if (rc)
+		CAM_ERR(CAM_SENSOR, "unregistering sensor subdev is not sucessful");
+
 	soc_info = &s_ctrl->soc_info;
+
 	for (i = 0; i < soc_info->num_clk; i++)
 		devm_clk_put(soc_info->dev, soc_info->clk[i]);
 
@@ -403,7 +417,7 @@ static int cam_sensor_driver_i2c_remove(struct i2c_client *client)
 	v4l2_set_subdevdata(&(s_ctrl->v4l2_dev_str.sd), NULL);
 	kfree(s_ctrl);
 
-	return 0;
+	return rc;
 }
 
 static const struct of_device_id cam_sensor_driver_dt_match[] = {

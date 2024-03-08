@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -625,42 +626,19 @@ static int32_t cam_cci_set_clk_param(struct cci_device *cci_dev,
 	struct cam_cci_clk_params_t *clk_params = NULL;
 	enum cci_i2c_master_t master = c_ctrl->cci_info->cci_i2c_master;
 	enum i2c_freq_mode i2c_freq_mode = c_ctrl->cci_info->i2c_freq_mode;
-	void __iomem *base = cci_dev->soc_info.reg_map[0].mem_base;
-	struct cam_cci_master_info *cci_master =
-		&cci_dev->cci_master_info[master];
+	struct cam_hw_soc_info *soc_info =
+		&cci_dev->soc_info;
+	void __iomem *base = soc_info->reg_map[0].mem_base;
 
 	if ((i2c_freq_mode >= I2C_MAX_MODES) || (i2c_freq_mode < 0)) {
 		CAM_ERR(CAM_CCI, "invalid i2c_freq_mode = %d", i2c_freq_mode);
 		return -EINVAL;
 	}
-	/*
-	 * If no change in i2c freq, then acquire semaphore only for the first
-	 * i2c transaction to indicate I2C transaction is in progress, else
-	 * always try to acquire semaphore, to make sure that no other I2C
-	 * transaction is in progress.
-	 */
-	mutex_lock(&cci_master->mutex);
-	if (i2c_freq_mode == cci_dev->i2c_freq_mode[master]) {
-		CAM_DBG(CAM_CCI, "Master: %d, curr_freq: %d", master,
-			i2c_freq_mode);
-		spin_lock(&cci_master->freq_cnt_lock);
-		if (cci_master->freq_ref_cnt == 0)
-			down(&cci_master->master_sem);
-		cci_master->freq_ref_cnt++;
-		spin_unlock(&cci_master->freq_cnt_lock);
-		mutex_unlock(&cci_master->mutex);
-		return 0;
-	}
-	CAM_DBG(CAM_CCI, "Master: %d, curr_freq: %d, req_freq: %d",
-		master, cci_dev->i2c_freq_mode[master], i2c_freq_mode);
-	down(&cci_master->master_sem);
-
-	spin_lock(&cci_master->freq_cnt_lock);
-	cci_master->freq_ref_cnt++;
-	spin_unlock(&cci_master->freq_cnt_lock);
 
 	clk_params = &cci_dev->cci_clk_params[i2c_freq_mode];
 
+	if (cci_dev->i2c_freq_mode[master] == i2c_freq_mode)
+		return 0;
 	if (master == MASTER_0) {
 		cam_io_w_mb(clk_params->hw_thigh << 16 |
 			clk_params->hw_tlow,
@@ -694,7 +672,6 @@ static int32_t cam_cci_set_clk_param(struct cci_device *cci_dev,
 	}
 	cci_dev->i2c_freq_mode[master] = i2c_freq_mode;
 
-	mutex_unlock(&cci_master->mutex);
 	return 0;
 }
 
@@ -862,15 +839,15 @@ static int32_t cam_cci_data_queue(struct cci_device *cci_dev,
 					case CAMERA_SENSOR_I2C_TYPE_DWORD:
 						data[i++] = (i2c_cmd->reg_data &
 							0xFF000000) >> 24;
-						/* fallthrough */
+						fallthrough;
 					case CAMERA_SENSOR_I2C_TYPE_3B:
 						data[i++] = (i2c_cmd->reg_data &
 							0x00FF0000) >> 16;
-						/* fallthrough */
+						fallthrough;
 					case CAMERA_SENSOR_I2C_TYPE_WORD:
 						data[i++] = (i2c_cmd->reg_data &
 							0x0000FF00) >> 8;
-						/* fallthrough */
+						fallthrough;
 					case CAMERA_SENSOR_I2C_TYPE_BYTE:
 						data[i++] = i2c_cmd->reg_data &
 							0x000000FF;
@@ -1197,7 +1174,7 @@ static int32_t cam_cci_burst_read(struct v4l2_subdev *sd,
 					CCI_I2C_M0_READ_BUF_LEVEL_ADDR +
 					master * 0x100);
 				CAM_ERR(CAM_CCI,
-					"wait timeout for RD_DONE irq for cci: %d, master: %d, rc = %d FIFO buf_lvl:0x%x, rc: %d",
+					"wait timeout for RD_DONE irq for cci: %d, master: %d, FIFO buf_lvl:0x%x, rc: %d",
 					cci_dev->soc_info.index, master,
 					val, rc);
 				cam_cci_dump_registers(cci_dev,
@@ -1513,6 +1490,13 @@ static void cam_cci_write_async_helper(struct work_struct *work)
 	cci_dev = write_async->cci_dev;
 	i2c_msg = &write_async->c_ctrl.cfg.cci_i2c_write_cfg;
 	master = write_async->c_ctrl.cci_info->cci_i2c_master;
+
+	if (master >= MASTER_MAX)
+	{
+		CAM_ERR(CAM_CCI, "master index value exceeded: %d", master);
+		master = NUM_MASTERS - 1;
+	}
+
 	cci_master_info = &cci_dev->cci_master_info[master];
 
 	mutex_lock(&cci_master_info->mutex_q[write_async->queue]);

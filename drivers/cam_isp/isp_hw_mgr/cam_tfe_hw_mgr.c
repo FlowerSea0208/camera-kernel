@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -8,6 +9,7 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <media/cam_tfe.h>
+
 #include "cam_smmu_api.h"
 #include "cam_req_mgr_workq.h"
 #include "cam_isp_hw_mgr_intf.h"
@@ -25,6 +27,7 @@
 #include "cam_compat.h"
 #include "cam_req_mgr_debug.h"
 #include "cam_trace.h"
+#include "cam_compat.h"
 
 #define CAM_TFE_HW_CONFIG_TIMEOUT 60
 #define CAM_TFE_HW_CONFIG_WAIT_MAX_TRY  3
@@ -37,6 +40,7 @@
 
 
 static struct cam_tfe_hw_mgr g_tfe_hw_mgr;
+static uint32_t g_num_tfe_available, g_num_tfe_functional;
 
 static int cam_tfe_hw_mgr_event_handler(
 	void                                *priv,
@@ -500,6 +504,20 @@ static void cam_tfe_hw_mgr_deinit_hw(
 	ctx->init_done = false;
 }
 
+static inline void cam_tfe_mgr_count_functional_tfe(void)
+{
+	int i;
+
+	g_num_tfe_functional = 0;
+
+	for (i = 0; i < CAM_TFE_HW_NUM_MAX; i++) {
+		if (g_tfe_hw_mgr.tfe_devices[i])
+			g_num_tfe_functional++;
+	}
+
+	CAM_DBG(CAM_ISP, "counted %u functional TFEs", g_num_tfe_functional);
+}
+
 static int cam_tfe_hw_mgr_init_hw(
 	struct cam_tfe_hw_mgr_ctx *ctx)
 {
@@ -743,7 +761,7 @@ static int cam_tfe_hw_mgr_release_hw_for_ctx(
 
 	/* clean up the callback function */
 	tfe_ctx->common.cb_priv = NULL;
-	memset(tfe_ctx->common.event_cb, 0, sizeof(tfe_ctx->common.event_cb));
+	tfe_ctx->common.event_cb = NULL;
 
 	CAM_DBG(CAM_ISP, "release context completed ctx id:%d",
 		tfe_ctx->ctx_index);
@@ -1893,6 +1911,7 @@ void cam_tfe_cam_cdm_callback(uint32_t handle, void *userdata,
 				ctx->last_submit_bl_cmd.cmd[i].input_len - 1);
 
 			cam_cdm_util_dump_cmd_buf(buf_start, buf_end);
+			cam_mem_put_cpu_buf(ctx->last_submit_bl_cmd.cmd[i].mem_handle);
 		}
 		if (ctx->packet != NULL)
 			cam_packet_dump_patch_info(ctx->packet,
@@ -2065,8 +2084,7 @@ static int cam_tfe_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	}
 
 	tfe_ctx->common.cb_priv = acquire_args->context_data;
-	for (i = 0; i < CAM_ISP_HW_EVENT_MAX; i++)
-		tfe_ctx->common.event_cb[i] = acquire_args->event_cb;
+	tfe_ctx->common.event_cb = acquire_args->event_cb;
 
 	tfe_ctx->hw_mgr = tfe_hw_mgr;
 
@@ -2302,8 +2320,7 @@ static int cam_tfe_mgr_acquire_dev(void *hw_mgr_priv, void *acquire_hw_args)
 	}
 
 	tfe_ctx->common.cb_priv = acquire_args->context_data;
-	for (i = 0; i < CAM_ISP_HW_EVENT_MAX; i++)
-		tfe_ctx->common.event_cb[i] = acquire_args->event_cb;
+	tfe_ctx->common.event_cb = acquire_args->event_cb;
 
 	tfe_ctx->hw_mgr = tfe_hw_mgr;
 
@@ -2632,7 +2649,7 @@ static int cam_isp_tfe_blob_bw_update(
 	}
 
 end:
-	kzfree(bw_upd_args);
+	cam_free_clear((void *)bw_upd_args);
 	bw_upd_args = NULL;
 	return rc;
 }
@@ -3585,6 +3602,7 @@ static int cam_tfe_mgr_dump(void *hw_mgr_priv, void *args)
 	}
 	dump_args->offset = isp_hw_dump_args.offset;
 	CAM_DBG(CAM_ISP, "offset %u", dump_args->offset);
+	cam_mem_put_cpu_buf(dump_args->buf_handle);
 	return rc;
 }
 
@@ -4183,6 +4201,7 @@ static int cam_tfe_update_dual_config(
 		(cmd_desc->offset >=
 			(len - sizeof(struct cam_isp_tfe_dual_config)))) {
 		CAM_ERR(CAM_ISP, "not enough buffer provided");
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 
@@ -4195,6 +4214,7 @@ static int cam_tfe_update_dual_config(
 		(remain_len -
 			offsetof(struct cam_isp_tfe_dual_config, stripes))) {
 		CAM_ERR(CAM_ISP, "not enough buffer for all the dual configs");
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 
@@ -4256,6 +4276,7 @@ static int cam_tfe_update_dual_config(
 	}
 
 end:
+	cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 	return rc;
 }
 
@@ -4910,7 +4931,6 @@ outportlog:
 	cam_tfe_mgr_print_io_bufs(hw_mgr, *resource_type, packet,
 		ctx_found, ctx);
 
-
 }
 
 static int cam_tfe_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
@@ -5341,7 +5361,6 @@ static int  cam_tfe_hw_mgr_find_affected_ctx(
 	struct cam_tfe_hw_mgr_ctx   *tfe_hwr_mgr_ctx = NULL;
 	cam_hw_event_cb_func         notify_err_cb;
 	struct cam_tfe_hw_mgr       *tfe_hwr_mgr = NULL;
-	enum cam_isp_hw_event_type   event_type = CAM_ISP_HW_EVENT_ERROR;
 	uint32_t i = 0;
 
 	if (!recovery_data) {
@@ -5370,7 +5389,7 @@ static int  cam_tfe_hw_mgr_find_affected_ctx(
 		}
 
 		atomic_set(&tfe_hwr_mgr_ctx->overflow_pending, 1);
-		notify_err_cb = tfe_hwr_mgr_ctx->common.event_cb[event_type];
+		notify_err_cb = tfe_hwr_mgr_ctx->common.event_cb;
 
 		/* Add affected_context in list of recovery data */
 		CAM_DBG(CAM_ISP, "Add affected ctx %d to list",
@@ -5569,8 +5588,7 @@ static int cam_tfe_hw_mgr_handle_hw_rup(
 	cam_hw_event_cb_func                     tfe_hwr_irq_rup_cb;
 	struct cam_isp_hw_reg_update_event_data  rup_event_data;
 
-	tfe_hwr_irq_rup_cb =
-		tfe_hw_mgr_ctx->common.event_cb[CAM_ISP_HW_EVENT_REG_UPDATE];
+	tfe_hwr_irq_rup_cb = tfe_hw_mgr_ctx->common.event_cb;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_TFE_IN_CAMIF:
@@ -5617,8 +5635,7 @@ static int cam_tfe_hw_mgr_handle_hw_epoch(
 	cam_hw_event_cb_func                  tfe_hw_irq_epoch_cb;
 	struct cam_isp_hw_epoch_event_data    epoch_done_event_data;
 
-	tfe_hw_irq_epoch_cb =
-		tfe_hw_mgr_ctx->common.event_cb[CAM_ISP_HW_EVENT_EPOCH];
+	tfe_hw_irq_epoch_cb = tfe_hw_mgr_ctx->common.event_cb;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_TFE_IN_CAMIF:
@@ -5654,8 +5671,7 @@ static int cam_tfe_hw_mgr_handle_hw_sof(
 	cam_hw_event_cb_func                  tfe_hw_irq_sof_cb;
 	struct cam_isp_hw_sof_event_data      sof_done_event_data;
 
-	tfe_hw_irq_sof_cb =
-		tfe_hw_mgr_ctx->common.event_cb[CAM_ISP_HW_EVENT_SOF];
+	tfe_hw_irq_sof_cb = tfe_hw_mgr_ctx->common.event_cb;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_TFE_IN_CAMIF:
@@ -5705,8 +5721,7 @@ static int cam_tfe_hw_mgr_handle_hw_eof(
 	cam_hw_event_cb_func                  tfe_hw_irq_eof_cb;
 	struct cam_isp_hw_eof_event_data      eof_done_event_data;
 
-	tfe_hw_irq_eof_cb =
-		tfe_hw_mgr_ctx->common.event_cb[CAM_ISP_HW_EVENT_EOF];
+	tfe_hw_irq_eof_cb = tfe_hw_mgr_ctx->common.event_cb;
 
 	switch (event_info->res_id) {
 	case CAM_ISP_HW_TFE_IN_CAMIF:
@@ -5749,8 +5764,7 @@ static int cam_tfe_hw_mgr_handle_hw_buf_done(
 	struct cam_isp_hw_done_event_data    buf_done_event_data = {0};
 	struct cam_isp_hw_event_info        *event_info = evt_info;
 
-	tfe_hwr_irq_wm_done_cb =
-		tfe_hw_mgr_ctx->common.event_cb[CAM_ISP_HW_EVENT_DONE];
+	tfe_hwr_irq_wm_done_cb = tfe_hw_mgr_ctx->common.event_cb;
 
 	buf_done_event_data.num_handles = 1;
 	buf_done_event_data.resource_handle[0] = event_info->res_id;
@@ -5911,31 +5925,26 @@ static int cam_tfe_hw_mgr_debug_register(void)
 	/* Store parent inode for cleanup in caller */
 	g_tfe_hw_mgr.debug_cfg.dentry = dbgfileptr;
 
-	dbgfileptr = debugfs_create_file("tfe_csid_debug", 0644,
+	debugfs_create_file("tfe_csid_debug", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry, NULL, &cam_tfe_csid_debug);
-	dbgfileptr = debugfs_create_u32("enable_recovery", 0644,
+	debugfs_create_u32("enable_recovery", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry,
 		&g_tfe_hw_mgr.debug_cfg.enable_recovery);
-	dbgfileptr = debugfs_create_u32("enable_reg_dump", 0644,
+	debugfs_create_u32("enable_reg_dump", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry,
 		&g_tfe_hw_mgr.debug_cfg.enable_reg_dump);
-	dbgfileptr = debugfs_create_u32("enable_csid_recovery", 0644,
+	debugfs_create_u32("enable_csid_recovery", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry,
 		&g_tfe_hw_mgr.debug_cfg.enable_csid_recovery);
-	dbgfileptr = debugfs_create_u32("set_tpg_pattern", 0644,
+	debugfs_create_u32("set_tpg_pattern", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry,
 		&g_tfe_hw_mgr.debug_cfg.set_tpg_pattern);
-	dbgfileptr = debugfs_create_file("tfe_camif_debug", 0644,
+	debugfs_create_file("tfe_camif_debug", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry, NULL, &cam_tfe_camif_debug);
-	dbgfileptr = debugfs_create_u32("per_req_reg_dump", 0644,
+	debugfs_create_u32("per_req_reg_dump", 0644,
 		g_tfe_hw_mgr.debug_cfg.dentry,
 		&g_tfe_hw_mgr.debug_cfg.per_req_reg_dump);
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_ISP, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
+
 end:
 	g_tfe_hw_mgr.debug_cfg.enable_recovery = 0;
 	return rc;
@@ -6146,6 +6155,14 @@ int cam_tfe_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 		*iommu_hdl = g_tfe_hw_mgr.mgr_common.img_iommu_hdl;
 
 	cam_tfe_hw_mgr_debug_register();
+	cam_tfe_mgr_count_functional_tfe();
+
+	cam_tfe_get_num_tfe_hws(&g_num_tfe_available);
+	rc = cam_cpas_prepare_subpart_info(CAM_IFE_HW_IDX, g_num_tfe_available,
+		g_num_tfe_functional);
+	if (rc)
+		CAM_ERR(CAM_ISP, "Failed to populate num_ifes, rc: %d", rc);
+
 	CAM_DBG(CAM_ISP, "Exit");
 
 	return 0;

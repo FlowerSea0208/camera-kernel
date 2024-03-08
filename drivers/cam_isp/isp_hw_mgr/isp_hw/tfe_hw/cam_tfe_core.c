@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -9,6 +10,7 @@
 #include <linux/timer.h>
 #include <linux/ratelimit.h>
 #include <media/cam_tfe.h>
+
 #include "cam_cdm_util.h"
 #include "cam_tasklet_util.h"
 #include "cam_isp_hw_mgr_intf.h"
@@ -17,6 +19,7 @@
 #include "cam_tfe_bus.h"
 #include "cam_debug_util.h"
 #include "cam_cpas_api.h"
+#include "cam_compat.h"
 
 static const char drv_name[] = "tfe";
 
@@ -48,11 +51,11 @@ struct cam_tfe_top_priv {
 		axi_vote_control[CAM_TFE_TOP_IN_PORT_MAX];
 	uint32_t                          irq_prepared_mask[3];
 	void                            *tasklet_info;
-	struct timeval                    sof_ts;
-	struct timeval                    epoch_ts;
-	struct timeval                    eof_ts;
-	struct timeval                    error_ts;
-	uint32_t                          top_debug;
+	struct timespec64                sof_ts;
+	struct timespec64                epoch_ts;
+	struct timespec64                eof_ts;
+	struct timespec64                error_ts;
+	uint32_t                         top_debug;
 };
 
 struct cam_tfe_camif_data {
@@ -175,11 +178,11 @@ int cam_tfe_get_hw_caps(void *hw_priv, void *get_hw_cap_args,
 
 void cam_tfe_get_timestamp(struct cam_isp_timestamp *time_stamp)
 {
-	struct timespec ts;
+	struct timespec64 ts;
 
-	ts = ktime_to_timespec(ktime_get_boottime());
+	ktime_get_boottime_ts64(&ts);
 	time_stamp->mono_time.tv_sec    = ts.tv_sec;
-	time_stamp->mono_time.tv_usec   = ts.tv_nsec/1000;
+	time_stamp->mono_time.tv_nsec   = ts.tv_nsec;
 }
 
 int cam_tfe_irq_config(void     *tfe_core_data,
@@ -326,13 +329,13 @@ static void cam_tfe_log_error_irq_status(
 	CAM_INFO(CAM_ISP,
 		"ERROR time %lld:%lld SOF %lld:%lld EPOCH %lld:%lld EOF %lld:%lld",
 		top_priv->error_ts.tv_sec,
-		top_priv->error_ts.tv_usec,
+		top_priv->error_ts.tv_nsec/NSEC_PER_USEC,
 		top_priv->sof_ts.tv_sec,
-		top_priv->sof_ts.tv_usec,
+		top_priv->sof_ts.tv_nsec/NSEC_PER_USEC,
 		top_priv->epoch_ts.tv_sec,
-		top_priv->epoch_ts.tv_usec,
+		top_priv->epoch_ts.tv_nsec/NSEC_PER_USEC,
 		top_priv->eof_ts.tv_sec,
-		top_priv->eof_ts.tv_usec);
+		top_priv->eof_ts.tv_nsec/NSEC_PER_USEC);
 
 	val_0 = cam_io_r(mem_base  +
 		top_priv->common_data.common_reg->debug_0);
@@ -350,10 +353,7 @@ static void cam_tfe_log_error_irq_status(
 	CAM_INFO(CAM_ISP, "Top debug [0]:0x%x [1]:0x%x [2]:0x%x [3]:0x%x",
 		val_0, val_1, val_2, val_3);
 
-	cam_cpas_reg_read(soc_private->cpas_handle,
-		CAM_CPAS_REG_CAMNOC, 0x20, true, &val_0);
-	CAM_INFO(CAM_ISP, "tfe_niu_MaxWr_Low offset 0x20 val 0x%x",
-		val_0);
+	cam_cpas_dump_camnoc_buff_fill_info(soc_private->cpas_handle);
 
 	val_0 = cam_io_r(mem_base  +
 		top_priv->common_data.common_reg->perf_pixel_count);
@@ -477,8 +477,8 @@ static int cam_tfe_error_irq_bottom_half(
 		evt_info.err_type = CAM_TFE_IRQ_STATUS_OVERFLOW;
 		top_priv->error_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->error_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->error_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		cam_tfe_log_error_irq_status(core_info, top_priv, evt_payload);
 		if (event_cb)
@@ -516,8 +516,8 @@ static int cam_tfe_rdi_irq_bottom_half(
 		CAM_DBG(CAM_ISP, "Received EOF");
 		top_priv->eof_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->eof_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->eof_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (rdi_priv->event_cb)
 			rdi_priv->event_cb(rdi_priv->priv,
@@ -529,8 +529,8 @@ static int cam_tfe_rdi_irq_bottom_half(
 		CAM_DBG(CAM_ISP, "Received SOF");
 		top_priv->sof_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->sof_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->sof_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (rdi_priv->event_cb)
 			rdi_priv->event_cb(rdi_priv->priv,
@@ -559,8 +559,8 @@ static int cam_tfe_rdi_irq_bottom_half(
 		CAM_DBG(CAM_ISP, "Received EPOCH0");
 		top_priv->epoch_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->epoch_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->epoch_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (rdi_priv->event_cb)
 			rdi_priv->event_cb(rdi_priv->priv,
@@ -594,8 +594,8 @@ static int cam_tfe_camif_irq_bottom_half(
 
 		top_priv->eof_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->eof_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->eof_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (camif_priv->event_cb)
 			camif_priv->event_cb(camif_priv->priv,
@@ -621,8 +621,8 @@ static int cam_tfe_camif_irq_bottom_half(
 
 		top_priv->sof_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->sof_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->sof_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (camif_priv->event_cb)
 			camif_priv->event_cb(camif_priv->priv,
@@ -652,8 +652,8 @@ static int cam_tfe_camif_irq_bottom_half(
 
 		top_priv->epoch_ts.tv_sec =
 			evt_payload->ts.mono_time.tv_sec;
-		top_priv->epoch_ts.tv_usec =
-			evt_payload->ts.mono_time.tv_usec;
+		top_priv->epoch_ts.tv_nsec =
+			evt_payload->ts.mono_time.tv_nsec;
 
 		if (camif_priv->event_cb)
 			camif_priv->event_cb(camif_priv->priv,
@@ -1219,7 +1219,7 @@ static int cam_tfe_top_set_axi_bw_vote(
 	}
 
 free_mem:
-	kzfree(agg_vote);
+	cam_free_clear((void *)agg_vote);
 	agg_vote = NULL;
 	return rc;
 }
@@ -2194,7 +2194,7 @@ int cam_tfe_top_start(struct cam_tfe_hw_core_info *core_info,
 
 	if (in_res->res_id == CAM_ISP_HW_TFE_IN_CAMIF) {
 		cam_tfe_camif_resource_start(core_info, in_res);
-	} else if (in_res->res_id >= CAM_ISP_HW_TFE_IN_RDI0 ||
+	} else if (in_res->res_id >= CAM_ISP_HW_TFE_IN_RDI0 &&
 		in_res->res_id <= CAM_ISP_HW_TFE_IN_RDI2) {
 		rsrc_rdi_data = (struct cam_tfe_rdi_data *) in_res->res_priv;
 		val = (rsrc_rdi_data->pix_pattern <<
@@ -2242,13 +2242,13 @@ int cam_tfe_top_start(struct cam_tfe_hw_core_info *core_info,
 			core_info->tfe_hw_info->error_irq_mask,
 			CAM_TFE_TOP_IRQ_REG_NUM, true);
 		top_priv->error_ts.tv_sec = 0;
-		top_priv->error_ts.tv_usec = 0;
+		top_priv->error_ts.tv_nsec = 0;
 		top_priv->sof_ts.tv_sec = 0;
-		top_priv->sof_ts.tv_usec = 0;
+		top_priv->sof_ts.tv_nsec = 0;
 		top_priv->epoch_ts.tv_sec = 0;
-		top_priv->epoch_ts.tv_usec = 0;
+		top_priv->epoch_ts.tv_nsec = 0;
 		top_priv->eof_ts.tv_sec = 0;
-		top_priv->eof_ts.tv_usec = 0;
+		top_priv->eof_ts.tv_nsec = 0;
 	}
 
 end:

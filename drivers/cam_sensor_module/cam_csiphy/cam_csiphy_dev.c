@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_csiphy_dev.h"
@@ -8,7 +9,7 @@
 #include "cam_csiphy_soc.h"
 #include "cam_csiphy_core.h"
 #include <media/cam_sensor.h>
-#include <dt-bindings/msm/msm-camera.h>
+#include <dt-bindings/msm-camera.h>
 #include "camera_main.h"
 
 static struct dentry *root_dentry;
@@ -58,15 +59,9 @@ static int cam_csiphy_debug_register(struct csiphy_device *csiphy_dev)
 	snprintf(debugfs_name, 25, "%s%d%s", "csiphy",
 		csiphy_dev->soc_info.index,
 		"_en_irq_dump");
-	dbgfileptr = debugfs_create_bool(debugfs_name, 0644,
+	debugfs_create_bool(debugfs_name, 0644,
 		root_dentry, &csiphy_dev->enable_irq_dump);
 
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_CSIPHY, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
 end:
 	return rc;
 }
@@ -236,7 +231,7 @@ static int cam_csiphy_component_bind(struct device *dev,
 		!cam_cpas_is_feature_supported(
 			CAM_CPAS_CSIPHY_FUSE,
 			(1 << new_csiphy_dev->soc_info.index), NULL)) {
-		CAM_ERR(CAM_CSIPHY, "PHY%d is not supported: %d",
+		CAM_ERR(CAM_CSIPHY, "PHY%d is not supported",
 			new_csiphy_dev->soc_info.index);
 		goto csiphy_no_resource;
 	}

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -19,10 +20,15 @@ int cam_flash_led_prepare(struct led_trigger *trigger, int options,
 	int *max_current, bool is_wled)
 {
 	int rc = 0;
+	int cmd = 0;
 
 	if (is_wled) {
 #if IS_REACHABLE(CONFIG_BACKLIGHT_QCOM_SPMI_WLED)
-		rc = wled_flash_led_prepare(trigger, options, max_current);
+
+	if (options == QUERY_CURRENT) {
+		cmd = QUERY_CURRENT_VAL;
+	}
+		rc = wled_flash_led_prepare(trigger, cmd, max_current);
 		if (rc) {
 			CAM_ERR(CAM_FLASH, "enable reg failed: rc: %d",
 				rc);
@@ -33,13 +39,24 @@ int cam_flash_led_prepare(struct led_trigger *trigger, int options,
 #endif
 	} else {
 #if IS_REACHABLE(CONFIG_LEDS_QPNP_FLASH_V2)
-		rc = qpnp_flash_led_prepare(trigger, options, max_current);
+
+		if (options == QUERY_CURRENT) {
+			cmd = QUERY_CURRENT_VAL;
+		}
+
+		rc = qpnp_flash_led_prepare(trigger, cmd, max_current);
 #elif IS_REACHABLE(CONFIG_LEDS_QTI_FLASH)
-		rc = qti_flash_led_prepare(trigger, options, max_current);
+
+		if (options == QUERY_CURRENT) {
+			cmd = QUERY_CURRENT_VAL;
+		}
+
+		rc = qti_flash_led_prepare(trigger, cmd, max_current);
 #endif
 		if (rc) {
 			CAM_ERR(CAM_FLASH,
-				"Regulator enable failed rc = %d", rc);
+				"Regulator enable failed rc = %d cmd = %d",
+                                rc, cmd);
 			return rc;
 		}
 	}
@@ -1060,6 +1077,10 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 		/* Loop through multiple command buffers */
 		for (i = 1; i < csl_packet->num_cmd_buf; i++) {
+			rc = cam_packet_util_validate_cmd_desc(&cmd_desc[i]);
+			if (rc)
+				return rc;
+
 			total_cmd_buf_in_bytes = cmd_desc[i].length;
 			processed_cmd_buf_in_bytes = 0;
 			if (!total_cmd_buf_in_bytes)
@@ -1172,6 +1193,7 @@ int cam_flash_i2c_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 
 				break;
 			}
+			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 		}
 		power_info = &fctrl->power_info;
 		if (!power_info) {
@@ -1369,6 +1391,7 @@ update_req_mgr:
 				add_req.req_id, add_req.trigger_eof);
 		}
 	}
+	cam_mem_put_cpu_buf(config.packet_handle);
 	return rc;
 }
 
@@ -1545,6 +1568,8 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 			rc = -EINVAL;
 			return rc;
 		}
+
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		break;
 	}
 	case CAM_FLASH_PACKET_OPCODE_SET_OPS: {
@@ -1652,6 +1677,8 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 			rc = -EINVAL;
 			return rc;
 		}
+
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		break;
 	}
 	case CAM_FLASH_PACKET_OPCODE_NON_REALTIME_SET_OPS: {
@@ -1731,7 +1758,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 				(struct cam_flash_query_curr *)cmd_buf;
 
 			rc = cam_flash_led_prepare(fctrl->switch_trigger,
-				QUERY_MAX_AVAIL_CURRENT, &query_curr_ma,
+				QUERY_CURRENT, &query_curr_ma,
 				soc_private->is_wled_flash);
 
 			CAM_DBG(CAM_FLASH, "query_curr_ma = %d",
@@ -1794,6 +1821,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 			return rc;
 		}
 
+		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		break;
 	}
 	case CAM_PKT_NOP_OPCODE: {
@@ -1856,6 +1884,7 @@ int cam_flash_pmic_pkt_parser(struct cam_flash_ctrl *fctrl, void *arg)
 		}
 	}
 
+	cam_mem_put_cpu_buf(config.packet_handle);
 	return rc;
 }
 

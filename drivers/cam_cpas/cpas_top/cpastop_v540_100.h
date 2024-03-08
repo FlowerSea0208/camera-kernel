@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CPASTOP_V540_100_H_
@@ -82,6 +83,7 @@ static struct cam_camnoc_specific
 	cam_cpas_v540_100_camnoc_specific[] = {
 	{
 		.port_type = CAM_CAMNOC_CDM,
+		.port_name = "CDM",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -130,6 +132,7 @@ static struct cam_camnoc_specific
 	},
 	{
 		.port_type = CAM_CAMNOC_TFE,
+		.port_name = "TFE",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -180,9 +183,17 @@ static struct cam_camnoc_specific
 			.enable = false,
 			.is_fuse_based = false,
 		},
+		.maxwr_low = {
+			.enable = true,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x20, /* TFE_MAXWR_LOW */
+			.value = 0x0,
+		},
 	},
 	{
 		.port_type = CAM_CAMNOC_OPE,
+		.port_name = "OPE",
 		.enable = true,
 		.priority_lut_low = {
 			.enable = true,
@@ -229,6 +240,13 @@ static struct cam_camnoc_specific
 			 */
 			.enable = false,
 			.is_fuse_based = false,
+		},
+		.maxwr_low = {
+			.enable = false,
+			.access_type = CAM_REG_TYPE_READ,
+			.masked_value = 0,
+			.offset = 0x420, /* OPE_MAXWR_LOW */
+			.value = 0x0,
 		},
 	},
 };

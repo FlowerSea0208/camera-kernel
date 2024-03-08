@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -69,6 +70,7 @@ enum cam_cpas_camera_version {
 	CAM_CPAS_CAMERA_VERSION_570  = 0x00050700,
 	CAM_CPAS_CAMERA_VERSION_680  = 0x00060800,
 	CAM_CPAS_CAMERA_VERSION_165  = 0x00010605,
+	CAM_CPAS_CAMERA_VERSION_346  = 0x00030406,
 	CAM_CPAS_CAMERA_VERSION_MAX
 };
 
@@ -102,6 +104,7 @@ enum cam_cpas_camera_version_map_id {
 	CAM_CPAS_CAMERA_VERSION_ID_570  = 0x8,
 	CAM_CPAS_CAMERA_VERSION_ID_680  = 0x9,
 	CAM_CPAS_CAMERA_VERSION_ID_165  = 0xA,
+	CAM_CPAS_CAMERA_VERSION_ID_346  = 0xB,
 	CAM_CPAS_CAMERA_VERSION_ID_MAX
 };
 
@@ -134,6 +137,7 @@ enum cam_cpas_hw_version {
 	CAM_CPAS_TITAN_175_V101 = 0x175101,
 	CAM_CPAS_TITAN_175_V120 = 0x175120,
 	CAM_CPAS_TITAN_175_V130 = 0x175130,
+	CAM_CPAS_TITAN_346_V100 = 0x346100,
 	CAM_CPAS_TITAN_480_V100 = 0x480100,
 	CAM_CPAS_TITAN_580_V100 = 0x580100,
 	CAM_CPAS_TITAN_540_V100 = 0x540100,
@@ -210,6 +214,16 @@ enum cam_camnoc_irq_type {
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_DECODE_ERROR,
 	CAM_CAMNOC_IRQ_IPE_BPS_UBWC_ENCODE_ERROR,
 	CAM_CAMNOC_IRQ_AHB_TIMEOUT,
+};
+
+/**
+ * enum cam_subparts_index - Enum for camera subparts indices
+ */
+enum cam_subparts_index {
+	CAM_IFE_HW_IDX,
+	CAM_IFE_LITE_HW_IDX,
+	CAM_SFE_HW_IDX,
+	CAM_CUSTOM_HW_IDX
 };
 
 /**
@@ -463,6 +477,23 @@ struct cam_axi_vote {
 	uint32_t num_paths;
 	struct cam_axi_per_path_bw_vote axi_path[CAM_CPAS_MAX_PATHS_PER_CLIENT];
 };
+
+/**
+ * cam_cpas_prepare_subpart_info()
+ *
+ * @brief: API to update the number of ifes, ife_lites, sfes and custom
+ *         in the struct cam_cpas_private_soc.
+ *
+ * @idx                   : Camera subpart index
+ * @num_subpart_available : Number of available subparts
+ * @num_subpart_functional: Number of functional subparts
+ *
+ * @returns 0 on success & -EINVAL when @subpart_type is invalid.
+ *
+ */
+int cam_cpas_prepare_subpart_info(
+	enum cam_subparts_index idx, uint32_t num_subpart_available,
+	uint32_t num_subpart_functional);
 
 /**
  * cam_cpas_register_client()
@@ -749,5 +780,17 @@ int cam_cpas_notify_event(const char *identifier_string,
 int cam_cpas_hw_get_camnoc_fill_level_info(
 	uint32_t cpas_version,
 	uint32_t client_handle);
+
+/**
+ * cam_cpas_dump_camnoc_buff_fill_info()
+ *
+ * @brief: API to dump camnoc buffer fill level info
+ *
+ * @client_handle : Client cpas handle
+ *
+ * @return 0 on success
+ *
+ */
+int cam_cpas_dump_camnoc_buff_fill_info(uint32_t client_handle);
 
 #endif /* _CAM_CPAS_API_H_ */

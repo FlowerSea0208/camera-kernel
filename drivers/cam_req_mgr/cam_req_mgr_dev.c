@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -10,15 +11,12 @@
 #include <linux/types.h>
 #include <linux/rwsem.h>
 
-#include <mm/slab.h>
-
 #include <media/v4l2-fh.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
 #include <media/cam_req_mgr.h>
 #include <media/cam_defs.h>
-#include <linux/list_sort.h>
 
 #include "cam_req_mgr_dev.h"
 #include "cam_req_mgr_util.h"
@@ -473,6 +471,7 @@ static long cam_private_ioctl(struct file *file, void *fh,
 		break;
 	case CAM_REQ_MGR_ALLOC_BUF: {
 		struct cam_mem_mgr_alloc_cmd cmd;
+		struct cam_mem_mgr_alloc_cmd_v2 cmd_v2 = {0};
 
 		if (k_ioctl->size != sizeof(cmd))
 			return -EINVAL;
@@ -484,7 +483,16 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			break;
 		}
 
-		rc = cam_mem_mgr_alloc_and_map(&cmd);
+		strscpy(cmd_v2.buf_name, "UNKNOWN", CAM_DMA_BUF_NAME_LEN);
+		memcpy(cmd_v2.mmu_hdls, cmd.mmu_hdls,
+			sizeof(__s32) * CAM_MEM_MMU_MAX_HANDLE);
+		cmd_v2.num_hdl = cmd.num_hdl;
+		cmd_v2.flags = cmd.flags;
+		cmd_v2.len = cmd.len;
+		cmd_v2.align = cmd.align;
+
+		rc = cam_mem_mgr_alloc_and_map(&cmd_v2);
+		memcpy(&cmd.out, &cmd_v2.out, sizeof(cmd.out));
 		if (!rc)
 			if (copy_to_user(
 				u64_to_user_ptr(k_ioctl->handle),
@@ -494,8 +502,32 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			}
 		}
 		break;
+	case CAM_REQ_MGR_ALLOC_BUF_V2: {
+		struct cam_mem_mgr_alloc_cmd_v2 cmd;
+
+		if (k_ioctl->size != sizeof(cmd))
+			return -EINVAL;
+
+		if (copy_from_user(&cmd,
+			u64_to_user_ptr(k_ioctl->handle),
+			sizeof(struct cam_mem_mgr_alloc_cmd_v2))) {
+			rc = -EFAULT;
+			break;
+		}
+
+		rc = cam_mem_mgr_alloc_and_map(&cmd);
+		if (!rc)
+			if (copy_to_user(
+				u64_to_user_ptr(k_ioctl->handle),
+				&cmd, sizeof(struct cam_mem_mgr_alloc_cmd_v2))) {
+				rc = -EFAULT;
+				break;
+			}
+		}
+		break;
 	case CAM_REQ_MGR_MAP_BUF: {
 		struct cam_mem_mgr_map_cmd cmd;
+		struct cam_mem_mgr_map_cmd_v2 cmd_v2 = {0};
 
 		if (k_ioctl->size != sizeof(cmd))
 			return -EINVAL;
@@ -507,11 +539,42 @@ static long cam_private_ioctl(struct file *file, void *fh,
 			break;
 		}
 
-		rc = cam_mem_mgr_map(&cmd);
+		strscpy(cmd_v2.buf_name, "UNKNOWN", CAM_DMA_BUF_NAME_LEN);
+		memcpy(cmd_v2.mmu_hdls, cmd.mmu_hdls,
+			sizeof(__s32) * CAM_MEM_MMU_MAX_HANDLE);
+		cmd_v2.num_hdl = cmd.num_hdl;
+		cmd_v2.flags = cmd.flags;
+		cmd_v2.fd = cmd.fd;
+
+		rc = cam_mem_mgr_map(&cmd_v2);
+		memcpy(&cmd.out, &cmd_v2.out, sizeof(cmd.out));
 		if (!rc)
 			if (copy_to_user(
 				u64_to_user_ptr(k_ioctl->handle),
 				&cmd, sizeof(struct cam_mem_mgr_map_cmd))) {
+				rc = -EFAULT;
+				break;
+			}
+		}
+		break;
+	case CAM_REQ_MGR_MAP_BUF_V2: {
+		struct cam_mem_mgr_map_cmd_v2 cmd;
+
+		if (k_ioctl->size != sizeof(cmd))
+			return -EINVAL;
+
+		if (copy_from_user(&cmd,
+			u64_to_user_ptr(k_ioctl->handle),
+			sizeof(struct cam_mem_mgr_map_cmd_v2))) {
+			rc = -EFAULT;
+			break;
+		}
+
+		rc = cam_mem_mgr_map(&cmd);
+		if (!rc)
+			if (copy_to_user(
+				u64_to_user_ptr(k_ioctl->handle),
+				&cmd, sizeof(struct cam_mem_mgr_map_cmd_v2))) {
 				rc = -EFAULT;
 				break;
 			}
@@ -624,9 +687,9 @@ static int cam_video_device_setup(void)
 	g_dev.video->fops = &g_cam_fops;
 	g_dev.video->ioctl_ops = &g_cam_ioctl_ops;
 	g_dev.video->minor = -1;
-	g_dev.video->vfl_type = VFL_TYPE_GRABBER;
+	g_dev.video->vfl_type = VFL_TYPE_VIDEO;
 	g_dev.video->device_caps |= V4L2_CAP_VIDEO_CAPTURE;
-	rc = video_register_device(g_dev.video, VFL_TYPE_GRABBER, -1);
+	rc = video_register_device(g_dev.video, VFL_TYPE_VIDEO, -1);
 	if (rc) {
 		CAM_ERR(CAM_CRM,
 			"video device registration failure rc = %d, name = %s, device_caps = %d",
@@ -697,24 +760,6 @@ void cam_subdev_notify_message(u32 subdev_type,
 	}
 }
 EXPORT_SYMBOL(cam_subdev_notify_message);
-
-
-static int cam_req_mgr_ordered_list_cmp(void *priv,
-	struct list_head *head_1, struct list_head *head_2)
-{
-	struct cam_subdev *entry_1 =
-		list_entry(head_1, struct cam_subdev, list);
-	struct cam_subdev *entry_2 =
-		list_entry(head_2, struct cam_subdev, list);
-	int ret = -1;
-
-	if (entry_1->close_seq_prior > entry_2->close_seq_prior)
-		return 1;
-	else if (entry_1->close_seq_prior < entry_2->close_seq_prior)
-		return ret;
-	else
-		return 0;
-}
 
 bool cam_req_mgr_is_open(uint64_t dev_id)
 {
@@ -856,16 +901,13 @@ static int cam_req_mgr_component_master_bind(struct device *dev)
 	INIT_LIST_HEAD(&cam_req_mgr_ordered_sd_list);
 
 	if (g_cam_req_mgr_timer_cachep == NULL) {
-		g_cam_req_mgr_timer_cachep = kmem_cache_create("crm_timer",
-			sizeof(struct cam_req_mgr_timer), 64,
-			SLAB_CONSISTENCY_CHECKS | SLAB_RED_ZONE |
-			SLAB_POISON | SLAB_STORE_USER, NULL);
+		g_cam_req_mgr_timer_cachep = KMEM_CACHE(cam_req_mgr_timer, 0x0);
+
 		if (!g_cam_req_mgr_timer_cachep)
 			CAM_ERR(CAM_CRM,
 				"Failed to create kmem_cache for crm_timer");
 		else
-			CAM_DBG(CAM_CRM, "Name : %s",
-				g_cam_req_mgr_timer_cachep->name);
+			CAM_DBG(CAM_CRM, "Name : cam_req_mgr_timer");
 	}
 
 	CAM_INFO(CAM_CRM, "All probes done, binding slave components");

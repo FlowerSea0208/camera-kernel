@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPASTOP_HW_H_
@@ -8,6 +9,10 @@
 
 #include "cam_cpas_api.h"
 #include "cam_cpas_hw.h"
+
+/* Camera Hw parts array indices */
+#define CAM_CPAS_PART_MAX_FUSE_BITS 8
+#define CAM_CPAS_PART_MAX_FUSE_BIT_INFO 2
 
 /**
  * enum cam_camnoc_hw_irq_type - Enum for camnoc error types
@@ -200,6 +205,7 @@ enum cam_camnoc_port_type {
  * struct cam_camnoc_specific : CPAS camnoc specific settings
  *
  * @port_type: Port type
+ * @port_name: Port name
  * @enable: Whether to enable settings for this connection
  * @priority_lut_low: Priority Low LUT mapping for this connection
  * @priority_lut_high: Priority High LUT mapping for this connection
@@ -210,10 +216,12 @@ enum cam_camnoc_port_type {
  * @qosgen_mainctl: qosgen shaping control configuration for this connection
  * @qosgen_shaping_low: qosgen shaping low configuration for this connection
  * @qosgen_shaping_high: qosgen shaping high configuration for this connection
+ * @maxwr_low: maxwr low configuration for this connection
  *
  */
 struct cam_camnoc_specific {
 	enum cam_camnoc_port_type port_type;
+	const char *port_name;
 	bool enable;
 	struct cam_cpas_reg priority_lut_low;
 	struct cam_cpas_reg priority_lut_high;
@@ -225,6 +233,7 @@ struct cam_camnoc_specific {
 	struct cam_cpas_reg qosgen_mainctl;
 	struct cam_cpas_reg qosgen_shaping_low;
 	struct cam_cpas_reg qosgen_shaping_high;
+	struct cam_cpas_reg maxwr_low;
 };
 
 /**
@@ -273,6 +282,18 @@ struct cam_cpas_hw_errata_wa {
 	union {
 		struct cam_cpas_reg reg_info;
 	} data;
+};
+
+/**
+ * struct cam_cpas_subpart_info : Struct for camera Hw parts info
+ *
+ * @num_bits: Number of entries in hw_bitmap_mask
+ * @hw_bitmap_mask: Contains Fuse flag and hw_map info
+ *
+ */
+struct cam_cpas_subpart_info {
+	uint32_t num_bits;
+	uint32_t hw_bitmap_mask[CAM_CPAS_PART_MAX_FUSE_BITS][CAM_CPAS_PART_MAX_FUSE_BIT_INFO];
 };
 
 /**
