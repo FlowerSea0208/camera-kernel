@@ -406,6 +406,9 @@ struct cam_ife_hw_concrete_ctx  {
 	atomic_t                                   ctx_state;
 	bool                                       is_offline;
 	uint32_t                                   offline_clk;
+	bool                                       waiting_start;
+	uint32_t                                   start_ctx_idx;
+
 };
 
 /**

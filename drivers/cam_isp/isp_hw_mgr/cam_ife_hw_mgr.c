@@ -15515,6 +15515,9 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 				(state == CAM_IFE_HW_STATE_STARTED &&
 					is_init_pkt)))
 				continue;
+			if (ife_ctx->waiting_start &&
+				c_elem->ctx_idx != ife_ctx->start_ctx_idx)
+				continue;
 			if (ife_hw_mgr->starting_offline_cnt == 0 &&
 				c_elem->request_id == 0) {
 				c_elem->hw_id = ife_ctx->acquired_hw_id;
@@ -15562,8 +15565,12 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			 * so restore state
 			 */
 			if (c_elem->cfg.request_id != 0) {
+				ife_ctx->waiting_start = false;
 				atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_BUSY);
+			} else {
+				ife_ctx->waiting_start = true;
+				ife_ctx->start_ctx_idx = c_elem->ctx_idx;
 			}
 		}
 	}
@@ -15740,11 +15747,13 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 		ife_mgr_ctx->is_offline = true;
 		ife_mgr_ctx->unpacker_fmt = ife_mgr_ctx->bw_data.format;
 		allocated = false;
+		mutex_lock(&ife_hw_mgr->ctx_mutex);
 		ctx_idx =
 			atomic_read(&ife_hw_mgr->num_acquired_offline_ctx);
 		/* TODO: update the condition for allocating additional HWs */
 		if (ctx_idx <
 			cam_ife_mgr_required_offline_hw(hw_mgr_priv, false)) {
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
 			rc =  cam_ife_mgr_acquire(hw_mgr_priv, acq_args_ptr);
 			if (rc) {
 				if (!ctx_idx) {
@@ -15759,6 +15768,8 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 					&ife_hw_mgr->num_acquired_offline_ctx);
 				allocated = true;
 			}
+		} else {
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
 		}
 
 		CAM_ERR(CAM_ISP, "Total IFEs used for offline: %d",
@@ -15773,6 +15784,8 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 			ife_mgr_ctx->hw_mgr = ife_mgr_ctx->concr_ctx->hw_mgr;
 
 			acquired_hw_data->ife_ctx->offline_clk = 0;
+			acquired_hw_data->ife_ctx->waiting_start = false;
+
 			acquired_hw_data->valid_acquired_hw =
 				acq_args_ptr->valid_acquired_hw;
 			memcpy(&acquired_hw_data->acquired_hw_id,
@@ -15829,6 +15842,9 @@ static int cam_ife_mgr_v_start_hw(void *hw_mgr_priv, void *start_hw_args)
 	}
 	hw_mgr_ctx = (struct cam_ife_hw_mgr_ctx *)
 		start_isp->hw_config.ctxt_to_hw_map;
+
+	mutex_lock(&ife_hw_mgr->ctx_mutex);
+
 	if (hw_mgr_ctx->is_offline) {
 		num_ctx = atomic_read(&ife_hw_mgr->num_acquired_offline_ctx);
 		for (i = 0; i < num_ctx; i++) {
@@ -15842,9 +15858,14 @@ static int cam_ife_mgr_v_start_hw(void *hw_mgr_priv, void *start_hw_args)
 			}
 		}
 		/* All contexts are started - no op */
-		if (i == num_ctx)
+		if (i == num_ctx) {
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
 			return 0;
+		}
 	}
+
+	mutex_unlock(&ife_hw_mgr->ctx_mutex);
+
 	return cam_ife_mgr_start_hw(hw_mgr_priv, start_hw_args);
 }
 static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
