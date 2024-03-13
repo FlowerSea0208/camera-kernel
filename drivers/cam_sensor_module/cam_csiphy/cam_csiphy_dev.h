@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CSIPHY_DEV_H_
@@ -444,6 +444,7 @@ struct csiphy_device {
 	struct msm_cam_clk_info                  csiphy_3p_clk_info[2];
 	struct clk                              *csiphy_3p_clk[2];
 	int32_t                                  ref_count;
+	uint32_t                                 share_count;
 	struct cam_subdev                        v4l2_dev_str;
 	struct cam_csiphy_param                  csiphy_info[
 					CSIPHY_MAX_INSTANCES_PER_PHY];

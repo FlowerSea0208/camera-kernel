@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SENSOR_DEV_H_
@@ -89,6 +89,7 @@ struct cam_sensor_dev_res_info {
  * @io_master_info: Information about the communication master
  * @sensor_state: Sensor states
  * @is_probe_succeed: Probe succeeded or not
+ * @is_always_on: sensor need always on or not
  * @id: Cell Index
  * @is_i3c_device: A Flag to indicate whether this sensor is an I3C Device.
  * @of_node: Of node ptr
@@ -122,6 +123,7 @@ struct cam_sensor_ctrl_t {
 	struct camera_io_master        io_master_info;
 	enum cam_sensor_state_t        sensor_state;
 	uint8_t                        is_probe_succeed;
+	uint8_t                        is_always_on;
 	uint32_t                       id;
 	bool                           is_i3c_device;
 	struct device_node            *of_node;
