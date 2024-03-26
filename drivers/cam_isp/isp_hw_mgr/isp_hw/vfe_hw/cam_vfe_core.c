@@ -566,6 +566,14 @@ int cam_vfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 			core_info->vfe_top->top_priv, cmd_type, cmd_args,
 			arg_size);
 		break;
+	case CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS:
+		if (core_info->vfe_rd_bus)
+			rc = core_info->vfe_rd_bus->hw_ops.process_cmd(
+				core_info->vfe_rd_bus->bus_priv, cmd_type,
+				cmd_args, arg_size);
+		else
+			rc = -EINVAL;
+		break;
 	default:
 		CAM_ERR(CAM_ISP, "Invalid cmd type:%d", cmd_type);
 		rc = -EINVAL;

@@ -4140,7 +4140,8 @@ static bool cam_ife_mgr_check_for_sfe_rd(
 static int cam_ife_mgr_check_and_update_fe_v2(
 	struct cam_ife_hw_mgr_ctx         *ife_ctx,
 	struct cam_isp_acquire_hw_info    *acquire_hw_info,
-	uint32_t                           acquire_info_size)
+	uint32_t                           acquire_info_size,
+	struct cam_ife_mgr_bw_data        *bw_data)
 {
 	int i;
 	bool is_sfe_rd = false, fetch_cfg = false;
@@ -4199,8 +4200,13 @@ static int cam_ife_mgr_check_and_update_fe_v2(
 			c_ctx->flags.is_fe_enabled = true;
 
 			/* Check for offline */
-			if (in_port->offline_mode)
+			if (in_port->offline_mode) {
 				c_ctx->flags.is_offline = true;
+				bw_data->format = in_port->format;
+				bw_data->width = in_port->left_width;
+				bw_data->height = in_port->height;
+				bw_data->framerate = in_port->ife_res_1;
+			}
 
 			/* Check for inline fetch modes */
 			if ((is_sfe_rd) && (!c_ctx->flags.is_offline)) {
@@ -4232,7 +4238,8 @@ static int cam_ife_mgr_check_and_update_fe_v2(
 static int cam_ife_mgr_check_and_update_fe(
 	struct cam_ife_hw_mgr_ctx         *ife_ctx,
 	struct cam_isp_acquire_hw_info    *acquire_hw_info,
-	uint32_t                           acquire_info_size)
+	uint32_t                           acquire_info_size,
+	struct cam_ife_mgr_bw_data        *bw_data)
 {
 	uint32_t major_ver = 0, minor_ver = 0;
 
@@ -4248,7 +4255,8 @@ static int cam_ife_mgr_check_and_update_fe(
 			ife_ctx, acquire_hw_info, acquire_info_size);
 	case 2:
 		return cam_ife_mgr_check_and_update_fe_v2(
-			ife_ctx, acquire_hw_info, acquire_info_size);
+			ife_ctx, acquire_hw_info, acquire_info_size,
+			bw_data);
 		break;
 	default:
 		CAM_ERR(CAM_ISP, "Invalid ver of common info from user");
@@ -5352,6 +5360,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	struct cam_ife_hw_mgr_ctx              *ife_mgr_ctx;
 	struct cam_ife_hw_concrete_ctx         *ife_ctx;
 	struct cam_cdm_acquire_data        cdm_acquire;
+	struct cam_ife_mgr_bw_data         bw_data;
 	uint32_t                           total_pix_port = 0;
 	uint32_t                           total_rdi_port = 0;
 	uint32_t                           total_pd_port = 0;
@@ -5402,7 +5411,8 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		(struct cam_isp_acquire_hw_info *)acquire_args->acquire_info;
 
 	rc = cam_ife_mgr_check_and_update_fe(ife_mgr_ctx, acquire_hw_info,
-		acquire_args->acquire_info_size);
+		acquire_args->acquire_info_size,
+		&bw_data);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "buffer size is not enough");
 		goto free_ctx;
@@ -10187,6 +10197,7 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 	struct cam_ife_hw_mgr_ctx *ife_mgr_ctx = NULL;
 	struct cam_ife_hw_concrete_ctx  *c_ctx = NULL;
 	struct cam_hw_prepare_update_args *prepare = NULL;
+	struct cam_ife_hw_mgr             *ife_hw_mgr;
 
 	if (!blob_data || (blob_size == 0) || !blob_info) {
 		CAM_ERR(CAM_ISP, "Invalid args data %pK size %d info %pK",
@@ -10211,6 +10222,8 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 		CAM_ERR(CAM_ISP, "Invalid ctx");
 		return -EINVAL;
 	}
+
+	ife_hw_mgr = c_ctx->hw_mgr;
 
 	CAM_DBG(CAM_ISP, "Context[%pK][%d] blob_type=%d, blob_size=%d",
 		c_ctx, c_ctx->ctx_index, blob_type, blob_size);
@@ -10269,6 +10282,10 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 		size_t clock_config_size = 0;
 		struct cam_isp_clock_config    *clock_config;
 		struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
+
+		if (c_ctx->is_offline)
+			/* Override clock for offline IFE */
+			break;
 
 		if (blob_size < sizeof(struct cam_isp_clock_config)) {
 			CAM_ERR(CAM_ISP, "Invalid blob size %u", blob_size);
@@ -15559,27 +15576,113 @@ static int cam_ife_mgr_v_get_hw_caps(void *hw_mgr_priv, void *hw_caps_args)
 	return cam_ife_mgr_get_hw_caps(hw_mgr_priv, hw_caps_args);
 }
 
-static int cam_ife_mgr_required_offline_hw(void *hw_mgr_priv, bool stop)
+static uint32_t cam_ife_mgr_clk_to_bw(uint32_t clk, uint32_t bpc)
+{
+	return clk * bpc;
+}
+
+static uint32_t cam_ife_mgr_bw_to_clk(uint32_t bw, uint32_t bpc)
+{
+	return bw / bpc;
+}
+
+static uint32_t cam_ife_mgr_calc_bw(struct cam_ife_mgr_bw_data *bw_data)
+{
+	uint32_t bw;
+
+	CAM_ERR(CAM_ISP, "BW OFFLINE stream dimensions %dx%d@%d",
+			bw_data->width, bw_data->height, bw_data->framerate);
+	bw = bw_data->width * bw_data->height * bw_data->framerate;
+	switch (bw_data->format) {
+	case CAM_FORMAT_MIPI_RAW_8:
+		break;
+	case CAM_FORMAT_MIPI_RAW_10:
+		bw = 5 * (bw / 4);
+		break;
+	case CAM_FORMAT_MIPI_RAW_12:
+	case CAM_FORMAT_MIPI_RAW_14:
+		bw = 3 * (bw / 2);
+		break;
+	case CAM_FORMAT_MIPI_RAW_20:
+		bw = 5 * (bw / 2);
+		break;
+	case CAM_FORMAT_MIPI_RAW_16:
+	case CAM_FORMAT_PLAIN16_8:
+	case CAM_FORMAT_PLAIN16_10:
+	case CAM_FORMAT_PLAIN16_12:
+	case CAM_FORMAT_PLAIN16_14:
+	case CAM_FORMAT_PLAIN16_16:
+		bw *= 2;
+		break;
+	default:
+		CAM_ERR(CAM_ISP, "Unsupported format %d", bw_data->format);
+		break;
+	}
+	return bw;
+}
+
+static uint32_t cam_ife_mgr_required_offline_hw(void *hw_mgr_priv, bool stop)
 {
 	struct cam_ife_hw_mgr          *ife_hw_mgr = hw_mgr_priv;
+	uint32_t                        max_bw, current_bw;
+	uint64_t                        total_bw;
+	uint64_t                        nom_bw_per_hw;
+	uint64_t                        max_bw_per_hw;
 	int i, cnt, req_hw;
 
+	nom_bw_per_hw = cam_ife_mgr_clk_to_bw(ife_hw_mgr->nom_clk_threshold,
+				ife_hw_mgr->bytes_per_clk);
+	max_bw_per_hw = cam_ife_mgr_clk_to_bw(ife_hw_mgr->max_clk_threshold,
+				ife_hw_mgr->bytes_per_clk);
+
+	total_bw = 0;
+	max_bw = 0;
 	cnt = 0;
 	for (i = 0; i < CAM_IFE_CTX_MAX; i++) {
 		if (ife_hw_mgr->virt_ctx_pool[i].ctx_in_use &&
-				ife_hw_mgr->virt_ctx_pool[i].is_offline)
+				ife_hw_mgr->virt_ctx_pool[i].is_offline) {
+			current_bw = cam_ife_mgr_calc_bw(
+				&ife_hw_mgr->virt_ctx_pool[i].bw_data);
+			if (current_bw > max_bw)
+				max_bw = current_bw;
+			total_bw += current_bw;
 			cnt++;
+		}
 	}
 
 	/* If only one context presents - we need to stop all HW*/
 	if ((stop) && (cnt == 1))
 		return 0;
 
-	req_hw = (cnt + 1) / 2;
-	CAM_ERR(CAM_ISP, "Currently needed %d IFEs for offline processing",
-			req_hw);
-	return req_hw > CAM_MAX_OFFLINE_HW ?
-		CAM_MAX_OFFLINE_HW : req_hw;
+	if (max_bw < nom_bw_per_hw)
+		req_hw = (uint32_t)((total_bw + nom_bw_per_hw - 1) /
+				nom_bw_per_hw);
+	else {
+		req_hw = (uint32_t)((total_bw + max_bw_per_hw - 1) /
+				max_bw_per_hw);
+	}
+
+	if (req_hw > CAM_MAX_OFFLINE_HW)
+		req_hw = CAM_MAX_OFFLINE_HW;
+
+	if (total_bw / req_hw > max_bw)
+		ife_hw_mgr->offline_clk =
+			cam_ife_mgr_bw_to_clk(total_bw / req_hw,
+				ife_hw_mgr->bytes_per_clk);
+	else
+		ife_hw_mgr->offline_clk = cam_ife_mgr_bw_to_clk(max_bw,
+				ife_hw_mgr->bytes_per_clk);
+
+	if (ife_hw_mgr->offline_clk > ife_hw_mgr->max_clk_threshold)
+		ife_hw_mgr->offline_clk = ife_hw_mgr->max_clk_threshold;
+	else if (ife_hw_mgr->offline_clk < ife_hw_mgr->min_clk_threshold)
+		ife_hw_mgr->offline_clk = ife_hw_mgr->min_clk_threshold;
+
+	CAM_DBG(CAM_ISP,
+			"Offline starting %d, CTXs %d, BW: %u needed %d IFEs @ :clk %d",
+			stop, cnt, total_bw,
+			req_hw, ife_hw_mgr->offline_clk);
+	return req_hw;
 }
 
 static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
@@ -15591,6 +15694,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 		(struct cam_isp_acquire_hw_info *)acq_args_ptr->acquire_info;
 	struct cam_ife_hw_mgr          *ife_hw_mgr = hw_mgr_priv;
 	struct cam_ife_offline_hw      *acquired_hw_data;
+	struct cam_ife_mgr_bw_data      bw_data;
 	bool allocated;
 	int i;
 	int rc;
@@ -15614,7 +15718,9 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 		return -EINVAL;
 	}
 
-	rc = cam_ife_mgr_check_and_update_fe(ife_mgr_ctx,acquire_hw_info,acq_args_ptr->acquire_info_size);
+	rc = cam_ife_mgr_check_and_update_fe(ife_mgr_ctx,acquire_hw_info,
+			acq_args_ptr->acquire_info_size,
+			&bw_data);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "Error checking FE");
 		return rc;
@@ -15663,6 +15769,7 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 			acquired_hw_data->ife_ctx->is_offline = true;
 			ife_mgr_ctx->hw_mgr = ife_mgr_ctx->concr_ctx->hw_mgr;
 
+			acquired_hw_data->ife_ctx->offline_clk = 0;
 			acquired_hw_data->valid_acquired_hw =
 				acq_args_ptr->valid_acquired_hw;
 			memcpy(&acquired_hw_data->acquired_hw_id,
@@ -15880,6 +15987,9 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 	struct cam_isp_hw_cap isp_cap = {0};
 	struct cam_isp_hw_path_port_map path_port_map;
 	struct cam_isp_hw_mgr_res *res_list_sfe_out;
+	struct cam_isp_hw_get_off_clk_thr  off_clk_thr;
+
+	CAM_DBG(CAM_ISP, "Enter");
 
 	memset(&g_ife_hw_mgr, 0, sizeof(g_ife_hw_mgr));
 	memset(&path_port_map, 0, sizeof(path_port_map));
@@ -15902,6 +16012,27 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 				(struct cam_hw_info *)
 				ife_device->hw_priv;
 			struct cam_hw_soc_info *soc_info = &vfe_hw->soc_info;
+
+			if (!ife_device->hw_ops.process_cmd(
+					vfe_hw,
+					CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS,
+					&off_clk_thr,
+					sizeof(off_clk_thr))) {
+				g_ife_hw_mgr.max_clk_threshold =
+					off_clk_thr.max_clk_threshold;
+				g_ife_hw_mgr.nom_clk_threshold =
+					off_clk_thr.nom_clk_threshold;
+				g_ife_hw_mgr.min_clk_threshold =
+					off_clk_thr.min_clk_threshold;
+				g_ife_hw_mgr.bytes_per_clk =
+					off_clk_thr.bytes_per_clk;
+				CAM_ERR(CAM_ISP,
+					"Offline IFE thresholds max %d nom %d  min%d",
+					off_clk_thr.max_clk_threshold,
+					off_clk_thr.nom_clk_threshold,
+					off_clk_thr.min_clk_threshold,
+					off_clk_thr.bytes_per_clk);
+			}
 
 			if (j == 0) {
 				ife_device->hw_ops.process_cmd(
