@@ -4355,7 +4355,7 @@ static struct cam_isp_ctx_irq_ops
 	{
 		.irq_ops = {
 			__cam_isp_ctx_handle_error,
-			__cam_isp_ctx_sof_in_activated_state,
+			NULL,
 			NULL,
 			__cam_isp_ctx_offline_epoch_in_activated_state,
 			__cam_isp_ctx_offline_eof_in_activated_state,
@@ -6193,6 +6193,8 @@ static void cam_isp_ctx_sync_callback(int32_t sync_obj, int status, void *data)
 		(atomic_inc_return(&req->num_in_acked) ==
 			req->num_in_map_entries)) {
 		__cam_isp_ctx_schedule_apply_req(ctx_isp);
+		if (ctx_isp->offline_context)
+			__cam_isp_ctx_schedule_start_offline(ctx_isp);
 	}
 }
 
