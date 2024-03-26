@@ -284,14 +284,22 @@ struct cam_ife_hw_mgr_ctx {
 
 
 /**
- * struct cam_ife_hw_concrete_ctx - IFE HW manager Context object
+ * struct cam_ife_hw_concrete_ctx - IFE HW Context object
  *
  * @list:                   used by the ctx list.
  * @common:                 common acquired context data
  * @ctx_index:              acquired context id.
  * @left_hw_idx:            hw index for master core [left]
  * @right_hw_idx:           hw index for slave core [right]
+ * @acquired_hw_id:         hw id that this context acquired
+ * @served_ctx_id:          contains currently and next served context ids
+ * @served_ctx_r:           index pointing to currently served context id
+ * @served_ctx_w:           index pointing to next served context id
  * @hw_mgr:                 IFE hw mgr which owns this context
+ * @ctx_in_use:             flag to tell whether context is active
+ * @res_list_tpg:           TPG resource list
+ * @res_list_ife_in:        Starting resource(TPG,PHY0, PHY1...) Can only be
+ *                          one.
  * @res_list_csid:          CSID resource list
  * @res_list_ife_src:       IFE input resource list
  * @res_list_sfe_src        SFE input resource list
@@ -339,6 +347,8 @@ struct cam_ife_hw_mgr_ctx {
  * @curr_num_exp:           Current num of exposures
  * @try_recovery_cnt:       Retry count for overflow recovery
  * @recovery_req_id:        The request id on which overflow recovery happens
+ * @ctx_state               Indicates context state
+ * @offline_clk             Clock value to be configured for offline processing
  *
  */
 struct cam_ife_hw_concrete_ctx  {

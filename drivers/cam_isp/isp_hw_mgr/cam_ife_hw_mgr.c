@@ -5308,26 +5308,6 @@ static inline void cam_ife_mgr_reset_streamon_scratch_cfg(
 	ctx->concr_ctx->scratch_buf_info.sfe_scratch_config->streamon_buf_mask = 0;
 }
 
-static int cam_ife_mgr_update_offline_out(
-	struct cam_ife_hw_mgr_ctx *ife_ctx)
-{
-	struct cam_isp_hw_mgr_res       *ife_src_res;
-	int i;
-	int rc;
-
-	for (i = 0; i < ife_ctx->num_in_ports; i++) {
-		list_for_each_entry(ife_src_res,
-				&ife_ctx->concr_ctx->res_list_ife_src, list) {
-			if (ife_src_res->res_id == CAM_ISP_HW_VFE_IN_CAMIF) {
-				rc = cam_ife_hw_mgr_acquire_res_ife_out_pixel(
-					ife_ctx, ife_src_res,
-					&ife_ctx->in_ports[i], true);
-			}
-		}
-	}
-	return rc;
-}
-
 static int cam_ife_mgr_acquire_offline_out(
 	struct cam_ife_hw_mgr_ctx *ife_ctx,
 	struct cam_hw_acquire_args *acquire_args)
@@ -5360,7 +5340,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	struct cam_ife_hw_mgr_ctx              *ife_mgr_ctx;
 	struct cam_ife_hw_concrete_ctx         *ife_ctx;
 	struct cam_cdm_acquire_data        cdm_acquire;
-	struct cam_ife_mgr_bw_data         bw_data;
+
 	uint32_t                           total_pix_port = 0;
 	uint32_t                           total_rdi_port = 0;
 	uint32_t                           total_pd_port = 0;
@@ -5412,11 +5392,12 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 
 	rc = cam_ife_mgr_check_and_update_fe(ife_mgr_ctx, acquire_hw_info,
 		acquire_args->acquire_info_size,
-		&bw_data);
+		&ife_mgr_ctx->bw_data);
 	if (rc) {
 		CAM_ERR(CAM_ISP, "buffer size is not enough");
 		goto free_ctx;
 	}
+	ife_ctx->is_offline = ife_ctx->flags.is_offline;
 
 	ife_mgr_ctx->num_in_ports = acquire_hw_info->num_inputs;
 	ife_mgr_ctx->in_ports = kcalloc(acquire_hw_info->num_inputs,
@@ -6521,8 +6502,8 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 	c_ctx->cdm_userdata.request_id = cfg->request_id;
 	c_ctx->cdm_userdata.hw_update_data = hw_update_data;
 
-	CAM_DBG(CAM_ISP, "Ctx[%pK][%d] : Applying Req %lld, init_packet=%d",
-		c_ctx, c_ctx->ctx_index, cfg->request_id, cfg->init_packet);
+	CAM_DBG(CAM_ISP, "Ctx[%pK][%d] : Applying Req %lld, init_packet=%d, offline %d",
+		c_ctx, c_ctx->ctx_index, cfg->request_id, cfg->init_packet,c_ctx->is_offline);
 
 	if (cfg->reapply_type && cfg->cdm_reset_before_apply) {
 		if (c_ctx->last_cdm_done_req < cfg->request_id) {
@@ -6552,7 +6533,7 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 		c_ctx->last_cdm_done_req = 0;
 	}
 
-	CAM_DBG(CAM_PERF,
+	CAM_DBG(CAM_ISP,
 		"ctx_idx=%d, bw_config_version=%d config_valid[BW VFE_CLK SFE_CLK]:[%d %d %d]",
 		c_ctx->ctx_index, c_ctx->bw_config_version,
 		hw_update_data->bw_clk_config.bw_config_valid,
@@ -6621,7 +6602,7 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 	}
 
 	CAM_DBG(CAM_ISP,
-		"Enter ctx id:%d num_hw_upd_entries %d request id: %llu",
+		"ctx id:%d num_hw_upd_entries %d request id: %llu",
 		c_ctx->ctx_index, cfg->num_hw_update_entries, cfg->request_id);
 
 	if (cfg->num_hw_update_entries > 0) {
@@ -6742,7 +6723,7 @@ static int cam_ife_mgr_config_hw(void *hw_mgr_priv,
 		CAM_ERR(CAM_ISP, "No commands to config");
 	}
 
-	CAM_DBG(CAM_ISP, "Exit: Config Done: %llu",  cfg->request_id);
+	CAM_DBG(CAM_ISP, "Exit: Config Done: rc=%d, request id %llu",rc, cfg->request_id);
 	return rc;
 }
 
@@ -7503,8 +7484,7 @@ start_only:
 	atomic_set(&ctx->overflow_pending, 0);
 
 	/* Apply initial configuration */
-	CAM_DBG(CAM_ISP, "Config HW");
-	CAM_ERR(CAM_ISP, "->Config HW, %p", hw_mgr_priv);
+	CAM_DBG(CAM_ISP, "Apply initial configuration %p", hw_mgr_priv);
 	rc = cam_ife_mgr_v_config_hw(hw_mgr_priv, &start_isp->hw_config);
 	if (rc) {
 		CAM_ERR(CAM_ISP,
@@ -10946,6 +10926,31 @@ static int cam_isp_packet_generic_blob_handler(void *user_data,
 	default:
 		CAM_WARN(CAM_ISP, "Invalid blob type %d", blob_type);
 		break;
+	}
+
+	if (c_ctx->is_offline && c_ctx->offline_clk !=
+					ife_hw_mgr->offline_clk) {
+		size_t clock_config_size = 0;
+		struct cam_isp_clock_config    *offline_clk_cfg;
+		struct cam_isp_prepare_hw_update_data   *prepare_hw_data;
+		offline_clk_cfg = (struct cam_isp_clock_config *)blob_data;
+
+		c_ctx->offline_clk = ife_hw_mgr->offline_clk;
+		offline_clk_cfg->left_pix_hz = ife_hw_mgr->offline_clk;
+
+		prepare_hw_data = (struct cam_isp_prepare_hw_update_data  *)
+			prepare->priv;
+		clock_config_size = sizeof(struct cam_isp_clock_config);
+
+		if (offline_clk_cfg->num_rdi >= 1)
+				clock_config_size += (offline_clk_cfg->num_rdi - 1) *
+					sizeof(offline_clk_cfg->rdi_hz);
+
+		CAM_DBG(CAM_ISP, "Override offline IFE clk to %u, vote rdi num %d size %d",
+				offline_clk_cfg->left_pix_hz,offline_clk_cfg->num_rdi,clock_config_size);
+		memcpy(&prepare_hw_data->bw_clk_config.ife_clock_config, offline_clk_cfg,
+			clock_config_size);
+		prepare_hw_data->bw_clk_config.ife_clock_config_valid = true;
 	}
 
 	return rc;
@@ -15551,17 +15556,6 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			break;
 		}
 		if (found) {
-			ife_ctx->served_ctx_w = 1 - ife_ctx->served_ctx_w;
-			ife_ctx->served_ctx_id[ife_ctx->served_ctx_w] =
-							run_hw_mgr_ctx->ctx_idx;
-
-			cam_ife_mgr_update_offline_out(run_hw_mgr_ctx);
-
-			rc = cam_ife_mgr_prepare_hw_update(hw_mgr_priv,
-					&c_elem->prepare);
-			c_elem->cfg.num_hw_update_entries =
-				c_elem->prepare.num_hw_update_entries;
-			rc = cam_ife_mgr_config_hw(hw_mgr_priv, &c_elem->cfg);
 			/* For the zero request we do not get event,
 			 * so restore state
 			 */
@@ -15573,6 +15567,16 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 				ife_ctx->waiting_start = true;
 				ife_ctx->start_ctx_idx = c_elem->ctx_idx;
 			}
+
+			ife_ctx->served_ctx_w = 1 - ife_ctx->served_ctx_w;
+			ife_ctx->served_ctx_id[ife_ctx->served_ctx_w] =
+							run_hw_mgr_ctx->ctx_idx;
+
+			rc = cam_ife_mgr_prepare_hw_update(hw_mgr_priv,
+					&c_elem->prepare);
+			c_elem->cfg.num_hw_update_entries =
+				c_elem->prepare.num_hw_update_entries;
+			rc = cam_ife_mgr_config_hw(hw_mgr_priv, &c_elem->cfg);
 		}
 	}
 
@@ -15588,12 +15592,12 @@ static int cam_ife_mgr_v_get_hw_caps(void *hw_mgr_priv, void *hw_caps_args)
 
 static uint32_t cam_ife_mgr_clk_to_bw(uint32_t clk, uint32_t bpc)
 {
-	return clk * bpc;
+	return clk * 2;
 }
 
 static uint32_t cam_ife_mgr_bw_to_clk(uint32_t bw, uint32_t bpc)
 {
-	return bw / bpc;
+	return bw / 2;
 }
 
 static uint32_t cam_ife_mgr_calc_bw(struct cam_ife_mgr_bw_data *bw_data)
@@ -15983,9 +15987,12 @@ static int cam_ife_mgr_v_config_hw(void *hw_mgr_priv, void *config_hw_args)
 
 	rc = cam_ife_mgr_enqueue_offline_config(hw_mgr_priv,
 			config_hw_args);
-	if (!rc)
+	if (!rc) {
 		rc = cam_ife_mgr_check_start_processing(hw_mgr_priv,
 							hw_mgr_ctx);
+	} else {
+		CAM_ERR(CAM_ISP, "offline config enqueue failed! ");
+	}
 	return rc;
 }
 static int cam_ife_mgr_v_cmd(void *hw_mgr_priv, void *cmd_args)
@@ -16037,26 +16044,16 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 				ife_device->hw_priv;
 			struct cam_hw_soc_info *soc_info = &vfe_hw->soc_info;
 
-			if (!ife_device->hw_ops.process_cmd(
-					vfe_hw,
-					CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS,
-					&off_clk_thr,
-					sizeof(off_clk_thr))) {
-				g_ife_hw_mgr.max_clk_threshold =
-					off_clk_thr.max_clk_threshold;
-				g_ife_hw_mgr.nom_clk_threshold =
-					off_clk_thr.nom_clk_threshold;
-				g_ife_hw_mgr.min_clk_threshold =
-					off_clk_thr.min_clk_threshold;
-				g_ife_hw_mgr.bytes_per_clk =
-					off_clk_thr.bytes_per_clk;
-				CAM_ERR(CAM_ISP,
-					"Offline IFE thresholds max %d nom %d  min%d",
-					off_clk_thr.max_clk_threshold,
-					off_clk_thr.nom_clk_threshold,
-					off_clk_thr.min_clk_threshold,
-					off_clk_thr.bytes_per_clk);
-			}
+			g_ife_hw_mgr.max_clk_threshold = 785000000;
+			g_ife_hw_mgr.nom_clk_threshold = 785000000;
+			g_ife_hw_mgr.min_clk_threshold = 466000000;
+			g_ife_hw_mgr.bytes_per_clk     = 2;
+			CAM_DBG(CAM_ISP,
+				"Offline IFE thresholds max %lld nom %lld  min%lld",
+				off_clk_thr.max_clk_threshold,
+				off_clk_thr.nom_clk_threshold,
+				off_clk_thr.min_clk_threshold,
+				off_clk_thr.bytes_per_clk);
 
 			if (j == 0) {
 				ife_device->hw_ops.process_cmd(
