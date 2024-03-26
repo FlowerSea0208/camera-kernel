@@ -885,6 +885,9 @@ static int __cam_isp_ctx_enqueue_request_in_order(
 			break;
 		}
 		list_add_tail(&req->list, &ctx->pending_req_list);
+		CAM_DBG(CAM_CTXT,
+			"[%s][%d] : Moving req[%llu] to pending_list",
+			ctx->dev_name, ctx->ctx_id, req->request_id);
 
 		if (!list_empty(&temp_list)) {
 			list_for_each_entry_safe(
@@ -2591,8 +2594,11 @@ static int __cam_isp_ctx_offline_eof_in_activated_state(
 	struct cam_isp_context *ctx_isp, void *evt_data)
 {
 	int rc;
+	struct cam_context *ctx = ctx_isp->base;
+	CAM_DBG(CAM_ISP, "EOF frame %lld ctx %u", ctx_isp->frame_id,
+		ctx->ctx_id);
 
-	//rc = __cam_isp_ctx_schedule_apply_req_offline(ctx_isp);
+
 	rc = __cam_isp_ctx_schedule_apply_req(ctx_isp);
 
 	if (ctx_isp->offline_context)
@@ -2606,9 +2612,8 @@ static int __cam_isp_ctx_offline_epoch_in_activated_state(
 	struct cam_context *ctx = ctx_isp->base;
 	struct cam_ctx_request *req, *req_temp;
 	uint64_t request_id = 0;
-	//int rc = 0;
 
-	CAM_DBG(CAM_ISP, "SOF frame %lld ctx %u", ctx_isp->frame_id,
+	CAM_DBG(CAM_ISP, "Epoch frame %lld ctx %u", ctx_isp->frame_id,
 		ctx->ctx_id);
 
 	/*
@@ -2627,11 +2632,6 @@ static int __cam_isp_ctx_offline_epoch_in_activated_state(
 			}
 		}
 	}
-
-	////rc = __cam_isp_ctx_schedule_apply_req(ctx_isp);
-
-	////if (ctx_isp->offline_context)
-	////	__cam_isp_ctx_schedule_start_offline(ctx_isp);
 
 	/*
 	 * If no valid request, wait for RUP shutter posted after buf done
@@ -6343,7 +6343,8 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 				ctx->state);
 		}
 	} else {
-		if ((ctx->state == CAM_CTX_FLUSHED) || (ctx->state < CAM_CTX_READY)) {
+		if ((!ctx_isp->offline_context) &&
+			((ctx->state == CAM_CTX_FLUSHED) || (ctx->state < CAM_CTX_READY))) {
 			rc = -EINVAL;
 			CAM_ERR(CAM_ISP, "Received update req %lld in wrong state:%d",
 				req->request_id, ctx->state);
@@ -7375,7 +7376,7 @@ static int __cam_isp_ctx_start_dev_in_ready(struct cam_context *ctx,
 		list_add(&req->list, &ctx->pending_req_list);
 		goto end;
 	}
-	CAM_DBG(CAM_ISP, "start device success ctx %u", ctx->ctx_id);
+	CAM_DBG(CAM_ISP, "start device success ctx %u state %d ", ctx->ctx_id,ctx->state);
 
 end:
 	return rc;
