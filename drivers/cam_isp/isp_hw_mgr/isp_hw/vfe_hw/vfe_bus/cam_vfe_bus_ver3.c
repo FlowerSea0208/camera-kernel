@@ -2005,9 +2005,9 @@ static int cam_vfe_bus_ver3_acquire_vfe_out(void *bus_priv, void *acquire_args,
 	if ((vfe_out_res_id == CAM_VFE_BUS_VER3_VFE_OUT_MAX) ||
 		(outmap_index >= ver3_bus_priv->num_out)) {
 		CAM_WARN(CAM_ISP,
-			"target does not support req res id :0x%x outtype:%d index:%d",
+			"target does not support req res id :0x%x outtype:%d index:%d num_out:%d",
 			out_acquire_args->out_port_info->res_type,
-			vfe_out_res_id, outmap_index);
+			vfe_out_res_id, outmap_index,ver3_bus_priv->num_out);
 		return -ENODEV;
 	}
 

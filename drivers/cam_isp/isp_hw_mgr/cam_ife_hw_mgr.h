@@ -38,6 +38,12 @@ enum cam_ife_ctx_master_type {
 #define CAM_IFE_CTX_CFG_SW_SYNC_ON        BIT(1)
 #define CAM_IFE_CTX_CFG_DYNAMIC_SWITCH_ON BIT(2)
 
+#define CAM_IFE_HW_STATE_STOPPED  0
+#define CAM_IFE_HW_STATE_STARTING 1
+#define CAM_IFE_HW_STATE_STARTED  2
+#define CAM_IFE_HW_STATE_BUSY     3
+#define CAM_IFE_HW_STATE_STOPPING 4
+
 /**
  * struct cam_ife_hw_mgr_debug - contain the debug information
  *
@@ -234,6 +240,33 @@ struct cam_ife_cdm_user_data {
 /**
  * struct cam_ife_hw_mgr_ctx - IFE HW manager Context object
  *
+ * concr_ctx:             HW Context currently used from this manager context
+ * hw_mgr:                IFE hw mgr which owns this context
+ * event_cb:              event callbacks
+ * cb_priv:               event callbacks data
+ * ctx_in_use:            indicates if context is active
+ * is_offline:            indicates if context is used for offline processing
+ * ctx_idx:               index of this context
+ * stop_done_complete:    completion signaled when context is ceased operation
+ * is_stopping:           if context is about to cease operation
+ *
+ */
+struct cam_ife_hw_mgr_ctx {
+	struct cam_ife_hw_concrete_ctx *concr_ctx;
+	struct cam_ife_hw_mgr          *hw_mgr; // seems not use it
+	cam_hw_event_cb_func            event_cb[CAM_ISP_HW_EVENT_MAX];
+	void                           *cb_priv;
+	uint32_t                        ctx_in_use;
+	bool                            is_offline;
+	uint32_t                        ctx_idx;
+	struct completion               stop_done_complete;
+	bool                            is_stopping;
+};
+
+
+/**
+ * struct cam_ife_hw_concrete_ctx - IFE HW manager Context object
+ *
  * @list:                   used by the ctx list.
  * @common:                 common acquired context data
  * @ctx_index:              acquired context id.
@@ -289,14 +322,19 @@ struct cam_ife_cdm_user_data {
  * @recovery_req_id:        The request id on which overflow recovery happens
  *
  */
-struct cam_ife_hw_mgr_ctx {
+struct cam_ife_hw_concrete_ctx  {
 	struct list_head                          list;
 	struct cam_isp_hw_mgr_ctx                 common;
 
+	void                                     *tasklet_info;
 	uint32_t                                  ctx_index;
 	uint32_t                                  left_hw_idx;
 	uint32_t                                  right_hw_idx;
 	struct cam_ife_hw_mgr                    *hw_mgr;
+	uint32_t                                  acquired_hw_id;
+	uint32_t                                  served_ctx_id[2];
+	uint32_t                                  served_ctx_r;
+	uint32_t                                  served_ctx_w;
 
 	struct cam_isp_hw_mgr_res                  res_list_ife_in;
 	struct list_head                           res_list_ife_csid;
@@ -346,6 +384,55 @@ struct cam_ife_hw_mgr_ctx {
 	uint32_t                                   curr_num_exp;
 	uint32_t                                   try_recovery_cnt;
 	uint64_t                                   recovery_req_id;
+	atomic_t                                   ctx_state;
+	bool                                       is_offline;
+};
+
+/**
+ * struct cam_ife_offline_hw - Offline ife context allocation information
+ *
+ * @ctx_idx:                context index
+ * @custom_enabled:         update the flag if context is connected to custom HW
+ * @use_frame_header_ts     obtain qtimer ts using frame header
+ * @acquired_hw_id:         Acquired hardware mask
+ * @acquired_hw_path:       Acquired path mask for an input
+ *                          if input splits into multiple paths,
+ *                          its updated per hardware
+ * valid_acquired_hw:       Valid num of acquired hardware
+ * @ife_ctx:                HW context connected to that HW
+ *
+ */
+struct cam_ife_offline_hw {
+	uint32_t                        ctx_idx;
+	bool                            custom_enabled;
+	bool                            use_frame_header_ts;
+	uint32_t                        acquired_hw_id[CAM_MAX_ACQ_RES];
+	uint32_t                        acquired_hw_path[CAM_MAX_ACQ_RES][
+						CAM_MAX_HW_SPLIT];
+	uint32_t                        valid_acquired_hw;
+	struct cam_ife_hw_concrete_ctx *ife_ctx;
+};
+
+/**
+ * struct cam_ife_mgr_offline_in_queue - Offline IFE input request queue element
+ *
+ * @list:                   list private data;
+ * @request_id:             request id
+ * @ctx_idx:                context owning this request
+ * @hw_id:                  ID of hardware core servicing this request
+ * @prepare:                prepare requset data
+ * @cfg:                    config request data
+ * @ready:                  indicates if request is ready to be processed
+ *
+ */
+struct cam_ife_mgr_offline_in_queue {
+	struct list_head                  list;
+	uint64_t                          request_id;
+	uint32_t                          ctx_idx;
+	uint32_t                          hw_id;
+	struct cam_hw_prepare_update_args prepare;
+	struct cam_hw_config_args         cfg;
+	bool                              ready;
 };
 
 /**
@@ -442,7 +529,8 @@ struct cam_ife_hw_mgr {
 	atomic_t                         active_ctx_cnt;
 	struct list_head                 free_ctx_list;
 	struct list_head                 used_ctx_list;
-	struct cam_ife_hw_mgr_ctx        ctx_pool[CAM_IFE_CTX_MAX];
+	struct cam_ife_hw_concrete_ctx   ctx_pool[CAM_IFE_CTX_MAX];
+	struct cam_ife_hw_mgr_ctx        virt_ctx_pool[CAM_IFE_CTX_MAX];
 
 	struct cam_ife_csid_hw_caps      csid_hw_caps[
 						CAM_IFE_CSID_HW_NUM_MAX];
@@ -450,6 +538,11 @@ struct cam_ife_hw_mgr {
 	struct cam_req_mgr_core_workq   *workq;
 	struct cam_ife_hw_mgr_debug      debug_cfg;
 	spinlock_t                       ctx_lock;
+	atomic_t                         num_acquired_offline_ctx;
+	struct cam_ife_offline_hw        acquired_hw_pool[CAM_IFE_CTX_MAX];
+	struct cam_ife_mgr_offline_in_queue   input_queue;
+	struct cam_ife_mgr_offline_in_queue   in_proc_queue;
+	uint32_t                         starting_offline_cnt;
 	bool                             hw_pid_support;
 	bool                             csid_rup_en;
 	bool                             csid_global_reset_en;
@@ -476,7 +569,7 @@ struct cam_ife_hw_mgr {
 struct cam_ife_hw_event_recovery_data {
 	uint32_t                   error_type;
 	uint32_t                   affected_core[CAM_ISP_HW_NUM_MAX];
-	struct cam_ife_hw_mgr_ctx *affected_ctx[CAM_IFE_CTX_MAX];
+	struct cam_ife_hw_concrete_ctx *affected_ctx[CAM_IFE_CTX_MAX];
 	uint32_t                   no_of_context;
 	uint32_t                   id[CAM_IFE_CTX_MAX];
 };
