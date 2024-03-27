@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -487,7 +487,8 @@ static int cam_flash_component_bind(struct device *dev,
 			&fctrl->power_info.gpio_num_info);
 		if ((rc < 0) || (!fctrl->power_info.gpio_num_info)) {
 			CAM_ERR(CAM_FLASH, "No/Error Flash GPIOs");
-			return -EINVAL;
+			/* In Current target no GPIO required for flash, hence need
+			to remove the condition */
 		}
 		rc = cam_sensor_util_regulator_powerup(soc_info);
 		if (rc < 0) {

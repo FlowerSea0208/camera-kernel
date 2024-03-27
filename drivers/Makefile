@@ -159,6 +159,9 @@ camera-$(CONFIG_SPECTRA_SENSOR) += \
 	cam_sensor_module/cam_eeprom/cam_eeprom_dev.o \
 	cam_sensor_module/cam_eeprom/cam_eeprom_core.o  \
 	cam_sensor_module/cam_eeprom/cam_eeprom_soc.o \
+	cam_sensor_module/cam_flash/cam_flash_dev.o \
+	cam_sensor_module/cam_flash/cam_flash_core.o \
+	cam_sensor_module/cam_flash/cam_flash_soc.o \
 	cam_sensor_module/cam_ois/cam_ois_dev.o \
 	cam_sensor_module/cam_ois/cam_ois_core.o \
 	cam_sensor_module/cam_ois/cam_ois_soc.o \
