@@ -11730,14 +11730,13 @@ static int cam_ife_mgr_csid_add_reg_update(struct cam_ife_hw_mgr_ctx *hw_mgr_ctx
 	struct cam_isp_hw_mgr_res            *hw_mgr_res;
 	struct cam_ife_csid_hw_caps          *csid_caps;
 	struct cam_isp_resource_node         *res;
-	struct cam_ife_hw_concrete_ctx       *ctx = hw_mgr_ctx->concr_ctx;
+	struct cam_ife_hw_concrete_ctx       *c_ctx = hw_mgr_ctx->concr_ctx;
 	struct cam_isp_change_base_args       change_base_info = {0};
 	struct cam_isp_csid_reg_update_args
 			rup_args[CAM_IFE_CSID_HW_NUM_MAX]  = {0};
 
-	hw_mgr = hw_mgr_ctx->hw_mgr;
-
-	list_for_each_entry(hw_mgr_res, &ctx->res_list_ife_csid, list) {
+	hw_mgr = c_ctx->hw_mgr;
+	list_for_each_entry(hw_mgr_res, &c_ctx->res_list_ife_csid, list) {
 
 		if (hw_mgr_res->res_type == CAM_ISP_RESOURCE_UNINT)
 			continue;
@@ -11758,8 +11757,8 @@ static int cam_ife_mgr_csid_add_reg_update(struct cam_ife_hw_mgr_ctx *hw_mgr_ctx
 			rup_args[hw_idx].num_res++;
 
 			CAM_DBG(CAM_ISP,
-				"Reg update queued for res %d hw_id %d",
-				res->res_id, res->hw_intf->hw_idx);
+				"[%d]Reg update queued for res %d hw_id %d",
+				i,res->res_id, res->hw_intf->hw_idx);
 		}
 	}
 
@@ -11768,18 +11767,18 @@ static int cam_ife_mgr_csid_add_reg_update(struct cam_ife_hw_mgr_ctx *hw_mgr_ctx
 			continue;
 
 		change_base_info.base_idx = i;
-		change_base_info.cdm_id = ctx->cdm_id;
+		change_base_info.cdm_id = c_ctx->cdm_id;
 		rc = cam_isp_add_change_base(prepare,
-			&ctx->res_list_ife_csid,
+			&c_ctx->res_list_ife_csid,
 			&change_base_info, kmd_buf);
 
-		CAM_DBG(CAM_ISP, "Ctx:%d Change base added for num_res %d",
-			ctx->ctx_index, rup_args[i].num_res);
+		CAM_DBG(CAM_ISP, "Ctx:%d Change base added for num_res %d , ctx_idx: %u",
+			c_ctx->ctx_index, rup_args[i].num_res, c_ctx->ctx_index);
 
 		if (rc) {
 			CAM_ERR(CAM_ISP,
 				"Change base Failed Ctx:%d hw_idx=%d, rc=%d",
-				ctx->ctx_index, i, rc);
+				c_ctx->ctx_index, i, rc);
 			break;
 		}
 
@@ -11788,12 +11787,12 @@ static int cam_ife_mgr_csid_add_reg_update(struct cam_ife_hw_mgr_ctx *hw_mgr_ctx
 
 		if (rc) {
 			CAM_ERR(CAM_ISP, "Ctx:%u Reg Update failed idx:%u",
-				ctx->ctx_index, i);
+				c_ctx->ctx_index, i);
 			break;
 		}
 
 		CAM_DBG(CAM_ISP, "Ctx:%d Reg update added id:%d num_res %d",
-			ctx->ctx_index, i, rup_args[i].num_res);
+			c_ctx->ctx_index, i, rup_args[i].num_res);
 	}
 
 	return rc;
