@@ -33,7 +33,7 @@
 #define CAM_TFE_CTX_MAX      4
 
 /* maximum context numbers for IFE */
-#define CAM_IFE_CTX_MAX      8
+#define CAM_IFE_CTX_MAX      10
 
 /* Appliacble vote paths for dual ife, based on no. of UAPI definitions */
 #define CAM_ISP_MAX_PER_PATH_VOTES 40
@@ -372,6 +372,7 @@ enum cam_isp_hw_mgr_command {
 	CAM_ISP_HW_MGR_CMD_PROG_DEFAULT_CFG,
 	CAM_ISP_HW_MGR_GET_SOF_TS,
 	CAM_ISP_HW_MGR_DUMP_STREAM_INFO,
+	CAM_ISP_HW_MGR_CMD_CHECK_START_OFFLINE,
 	CAM_ISP_HW_MGR_CMD_MAX,
 };
 

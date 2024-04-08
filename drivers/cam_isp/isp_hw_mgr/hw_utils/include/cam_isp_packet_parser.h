@@ -405,4 +405,7 @@ int cam_isp_add_csid_command_buffers(
 int cam_isp_get_cmd_buf_count(
 	struct cam_hw_prepare_update_args    *prepare,
 	struct cam_isp_cmd_buf_count         *cmd_buf_count);
+
+int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare);
+
 #endif /*_CAM_ISP_HW_PARSER_H */
