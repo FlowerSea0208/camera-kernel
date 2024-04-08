@@ -2064,7 +2064,8 @@ err:
 static int cam_ife_hw_mgr_acquire_res_ife_out_pixel(
 	struct cam_ife_hw_mgr_ctx           *ife_ctx,
 	struct cam_isp_hw_mgr_res           *ife_src_res,
-	struct cam_isp_in_port_generic_info *in_port)
+	struct cam_isp_in_port_generic_info *in_port,
+	bool                                 update_only)
 {
 	int rc = -1;
 	uint32_t  i, j, k;
@@ -2138,14 +2139,29 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_pixel(
 				vfe_acquire.vfe_out.dual_slave_core =
 					c_ctx->left_hw_idx;
 			}
-			rc = hw_intf->hw_ops.reserve(hw_intf->hw_priv,
-				&vfe_acquire,
-				sizeof(struct cam_vfe_acquire_args));
-			if (rc) {
-				CAM_ERR(CAM_ISP,
-					"Can not acquire out resource 0x%x",
-					out_port->res_type);
-				goto err;
+
+			if (update_only) {
+				rc = hw_intf->hw_ops.process_cmd(
+					hw_intf->hw_priv,
+					CAM_ISP_HW_CMD_WM_UPDATE,
+					&vfe_acquire,
+					sizeof(struct cam_vfe_acquire_args));
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Can not update out resource 0x%x",
+						out_port->res_type);
+					goto err;
+				}
+			} else {
+				rc = hw_intf->hw_ops.reserve(hw_intf->hw_priv,
+					&vfe_acquire,
+					sizeof(struct cam_vfe_acquire_args));
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Can not acquire out resource 0x%x",
+						out_port->res_type);
+					goto err;
+				}
 			}
 
 			ife_out_res->hw_res[j] =
@@ -2155,10 +2171,14 @@ static int cam_ife_hw_mgr_acquire_res_ife_out_pixel(
 				ife_out_res->hw_res[j]->res_id);
 
 		}
-		ife_out_res->res_type = CAM_ISP_RESOURCE_VFE_OUT;
-		ife_out_res->res_id = out_port->res_type;
-		ife_src_res->num_children++;
-		c_ctx->num_acq_vfe_out++;
+		if (!update_only) {
+			ife_out_res->res_type = CAM_ISP_RESOURCE_VFE_OUT;
+			ife_out_res->res_id = out_port->res_type;
+			ife_src_res->num_children++;
+			c_ctx->num_acq_vfe_out++;
+			CAM_DBG(CAM_ISP, "IFE SRC num_children = %d acq vfe out %d",
+				ife_src_res->num_children,c_ctx->num_acq_vfe_out);
+		}
 	}
 
 	return 0;
@@ -2445,7 +2465,7 @@ static int cam_ife_hw_mgr_acquire_res_ife_out(
 		case CAM_ISP_HW_VFE_IN_RD:
 		case CAM_ISP_HW_VFE_IN_LCR:
 			rc = cam_ife_hw_mgr_acquire_res_ife_out_pixel(ife_ctx,
-				ife_src_res, in_port);
+				ife_src_res, in_port,false);
 			break;
 		case CAM_ISP_HW_VFE_IN_RDI0:
 		case CAM_ISP_HW_VFE_IN_RDI1:
@@ -5280,6 +5300,48 @@ static inline void cam_ife_mgr_reset_streamon_scratch_cfg(
 	ctx->concr_ctx->scratch_buf_info.sfe_scratch_config->streamon_buf_mask = 0;
 }
 
+static int cam_ife_mgr_update_offline_out(
+	struct cam_ife_hw_mgr_ctx *ife_ctx)
+{
+	struct cam_isp_hw_mgr_res       *ife_src_res;
+	int i;
+	int rc;
+
+	for (i = 0; i < ife_ctx->num_in_ports; i++) {
+		list_for_each_entry(ife_src_res,
+				&ife_ctx->concr_ctx->res_list_ife_src, list) {
+			if (ife_src_res->res_id == CAM_ISP_HW_VFE_IN_CAMIF) {
+				rc = cam_ife_hw_mgr_acquire_res_ife_out_pixel(
+					ife_ctx, ife_src_res,
+					&ife_ctx->in_ports[i], true);
+			}
+		}
+	}
+	return rc;
+}
+
+static int cam_ife_mgr_acquire_offline_out(
+	struct cam_ife_hw_mgr_ctx *ife_ctx,
+	struct cam_hw_acquire_args *acquire_args)
+{
+	struct cam_isp_acquire_hw_info      *acquire_hw_info;
+	uint32_t                             input_size = 0;
+	int i;
+	int rc;
+
+	acquire_hw_info =
+		(struct cam_isp_acquire_hw_info *)acquire_args->acquire_info;
+	ife_ctx->num_in_ports = acquire_hw_info->num_inputs;
+	ife_ctx->in_ports = kcalloc(ife_ctx->num_in_ports,
+			sizeof(struct cam_isp_in_port_generic_info),
+			GFP_KERNEL);
+	for (i = 0; i < acquire_hw_info->num_inputs; i++) {
+		rc = cam_ife_mgr_acquire_get_unified_structure(acquire_hw_info,
+			i, &input_size, &ife_ctx->in_ports[i]);
+	}
+	return rc;
+}
+
 /* entry function: acquire_hw */
 static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 {
@@ -5289,7 +5351,6 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	int i, j;
 	struct cam_ife_hw_mgr_ctx              *ife_mgr_ctx;
 	struct cam_ife_hw_concrete_ctx         *ife_ctx;
-	struct cam_isp_in_port_generic_info *in_port = NULL;
 	struct cam_cdm_acquire_data        cdm_acquire;
 	uint32_t                           total_pix_port = 0;
 	uint32_t                           total_rdi_port = 0;
@@ -5347,47 +5408,51 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 		goto free_ctx;
 	}
 
-	in_port = kcalloc(acquire_hw_info->num_inputs,
+	ife_mgr_ctx->num_in_ports = acquire_hw_info->num_inputs;
+	ife_mgr_ctx->in_ports = kcalloc(acquire_hw_info->num_inputs,
 			sizeof(struct cam_isp_in_port_generic_info),
 			GFP_KERNEL);
 
-	if (!in_port) {
+	if (!ife_mgr_ctx->in_ports) {
 		CAM_ERR(CAM_ISP, "No memory available");
 		rc = -ENOMEM;
 		goto free_ctx;
 	}
 
-	/* Update in_port structure */
+	/* Update in_ports structure */
 	for (i = 0; i < acquire_hw_info->num_inputs; i++) {
 		rc = cam_ife_mgr_acquire_get_unified_structure(acquire_hw_info,
-			i, &input_size, &in_port[i]);
+			i, &input_size, &ife_mgr_ctx->in_ports[i]);
 
 		if (rc < 0) {
 			CAM_ERR(CAM_ISP, "Failed in parsing: %d", rc);
 			goto free_mem;
 		}
 
+		CAM_DBG(CAM_ISP, "in_res_type %x",
+				ife_mgr_ctx->in_ports[i].res_type);
+
 		/* Check for formats in multi vc-dt FE use-cases */
 		if (ife_ctx->flags.is_fe_enabled) {
-			input_format_checker = in_port[i].format[0];
-			for (j = 1; j < in_port[i].num_valid_vc_dt; j++) {
-				if (in_port[i].format[j] != input_format_checker) {
+			input_format_checker = ife_mgr_ctx->in_ports[i].format[0];
+			for (j = 1; j < ife_mgr_ctx->in_ports[i].num_valid_vc_dt; j++) {
+				if (ife_mgr_ctx->in_ports[i].format[j] != input_format_checker) {
 					CAM_ERR(CAM_ISP,
 						"Different input formats for FE use-cases not supported - formats vc0: %u vc%d: %u",
-						input_format_checker, j, in_port[i].format[j]);
+						input_format_checker, j, ife_mgr_ctx->in_ports[i].format[j]);
 					rc = -EINVAL;
 					goto free_mem;
 				}
 			}
 		}
 
-		cam_ife_hw_mgr_preprocess_port(ife_mgr_ctx, &in_port[i]);
-		total_pix_port += in_port[i].ipp_count +
-					in_port[i].ife_rd_count +
-					in_port[i].lcr_count;
-		total_rdi_port += in_port[i].rdi_count;
-		total_pd_port += in_port[i].ppp_count;
-		total_lite_port += in_port[i].lite_path_count;
+		cam_ife_hw_mgr_preprocess_port(ife_mgr_ctx, &ife_mgr_ctx->in_ports[i]);
+		total_pix_port += ife_mgr_ctx->in_ports[i].ipp_count +
+					ife_mgr_ctx->in_ports[i].ife_rd_count +
+					ife_mgr_ctx->in_ports[i].lcr_count;
+		total_rdi_port += ife_mgr_ctx->in_ports[i].rdi_count;
+		total_pd_port += ife_mgr_ctx->in_ports[i].ppp_count;
+		total_lite_port += ife_mgr_ctx->in_ports[i].lite_path_count;
 	}
 
 	/* Check whether context has only RDI resource */
@@ -5410,53 +5475,47 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 
 	/* acquire HW resources */
 	for (i = 0; i < acquire_hw_info->num_inputs; i++) {
-		CAM_DBG(CAM_ISP, "in_res_type %x", in_port[i].res_type);
+		CAM_DBG(CAM_ISP, "in_res_type %x", ife_mgr_ctx->in_ports[i].res_type);
 		if (!ife_ctx->ctx_type) {
-			if (in_port[i].cust_node) {
+			if (ife_mgr_ctx->in_ports[i].cust_node) {
 				ife_ctx->ctx_type = CAM_IFE_CTX_TYPE_CUSTOM;
 				/* These can be obtained from uapi */
 				ife_ctx->ctx_config |=
 					CAM_IFE_CTX_CFG_FRAME_HEADER_TS;
 				ife_ctx->ctx_config |=
 					CAM_IFE_CTX_CFG_SW_SYNC_ON;
-			} else if (in_port[i].sfe_in_path_type) {
+			} else if (ife_mgr_ctx->in_ports[i].sfe_in_path_type) {
 				ife_ctx->ctx_type = CAM_IFE_CTX_TYPE_SFE;
 			}
 		}
 
 		CAM_DBG(CAM_ISP,
 			"in_res_type: 0x%x sfe_in_path_type: 0x%x sfe_ife_enable: 0x%x",
-			in_port[i].res_type, in_port[i].sfe_in_path_type,
-			in_port[i].sfe_ife_enable);
+			ife_mgr_ctx->in_ports[i].res_type, ife_mgr_ctx->in_ports[i].sfe_in_path_type,
+			ife_mgr_ctx->in_ports[i].sfe_ife_enable);
 
 		if (ife_ctx->flags.is_offline)
 			rc = cam_ife_mgr_acquire_hw_for_offline_ctx(
-				ife_mgr_ctx, &in_port[i],
+				ife_mgr_ctx, &ife_mgr_ctx->in_ports[i],
 				&acquire_args->acquired_hw_id[i],
 				acquire_args->acquired_hw_path[i]);
 		else
 			rc = cam_ife_mgr_acquire_hw_for_ctx(ife_mgr_ctx,
-				&in_port[i],
+				&ife_mgr_ctx->in_ports[i],
 				&acquire_args->acquired_hw_id[i],
 				acquire_args->acquired_hw_path[i],
 				&acquired_rdi_res);
 
 		if (rc) {
 			cam_ife_hw_mgr_print_acquire_info(ife_mgr_ctx,
-				(in_port[i].ipp_count +
-				in_port[i].ife_rd_count +
-				in_port[i].lcr_count),
-				in_port[i].ppp_count,
-				in_port[i].rdi_count, rc);
+				(ife_mgr_ctx->in_ports[i].ipp_count +
+				ife_mgr_ctx->in_ports[i].ife_rd_count +
+				ife_mgr_ctx->in_ports[i].lcr_count),
+				ife_mgr_ctx->in_ports[i].ppp_count,
+				ife_mgr_ctx->in_ports[i].rdi_count, rc);
 			goto free_res;
 		}
-
-		kfree(in_port[i].data);
-		in_port[i].data = NULL;
 	}
-
-	kfree(in_port);
-	in_port = NULL;
 
 	ife_mgr_ctx->concr_ctx->acquired_hw_id =
 		acquire_args->acquired_hw_id[0];
@@ -5584,14 +5643,14 @@ free_cdm_cmd:
 free_res:
 	cam_ife_hw_mgr_release_hw_for_ctx(ife_mgr_ctx);
 free_mem:
-	if (in_port) {
+	if (ife_mgr_ctx->in_ports) {
 		for (i = 0; i < acquire_hw_info->num_inputs; i++) {
-			kfree(in_port[i].data);
-			in_port[i].data = NULL;
+			kfree(ife_mgr_ctx->in_ports[i].data);
+			ife_mgr_ctx->in_ports[i].data = NULL;
 		}
 
-		kfree(in_port);
-		in_port = NULL;
+		kfree(ife_mgr_ctx->in_ports);
+		ife_mgr_ctx->in_ports = NULL;
 	}
 free_ctx:
 	cam_ife_hw_mgr_put_ctx(&ife_hw_mgr->free_ctx_list, &ife_mgr_ctx);
@@ -12204,7 +12263,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		((!ctx->flags.is_offline) || atomic_read(&ctx->ctx_state) == CAM_IFE_HW_STATE_STARTING)) {
 		if ((!prepare->num_reg_dump_buf) || (prepare->num_reg_dump_buf >
 			CAM_REG_DUMP_MAX_BUF_ENTRIES))
-			goto end;
+			goto offline;
 
 		/* Copy reg dump buf desc for error/flush cases */
 		if (!ctx->num_reg_dump_buf) {
@@ -12218,7 +12277,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 
 		/* Per req reg dump */
 		cam_ife_mgr_check_for_per_request_reg_dump(prepare, prepare_hw_data);
-		goto end;
+		goto offline;
 	} else {
 		cam_ife_mgr_check_for_per_request_reg_dump(prepare, prepare_hw_data);
 	}
@@ -12238,6 +12297,7 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 		goto end;
 	}
 
+offline:
 	/* add go_cmd for offline context */
 	if (prepare->num_out_map_entries &&
 		prepare->num_in_map_entries &&
@@ -15297,7 +15357,7 @@ static int cam_ife_mgr_free_in_proc_req(struct cam_ife_hw_mgr *ife_hw_mgr,
 }
 
 static int cam_ife_mgr_flush_in_queue(struct cam_ife_hw_mgr *ife_hw_mgr,
-					uint32_t ctx_idx)
+					uint32_t ctx_idx, bool just_incomplete)
 {
 	struct cam_ife_mgr_offline_in_queue *c_elem;
 	struct cam_ife_mgr_offline_in_queue *c_elem_temp;
@@ -15305,7 +15365,7 @@ static int cam_ife_mgr_flush_in_queue(struct cam_ife_hw_mgr *ife_hw_mgr,
 	list_for_each_entry_safe(c_elem, c_elem_temp,
 			&ife_hw_mgr->input_queue.list, list) {
 		if (c_elem->ctx_idx == ctx_idx &&
-					!c_elem->ready) {
+					!(c_elem->ready && just_incomplete)) {
 			CAM_DBG(CAM_ISP, "flush req %llu", c_elem->request_id);
 			list_del_init(&c_elem->list);
 			kfree(c_elem);
@@ -15475,6 +15535,8 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			ife_ctx->served_ctx_id[ife_ctx->served_ctx_w] =
 							run_hw_mgr_ctx->ctx_idx;
 
+			cam_ife_mgr_update_offline_out(run_hw_mgr_ctx);
+
 			rc = cam_ife_mgr_prepare_hw_update(hw_mgr_priv,
 					&c_elem->prepare);
 			c_elem->cfg.num_hw_update_entries =
@@ -15625,6 +15687,11 @@ static int cam_ife_mgr_v_acquire(void *hw_mgr_priv, void *acquire_hw_args)
 			 */
 			acquired_hw_data = &ife_hw_mgr->acquired_hw_pool[0];
 			ife_mgr_ctx->hw_mgr = acquired_hw_data->ife_ctx->hw_mgr;
+
+			ife_mgr_ctx->concr_ctx = acquired_hw_data->ife_ctx;
+			cam_ife_mgr_acquire_offline_out(ife_mgr_ctx,
+				acq_args_ptr);
+
 			acq_args_ptr->valid_acquired_hw =
 				acquired_hw_data->valid_acquired_hw;
 			/* Should not be used for offline */
@@ -15700,7 +15767,7 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 		 * complex HW allocation.
 		 */
 		mutex_lock(&ife_hw_mgr->ctx_mutex);
-		cam_ife_mgr_flush_in_queue(ife_hw_mgr, hw_mgr_ctx->ctx_idx);
+		cam_ife_mgr_flush_in_queue(ife_hw_mgr, hw_mgr_ctx->ctx_idx, true);
 		num_ctx = atomic_read(&ife_hw_mgr->num_acquired_offline_ctx);
 		if (num_ctx <=
 			cam_ife_mgr_required_offline_hw(hw_mgr_priv, true))
@@ -15721,17 +15788,28 @@ static int cam_ife_mgr_v_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 			if (rem_jiffies == 0) {
 				hw_mgr_ctx->is_stopping = false;
 				CAM_ERR(CAM_ISP,
-				    "Offline IFE drain during stop timeout");
+					"Offline IFE ctx %d drain timed out",
+					hw_mgr_ctx->ctx_idx);
+				/* forcefully flush all requests from queue */
+				mutex_lock(&ife_hw_mgr->ctx_mutex);
+				cam_ife_mgr_flush_in_queue(ife_hw_mgr,
+					hw_mgr_ctx->ctx_idx,
+					false);
+				mutex_unlock(&ife_hw_mgr->ctx_mutex);
 			}
 			if (ife_ctx)
 				atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_STOPPING);
 			else
 				return 0;
-		} else {
+		} else if (ife_ctx) {
 			atomic_set(&ife_ctx->ctx_state,
 						CAM_IFE_HW_STATE_STOPPING);
 			mutex_unlock(&ife_hw_mgr->ctx_mutex);
+		} else {
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
+			CAM_ERR(CAM_ISP, "Invalid IFE HW context");
+			return -EINVAL;
 		}
 		atomic_dec(&ife_hw_mgr->num_acquired_offline_ctx);
 	}
