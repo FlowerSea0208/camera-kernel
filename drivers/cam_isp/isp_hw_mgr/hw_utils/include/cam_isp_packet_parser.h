@@ -253,7 +253,8 @@ int cam_isp_add_io_buffers(
 	bool                                     fill_fence,
 	enum cam_isp_hw_type                     hw_type,
 	struct cam_isp_frame_header_info        *frame_header_info,
-	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg);
+	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg,
+	uint32_t                                 unpacker_fmt);
 
 /*
  * cam_isp_add_reg_update()

@@ -18,9 +18,10 @@
  *
  * @takslet_info:          assciated tasklet
  * @event_cb:              call back interface to ISP context. Set during
- *                         acquire device
+ *                         acquire device, it be ignore after multi offline
+ *                         concurency enabled.
  * @cb_priv:               first argument for the call back function
- *                         set during acquire device
+ *                         set during acquire device, the same as above
  * @mini_dump_cb:          Callback for mini dump
  * @sec_pf_evt_cb:         Callback interface to ISP context for CDM page fault
  *                         set during device acquire

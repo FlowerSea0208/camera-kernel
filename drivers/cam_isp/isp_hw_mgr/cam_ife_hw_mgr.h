@@ -238,6 +238,22 @@ struct cam_ife_cdm_user_data {
 };
 
 /**
+ * struct cam_ife_mgr_bw_data - contain data to calc bandwidth for context
+ *
+ * @format:                    image format
+ * @width:                     image width
+ * @height:                    image height
+ * @framerate:                 framerate
+ *
+ */
+struct cam_ife_mgr_bw_data {
+	uint32_t format;
+	uint32_t width;
+	uint32_t height;
+	uint32_t framerate;
+};
+
+/**
  * struct cam_ife_hw_mgr_ctx - IFE HW manager Context object
  *
  * concr_ctx:             HW Context currently used from this manager context
@@ -247,34 +263,43 @@ struct cam_ife_cdm_user_data {
  * ctx_in_use:            indicates if context is active
  * is_offline:            indicates if context is used for offline processing
  * ctx_idx:               index of this context
- * stop_done_complete:    completion signaled when context is ceased operation
- * is_stopping:           if context is about to cease operation
+ * num_in_ports:          number of context input ports
+ * in_ports:              context input ports
+ * bw_data:               contains data for BW usage calculation
  *
  */
 struct cam_ife_hw_mgr_ctx {
 	struct cam_ife_hw_concrete_ctx       *concr_ctx;
-	struct cam_ife_hw_mgr                *hw_mgr; // seems not use it
+	struct cam_ife_hw_mgr                *hw_mgr;
 	cam_hw_event_cb_func                  event_cb[CAM_ISP_HW_EVENT_MAX];
 	void                                 *cb_priv;
 	uint32_t                              ctx_in_use;
 	bool                                  is_offline;
 	uint32_t                              ctx_idx;
-	struct completion                     stop_done_complete;
-	bool                                  is_stopping;
 	uint32_t                              num_in_ports;
 	struct cam_isp_in_port_generic_info  *in_ports;
+	struct cam_ife_mgr_bw_data            bw_data;
+	uint32_t                              unpacker_fmt;
 };
 
 
 /**
- * struct cam_ife_hw_concrete_ctx - IFE HW manager Context object
+ * struct cam_ife_hw_concrete_ctx - IFE HW Context object
  *
  * @list:                   used by the ctx list.
  * @common:                 common acquired context data
  * @ctx_index:              acquired context id.
  * @left_hw_idx:            hw index for master core [left]
  * @right_hw_idx:           hw index for slave core [right]
+ * @acquired_hw_id:         hw id that this context acquired
+ * @served_ctx_id:          contains currently and next served context ids
+ * @served_ctx_r:           index pointing to currently served context id
+ * @served_ctx_w:           index pointing to next served context id
  * @hw_mgr:                 IFE hw mgr which owns this context
+ * @ctx_in_use:             flag to tell whether context is active
+ * @res_list_tpg:           TPG resource list
+ * @res_list_ife_in:        Starting resource(TPG,PHY0, PHY1...) Can only be
+ *                          one.
  * @res_list_csid:          CSID resource list
  * @res_list_ife_src:       IFE input resource list
  * @res_list_sfe_src        SFE input resource list
@@ -322,6 +347,8 @@ struct cam_ife_hw_mgr_ctx {
  * @curr_num_exp:           Current num of exposures
  * @try_recovery_cnt:       Retry count for overflow recovery
  * @recovery_req_id:        The request id on which overflow recovery happens
+ * @ctx_state               Indicates context state
+ * @offline_clk             Clock value to be configured for offline processing
  *
  */
 struct cam_ife_hw_concrete_ctx  {
@@ -388,6 +415,10 @@ struct cam_ife_hw_concrete_ctx  {
 	uint64_t                                   recovery_req_id;
 	atomic_t                                   ctx_state;
 	bool                                       is_offline;
+	uint32_t                                   offline_clk;
+	bool                                       waiting_start;
+	uint32_t                                   start_ctx_idx;
+
 };
 
 /**
@@ -519,6 +550,11 @@ struct cam_isp_sfe_cache_info {
  * @num_caches_found       Number of caches supported
  * @sys_cache_info         Sys cache info
  * @sfe_cache_info         SFE Cache Info
+ * @offline_clk:               last set clock for offline processing
+ * @max_clk_threshold:         min clock threshold
+ * @nom_clk_threshold:         nom clock threshold
+ * @min_clk_threshold:         max clock threshold
+ * @bytes_per_clk:             bytes per clock processed
  */
 struct cam_ife_hw_mgr {
 	struct cam_isp_hw_mgr          mgr_common;
@@ -556,6 +592,12 @@ struct cam_ife_hw_mgr {
 	uint32_t                         num_caches_found;
 	struct cam_isp_sys_cache_info    sys_cache_info[CAM_LLCC_MAX];
 	struct cam_isp_sfe_cache_info    sfe_cache_info[CAM_SFE_HW_NUM_MAX];
+
+	uint32_t                         offline_clk;
+	uint32_t                         max_clk_threshold;
+	uint32_t                         nom_clk_threshold;
+	uint32_t                         min_clk_threshold;
+	uint32_t                         bytes_per_clk;
 };
 
 /**
