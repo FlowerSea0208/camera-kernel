@@ -133,6 +133,10 @@ struct cam_sfe_bus_rd_priv {
 	void                               *tasklet_info;
 	uint32_t                            top_irq_shift;
 	uint32_t                            latency_buf_allocation;
+	uint32_t                            max_clk_threshold;
+	uint32_t                            nom_clk_threshold;
+	uint32_t                            min_clk_threshold;
+	uint32_t                            bytes_per_clk;
 };
 
 static void cam_sfe_bus_rd_pxls_to_bytes(uint32_t pxls, uint32_t fmt,
@@ -1308,6 +1312,15 @@ static int cam_sfe_bus_init_sfe_bus_read_resource(
 	rsrc_data->secure_mode = CAM_SECURE_MODE_NON_SECURE;
 	sfe_bus_rd->hw_intf = bus_rd_priv->common_data.hw_intf;
 
+	bus_rd_priv->max_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].max_clk_threshold;
+	bus_rd_priv->nom_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].nom_clk_threshold;
+	bus_rd_priv->min_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].min_clk_threshold;
+	bus_rd_priv->bytes_per_clk  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].bytes_per_clk;
+
 	return 0;
 }
 
@@ -1788,6 +1801,25 @@ end:
 	return 0;
 }
 
+static int cam_sfe_bus_rd_get_off_clk_thr(void *priv, void *cmd_args,
+	uint32_t arg_size)
+{
+	struct cam_sfe_bus_rd_priv    *bus_priv;
+	struct cam_isp_hw_get_off_clk_thr  *args = cmd_args;
+
+	if (arg_size != sizeof(struct cam_isp_hw_get_off_clk_thr)) {
+		CAM_ERR(CAM_ISP, "invalid ars size");
+		return -EINVAL;
+	}
+	bus_priv = (struct cam_sfe_bus_rd_priv  *) priv;
+	args->max_clk_threshold = bus_priv->max_clk_threshold;
+	args->nom_clk_threshold = bus_priv->nom_clk_threshold;
+	args->min_clk_threshold = bus_priv->min_clk_threshold;
+	args->bytes_per_clk     = bus_priv->bytes_per_clk;
+
+	return 0;
+}
+
 static int cam_sfe_bus_init_hw(void *hw_priv,
 	void *init_hw_args, uint32_t arg_size)
 {
@@ -1923,6 +1955,9 @@ static int cam_sfe_bus_rd_process_cmd(
 	}
 
 	switch (cmd_type) {
+	case CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS:
+		rc = cam_sfe_bus_rd_get_off_clk_thr(priv, cmd_args, arg_size);
+		break;
 	case CAM_ISP_HW_CMD_GET_BUF_UPDATE_RM:
 		rc = cam_sfe_bus_rd_update_rm(priv, cmd_args, arg_size);
 		break;
