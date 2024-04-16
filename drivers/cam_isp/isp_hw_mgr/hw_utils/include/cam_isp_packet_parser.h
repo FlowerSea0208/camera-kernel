@@ -253,7 +253,8 @@ int cam_isp_add_io_buffers(
 	bool                                     fill_fence,
 	enum cam_isp_hw_type                     hw_type,
 	struct cam_isp_frame_header_info        *frame_header_info,
-	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg);
+	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg,
+	uint32_t                                 unpacker_fmt);
 
 /*
  * cam_isp_add_reg_update()
@@ -405,4 +406,7 @@ int cam_isp_add_csid_command_buffers(
 int cam_isp_get_cmd_buf_count(
 	struct cam_hw_prepare_update_args    *prepare,
 	struct cam_isp_cmd_buf_count         *cmd_buf_count);
+
+int cam_isp_count_hw_entries(struct cam_hw_prepare_update_args *prepare);
+
 #endif /*_CAM_ISP_HW_PARSER_H */
