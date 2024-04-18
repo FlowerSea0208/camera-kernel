@@ -28,7 +28,7 @@
 #define CAM_ISP_CTX_RES_MAX                     24
 
 /* max requests per ctx for isp */
-#define CAM_ISP_CTX_REQ_MAX                     8
+#define CAM_ISP_CTX_REQ_MAX                     12
 
 /*
  * Maximum entries in state monitoring array for error logging
