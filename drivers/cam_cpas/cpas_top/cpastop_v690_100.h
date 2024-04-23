@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CPASTOP_V690_100_H_
@@ -60,7 +60,7 @@ static struct cam_camnoc_irq_err
 	},
 	{
 		.irq_type = CAM_CAMNOC_HW_IRQ_IFE_UBWC_ENCODE_ERROR,
-		.enable = true,
+		.enable = false,
 		.sbm_port = 0x20, /* SBM_FAULTINSTATUS0_LOW_PORT5_MASK */
 		.err_enable = {
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -82,7 +82,7 @@ static struct cam_camnoc_irq_err
 	},
 	{
 		.irq_type = CAM_CAMNOC_HW_IRQ_IPE0_UBWC_DECODE_ERROR,
-		.enable = true,
+		.enable = false,
 		.sbm_port = 0x4, /* SBM_FAULTINSTATUS0_LOW_PORT2_MASK */
 		.err_enable = {
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -104,7 +104,7 @@ static struct cam_camnoc_irq_err
 	},
 	{
 		.irq_type = CAM_CAMNOC_HW_IRQ_IPE_UBWC_ENCODE_ERROR,
-		.enable = true,
+		.enable = false,
 		.sbm_port = 0x10, /* SBM_FAULTINSTATUS0_LOW_PORT4_MASK */
 		.err_enable = {
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -177,7 +177,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_IFE_RDI_WR,
 		.port_name = "IFE_RDI_WR",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -253,7 +253,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_IFE_LINEAR_STATS,
 		.port_name = "IFE_LINEAR_STATS",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -329,7 +329,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_SFE_RD,
 		.port_name = "SFE_RD",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -398,7 +398,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_IPE_WR,
 		.port_name = "IPE_WR",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = true,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -469,7 +469,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_IPE0_RD,
 		.port_name = "IPE0_RD",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -537,7 +537,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_CDM,
 		.port_name = "CDM",
-		.enable = true,
+		.enable = false,
 		.priority_lut_low = {
 			.enable = false,
 			.access_type = CAM_REG_TYPE_READ_WRITE,
@@ -601,7 +601,7 @@ static struct cam_camnoc_specific
 	{
 		.port_type = CAM_CAMNOC_ICP,
 		.port_name = "ICP",
-		.enable = true,
+		.enable = false,
 		.flag_out_set0_low = {
 			.enable = false,
 			.access_type = CAM_REG_TYPE_WRITE,
