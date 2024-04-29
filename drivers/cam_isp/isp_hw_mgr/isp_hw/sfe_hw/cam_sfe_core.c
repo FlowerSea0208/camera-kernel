@@ -416,6 +416,14 @@ int cam_sfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 			core_info->sfe_bus_wr->bus_priv, cmd_type,
 			cmd_args, arg_size);
 		break;
+	case CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS:
+		if (core_info->sfe_bus_rd)
+			rc = core_info->sfe_bus_rd->hw_ops.process_cmd(
+				core_info->sfe_bus_rd->bus_priv, cmd_type,
+				cmd_args, arg_size);
+		else
+			rc = -EINVAL;
+		break;
 	case CAM_ISP_HW_CMD_GET_HFR_UPDATE_RM:
 	case CAM_ISP_HW_CMD_GET_BUF_UPDATE_RM:
 	case CAM_ISP_HW_CMD_BUF_UPDATE_RM:

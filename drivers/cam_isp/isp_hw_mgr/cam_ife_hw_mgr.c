@@ -16310,17 +16310,6 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 				ife_device->hw_priv;
 			struct cam_hw_soc_info *soc_info = &vfe_hw->soc_info;
 
-			g_ife_hw_mgr.max_clk_threshold = 785000000;
-			g_ife_hw_mgr.nom_clk_threshold = 785000000;
-			g_ife_hw_mgr.min_clk_threshold = 466000000;
-			g_ife_hw_mgr.bytes_per_clk     = 2;
-			CAM_DBG(CAM_ISP,
-				"Offline IFE thresholds max %lld nom %lld  min%lld",
-				off_clk_thr.max_clk_threshold,
-				off_clk_thr.nom_clk_threshold,
-				off_clk_thr.min_clk_threshold,
-				off_clk_thr.bytes_per_clk);
-
 			if (j == 0) {
 				ife_device->hw_ops.process_cmd(
 					vfe_hw,
@@ -16396,6 +16385,27 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 				struct cam_hw_info *sfe_hw =
 					(struct cam_hw_info *)
 					sfe_device->hw_priv;
+
+				if (!sfe_device->hw_ops.process_cmd(
+						sfe_hw,
+						CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS,
+						&off_clk_thr,
+						sizeof(off_clk_thr))) {
+					g_ife_hw_mgr.max_clk_threshold =
+						off_clk_thr.max_clk_threshold;
+					g_ife_hw_mgr.nom_clk_threshold =
+						off_clk_thr.nom_clk_threshold;
+					g_ife_hw_mgr.min_clk_threshold =
+						off_clk_thr.min_clk_threshold;
+					g_ife_hw_mgr.bytes_per_clk =
+						off_clk_thr.bytes_per_clk;
+					CAM_ERR(CAM_ISP,
+						"Offline SFE thresholds max %d nom %d  min%d",
+						off_clk_thr.max_clk_threshold,
+						off_clk_thr.nom_clk_threshold,
+						off_clk_thr.min_clk_threshold,
+						off_clk_thr.bytes_per_clk);
+				}
 
 				rc = sfe_device->hw_ops.process_cmd(
 					sfe_hw,
