@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/device.h>
@@ -700,6 +700,8 @@ static int cam_cpas_apply_smart_qos(
 	struct cam_cpas_tree_node *niu_node;
 	uint8_t i;
 	int32_t reg_indx = cpas_core->regbase_index[CAM_CPAS_REG_CAMNOC];
+	int32_t cam_qos_cnt = 0, ret = 0;
+	struct qcom_scm_camera_qos scm_buf[QCOM_SCM_CAMERA_MAX_QOS_CNT] = {0};
 
 	if (cpas_core->smart_qos_dump) {
 		CAM_INFO(CAM_PERF, "Printing SmartQos values before update");
@@ -710,10 +712,31 @@ static int cam_cpas_apply_smart_qos(
 		niu_node = soc_private->smart_qos_info->rt_wr_niu_node[i];
 
 		if (niu_node->curr_priority != niu_node->applied_priority) {
-			cam_io_w_mb(niu_node->curr_priority,
-				soc_info->reg_map[reg_indx].mem_base +
-				niu_node->pri_lut_low_offset);
-			niu_node->applied_priority = niu_node->curr_priority;
+			if (!soc_private->enable_secure_qos_update)
+			{
+				cam_io_w_mb(niu_node->curr_priority,
+					soc_info->reg_map[reg_indx].mem_base +
+					niu_node->pri_lut_low_offset);
+				niu_node->applied_priority = niu_node->curr_priority;
+			}
+			else
+			{
+				scm_buf[cam_qos_cnt].offset = niu_node->pri_lut_low_offset;
+				scm_buf[cam_qos_cnt].val = niu_node->curr_priority;
+				cam_qos_cnt++;
+			}
+		}
+
+		if (soc_private->enable_secure_qos_update && cam_qos_cnt) {
+			CAM_DBG(CAM_PERF, "Updating secure camera smartOos count: %d", cam_qos_cnt);
+			ret = cam_update_camnoc_qos_settings(CAM_QOS_UPDATE_TYPE_SMART,
+				cam_qos_cnt, scm_buf);
+			if (ret) {
+				CAM_ERR(CAM_PERF, "Secure camera smartOos update failed:%d", ret);
+				return ret;
+			}
+			CAM_DBG(CAM_PERF, "Updated secure camera smartOos");
+			cam_qos_cnt = 0;
 		}
 	}
 

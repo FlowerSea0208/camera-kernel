@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPAS_API_H_
@@ -27,6 +27,15 @@
 /* Qos Selection mask */
 #define CAM_CPAS_QOS_DEFAULT_SETTINGS_MASK 0x1
 #define CAM_CPAS_QOS_CUSTOM_SETTINGS_MASK  0x2
+
+/**
+ *  Secure camera QoS update id - Enum for identify QOS settings update type
+ */
+enum secure_camera_qos_update_type {
+	CAM_QOS_UPDATE_TYPE_STATIC = 0x0,
+	CAM_QOS_UPDATE_TYPE_SMART  = 0x1,
+	CAM_QOS_UPDATE_TYPE_MAX,
+};
 
 /**
  * enum cam_cpas_reg_base - Enum for register base identifier. These
