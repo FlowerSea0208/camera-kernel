@@ -416,6 +416,7 @@ struct cam_ife_hw_concrete_ctx  {
 	atomic_t                                   ctx_state;
 	bool                                       is_offline;
 	uint32_t                                   offline_clk;
+	uint32_t                                   offline_sfe_clk;
 	bool                                       waiting_start;
 	uint32_t                                   start_ctx_idx;
 
@@ -594,6 +595,7 @@ struct cam_ife_hw_mgr {
 	struct cam_isp_sfe_cache_info    sfe_cache_info[CAM_SFE_HW_NUM_MAX];
 
 	uint32_t                         offline_clk;
+	uint32_t                         offline_sfe_clk;
 	uint32_t                         max_clk_threshold;
 	uint32_t                         nom_clk_threshold;
 	uint32_t                         min_clk_threshold;
