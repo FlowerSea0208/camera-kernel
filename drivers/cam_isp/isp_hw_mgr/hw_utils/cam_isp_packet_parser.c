@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <media/cam_defs.h>
@@ -767,8 +767,8 @@ static int cam_isp_io_buf_get_entries_util(
 				&buf_info->scratch_check_cfg->ife_scratch_res_info,
 				io_cfg->resource_type);
 		}
-
 		*hw_mgr_res = &buf_info->res_list_isp_out[buf_info->out_map[res_id]];
+
 		if ((*hw_mgr_res)->res_type == CAM_ISP_RESOURCE_UNINT) {
 			CAM_ERR(CAM_ISP, "io res id:%d not valid",
 				io_cfg->resource_type);
@@ -852,7 +852,8 @@ static int cam_isp_add_io_buffers_util(
 	struct cam_hw_fence_map_entry      *out_map_entry = NULL;
 	struct cam_smmu_buffer_tracker     *old_head_entry, *new_head_entry;
 	uint32_t                            kmd_buf_remain_size;
-	uint32_t                            plane_id, num_entries;
+	uint32_t                            plane_id;
+	int                                 num_entries;
 	dma_addr_t                         *image_buf_addr;
 	uint32_t                           *image_buf_offset;
 	size_t                              size;
@@ -897,7 +898,7 @@ static int cam_isp_add_io_buffers_util(
 		secure_mode.data = (void *)&mode;
 		rc = res->hw_intf->hw_ops.process_cmd(
 			res->hw_intf->hw_priv, secure_mode_cmd,
-			&secure_mode, sizeof(struct cam_isp_hw_get_cmd_update));
+			&secure_mode, (uint32_t)sizeof(struct cam_isp_hw_get_cmd_update));
 		if (rc) {
 			CAM_ERR(CAM_ISP, "Get secure mode failed cmd_type %d res_id %d",
 				secure_mode_cmd, res->res_id);
@@ -934,8 +935,8 @@ static int cam_isp_add_io_buffers_util(
 		CAM_DBG(CAM_ISP, "get io_addr for plane %d: 0x%llx, mem_hdl=0x%x",
 			plane_id, io_addr[plane_id], io_cfg->mem_handle[plane_id]);
 
-		CAM_DBG(CAM_ISP, "mmu_hdl=0x%x, size=%d, end=0x%x",
-			mmu_hdl, (int)size, io_addr[plane_id]+size);
+		CAM_DBG(CAM_ISP, "mmu_hdl=0x%x, size=%zu, end=0x%llx",
+			mmu_hdl, size, io_addr[plane_id]+size);
 	}
 
 	if (!plane_id) {
@@ -987,7 +988,7 @@ static int cam_isp_add_io_buffers_util(
 	rc = res->hw_intf->hw_ops.process_cmd(
 		res->hw_intf->hw_priv,
 		bus_update_cmd, &update_buf,
-		sizeof(struct cam_isp_hw_get_cmd_update));
+		(uint32_t)sizeof(struct cam_isp_hw_get_cmd_update));
 
 	if (rc) {
 		CAM_ERR(CAM_ISP, "get buf cmd error:%d",
@@ -1220,13 +1221,14 @@ int cam_isp_add_io_buffers(struct cam_isp_io_buf_info   *io_info)
 	}
 
 	disabled_wm_mask = (prepare_hw_data->wm_bitmask ^ cfg_io_mask);
+
 	if ((io_info->base->hw_type == CAM_ISP_HW_TYPE_TFE) && disabled_wm_mask) {
 		for (j = 0; j < io_info->out_max; j++) {
 			rc = cam_isp_add_disable_wm_update(io_info->prepare,
-					&io_info->res_list_isp_out[j],
+					&io_info->res_list_isp_out[io_info->out_map[j]],
 					io_info->base->idx, io_info->kmd_buf_info,
-					disabled_wm_mask,
-					&io_info->kmd_buf_info->used_bytes);
+					&disabled_wm_mask,
+					io_info);
 			if (rc) {
 				CAM_ERR_RATE_LIMIT(CAM_ISP, "Disable out res %d failed",
 						j, rc);
@@ -1263,8 +1265,8 @@ int cam_isp_add_disable_wm_update(
 	struct cam_isp_hw_mgr_res            *isp_hw_res,
 	uint32_t                              base_idx,
 	struct cam_kmd_buf_info              *kmd_buf_info,
-	uint64_t                              wm_mask,
-	uint32_t                             *io_cfg_used_bytes)
+	uint64_t                              *wm_mask,
+	struct cam_isp_io_buf_info *io_info)
 {
 	int rc = 0;
 	struct cam_hw_intf                 *hw_intf;
@@ -1281,23 +1283,25 @@ int cam_isp_add_disable_wm_update(
 		res = isp_hw_res->hw_res[i];
 		if (res->hw_intf->hw_idx != base_idx)
 			continue;
-		if (!(wm_mask & (1 << res->res_id))) {
+		if (!(*wm_mask & (1 << res->res_id))) {
 			CAM_DBG(CAM_ISP, "No need to disable out res %d", res->res_id);
 			continue;
 		}
-		if (kmd_buf_info->size > (kmd_buf_info->used_bytes +
-			(*io_cfg_used_bytes))) {
-			kmd_buf_remain_size =  kmd_buf_info->size -
-			(kmd_buf_info->used_bytes +
-			(*io_cfg_used_bytes));
+
+		*wm_mask &= ~BIT(res->res_id);
+
+		if (kmd_buf_info->used_bytes < kmd_buf_info->size) {
+			kmd_buf_remain_size = kmd_buf_info->size - kmd_buf_info->used_bytes;
 		} else {
-			CAM_ERR(CAM_ISP, "no free mem %d %d", kmd_buf_info->size,
-				kmd_buf_info->used_bytes + (*io_cfg_used_bytes));
-			rc = -EINVAL;
-			return rc;
+			CAM_ERR(CAM_ISP,
+				"no free kmd memory for base=%d bytes_used=%u buf_size=%u",
+				base_idx, kmd_buf_info->used_bytes, kmd_buf_info->size);
+				rc = -EINVAL;
+				return rc;
 		}
+
 		wm_update.cmd.cmd_buf_addr = kmd_buf_info->cpu_addr +
-			kmd_buf_info->used_bytes/4 + (*io_cfg_used_bytes)/4;
+			kmd_buf_info->used_bytes/4;
 		wm_update.cmd.size = kmd_buf_remain_size;
 		wm_update.cmd_type = CAM_ISP_HW_CMD_BUS_WM_DISABLE;
 		wm_update.res = res;
@@ -1311,9 +1315,11 @@ int cam_isp_add_disable_wm_update(
 			return rc;
 		}
 		CAM_DBG(CAM_ISP,
-			"Out res %d disable update added hw_id %d cdm_idx %d",
-			res->res_id, res->hw_intf->hw_idx, base_idx);
-		(*io_cfg_used_bytes) += wm_update.cmd.used_bytes;
+			"Out res %d disable update added hw_id %d cdm_idx %d split id: %d",
+			res->res_id, res->hw_intf->hw_idx, base_idx, i);
+
+		io_info->kmd_buf_info->used_bytes += wm_update.cmd.used_bytes;
+		io_info->kmd_buf_info->offset += wm_update.cmd.used_bytes;
 	}
 	return rc;
 }

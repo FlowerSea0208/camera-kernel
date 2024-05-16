@@ -1,17 +1,17 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
-#ifndef _CAM_TFE770_H_
-#define _CAM_TFE770_H_
+#ifndef _CAM_TFE665_H_
+#define _CAM_TFE665_H_
 #include <media/cam_isp_tfe.h>
 #include "cam_tfe_core.h"
 #include "cam_tfe_bus.h"
 
 
-static struct cam_tfe_top_reg_offset_common  tfe770_top_commong_reg  = {
+static struct cam_tfe_top_reg_offset_common  tfe665_top_commong_reg  = {
 	.hw_version                             = 0x00001800,
 	.hw_capability                          = 0x00001804,
 	.lens_feature                           = 0x00001808,
@@ -97,7 +97,7 @@ static struct cam_tfe_top_reg_offset_common  tfe770_top_commong_reg  = {
 	.epoch_shift_val                        = 16,
 };
 
-static struct cam_tfe_camif_reg  tfe770_camif_reg = {
+static struct cam_tfe_camif_reg  tfe665_camif_reg = {
 	.hw_version                   = 0x00001C00,
 	.hw_status                    = 0x00001C04,
 	.module_cfg                   = 0x00001C60,
@@ -115,7 +115,7 @@ static struct cam_tfe_camif_reg  tfe770_camif_reg = {
 	.reg_update_cmd               = 0x0000182C,
 };
 
-static struct cam_tfe_camif_reg_data tfe770_camif_reg_data = {
+static struct cam_tfe_camif_reg_data tfe665_camif_reg_data = {
 	.extern_reg_update_mask       = 0x00000001,
 	.dual_tfe_pix_en_shift        = 0x00000001,
 	.extern_reg_update_shift      = 0x0,
@@ -157,7 +157,7 @@ static struct cam_tfe_camif_reg_data tfe770_camif_reg_data = {
 	.extern_mup_shift             = 22,
 };
 
-static struct cam_tfe_rdi_reg  tfe770_rdi0_reg = {
+static struct cam_tfe_rdi_reg  tfe665_rdi0_reg = {
 	.rdi_hw_version              = 0x00001E00,
 	.rdi_hw_status               = 0x00001E04,
 	.rdi_module_config           = 0x00001E60,
@@ -171,7 +171,7 @@ static struct cam_tfe_rdi_reg  tfe770_rdi0_reg = {
 	.reg_update_cmd              = 0x0000182C,
 };
 
-static struct cam_tfe_rdi_reg_data tfe770_rdi0_reg_data = {
+static struct cam_tfe_rdi_reg_data tfe665_rdi0_reg_data = {
 	.reg_update_cmd_data         = 0x2,
 	.epoch_line_cfg              = 0x00140014,
 	.pixel_pattern_shift         = 24,
@@ -194,7 +194,7 @@ static struct cam_tfe_rdi_reg_data tfe770_rdi0_reg_data = {
 	.diag_sensor_shift           = 0x1,
 };
 
-static struct cam_tfe_rdi_reg  tfe770_rdi1_reg = {
+static struct cam_tfe_rdi_reg  tfe665_rdi1_reg = {
 	.rdi_hw_version              = 0x00002000,
 	.rdi_hw_status               = 0x00002004,
 	.rdi_module_config           = 0x00002060,
@@ -208,7 +208,7 @@ static struct cam_tfe_rdi_reg  tfe770_rdi1_reg = {
 	.reg_update_cmd              = 0x0000182C,
 };
 
-static struct cam_tfe_rdi_reg_data tfe770_rdi1_reg_data = {
+static struct cam_tfe_rdi_reg_data tfe665_rdi1_reg_data = {
 	.reg_update_cmd_data         = 0x4,
 	.epoch_line_cfg              = 0x00140014,
 	.pixel_pattern_shift         = 24,
@@ -231,7 +231,7 @@ static struct cam_tfe_rdi_reg_data tfe770_rdi1_reg_data = {
 	.diag_sensor_shift           = 0x1,
 };
 
-static struct cam_tfe_rdi_reg  tfe770_rdi2_reg = {
+static struct cam_tfe_rdi_reg  tfe665_rdi2_reg = {
 	.rdi_hw_version              = 0x00002200,
 	.rdi_hw_status               = 0x00002204,
 	.rdi_module_config           = 0x00002260,
@@ -245,7 +245,7 @@ static struct cam_tfe_rdi_reg  tfe770_rdi2_reg = {
 	.reg_update_cmd              = 0x0000182C,
 };
 
-static struct cam_tfe_rdi_reg_data tfe770_rdi2_reg_data = {
+static struct cam_tfe_rdi_reg_data tfe665_rdi2_reg_data = {
 	.reg_update_cmd_data         = 0x8,
 	.epoch_line_cfg              = 0x00140014,
 	.pixel_pattern_shift         = 24,
@@ -269,7 +269,7 @@ static struct cam_tfe_rdi_reg_data tfe770_rdi2_reg_data = {
 
 };
 
-static struct cam_tfe_ppp_reg  tfe770_ppp_reg = {
+static struct cam_tfe_ppp_reg  tfe665_ppp_reg = {
 	.ppp_hw_version              = 0x00002400,
 	.ppp_hw_status               = 0x00002404,
 	.ppp_module_config           = 0x00002460,
@@ -283,7 +283,7 @@ static struct cam_tfe_ppp_reg  tfe770_ppp_reg = {
 	.reg_update_cmd              = 0x0000182C,
 };
 
-static struct cam_tfe_ppp_reg_data tfe770_ppp_reg_data = {
+static struct cam_tfe_ppp_reg_data tfe665_ppp_reg_data = {
 	.sof_irq_mask                = 0x00000000,
 	.epoch0_irq_mask             = 0x00000000,
 	.epoch1_irq_mask             = 0x00000000,
@@ -300,7 +300,7 @@ static struct cam_tfe_ppp_reg_data tfe770_ppp_reg_data = {
 	.lcr_dis_en_shift            = 23,
 };
 
-static struct cam_tfe_clc_hw_status  tfe770_clc_hw_info[CAM_TFE_MAX_CLC] = {
+static struct cam_tfe_clc_hw_status  tfe665_clc_hw_info[CAM_TFE_MAX_CLC] = {
 	{
 		.name = "CLC_CAMIF",
 		.hw_status_reg = 0x1C04,
@@ -467,29 +467,29 @@ static struct cam_tfe_clc_hw_status  tfe770_clc_hw_info[CAM_TFE_MAX_CLC] = {
 	},
 };
 
-static struct  cam_tfe_top_hw_info tfe770_top_hw_info = {
-	.common_reg = &tfe770_top_commong_reg,
+static struct  cam_tfe_top_hw_info tfe665_top_hw_info = {
+	.common_reg = &tfe665_top_commong_reg,
 	.camif_hw_info = {
-		.camif_reg = &tfe770_camif_reg,
-		.reg_data  = &tfe770_camif_reg_data,
+		.camif_reg = &tfe665_camif_reg,
+		.reg_data  = &tfe665_camif_reg_data,
 	},
 	.rdi_hw_info  = {
 		{
-			.rdi_reg  = &tfe770_rdi0_reg,
-			.reg_data = &tfe770_rdi0_reg_data,
+			.rdi_reg  = &tfe665_rdi0_reg,
+			.reg_data = &tfe665_rdi0_reg_data,
 		},
 		{
-			.rdi_reg  = &tfe770_rdi1_reg,
-			.reg_data = &tfe770_rdi1_reg_data,
+			.rdi_reg  = &tfe665_rdi1_reg,
+			.reg_data = &tfe665_rdi1_reg_data,
 		},
 		{
-			.rdi_reg  = &tfe770_rdi2_reg,
-			.reg_data = &tfe770_rdi2_reg_data,
+			.rdi_reg  = &tfe665_rdi2_reg,
+			.reg_data = &tfe665_rdi2_reg_data,
 		},
 	},
 	.ppp_hw_info = {
-		.ppp_reg = &tfe770_ppp_reg,
-		.reg_data  = &tfe770_ppp_reg_data,
+		.ppp_reg = &tfe665_ppp_reg,
+		.reg_data  = &tfe665_ppp_reg_data,
 	},
 	.in_port = {
 		CAM_TFE_CAMIF_VER_1_0,
@@ -607,7 +607,7 @@ static struct  cam_tfe_top_hw_info tfe770_top_hw_info = {
 	},
 };
 
-static struct cam_tfe_bus_hw_info  tfe770_bus_hw_info = {
+static struct cam_tfe_bus_hw_info  tfe665_bus_hw_info = {
 	.common_reg = {
 		.hw_version  = 0x00003000,
 		.cgc_ovd     = 0x00003008,
@@ -1403,7 +1403,7 @@ static struct cam_tfe_bus_hw_info  tfe770_bus_hw_info = {
 	.max_out_res = CAM_ISP_TFE_OUT_RES_MAX & 0xFF,
 };
 
-struct cam_tfe_hw_info cam_tfe770 = {
+struct cam_tfe_hw_info cam_tfe665 = {
 	.top_irq_mask = {
 		0x00001834,
 		0x00001838,
@@ -1465,12 +1465,12 @@ struct cam_tfe_hw_info cam_tfe770 = {
 	},
 
 	.num_clc = 39,
-	.clc_hw_status_info            = tfe770_clc_hw_info,
+	.clc_hw_status_info            = tfe665_clc_hw_info,
 	.bus_version                   = CAM_TFE_BUS_1_0,
-	.bus_hw_info                   = &tfe770_bus_hw_info,
+	.bus_hw_info                   = &tfe665_bus_hw_info,
 
 	.top_version                   = CAM_TFE_TOP_1_0,
-	.top_hw_info                   = &tfe770_top_hw_info,
+	.top_hw_info                   = &tfe665_top_hw_info,
 };
 
-#endif /* _CAM_TFE770__H_ */
+#endif /* _CAM_TFE665__H_ */
