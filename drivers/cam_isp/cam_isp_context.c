@@ -1329,6 +1329,10 @@ static void __cam_isp_ctx_send_sof_timestamp(
 	struct cam_req_mgr_message   req_msg;
 	struct cam_context           *ctx = ctx_isp->base;
 
+	// offline context no needed to send sof event to userspace
+	if (ctx_isp->offline_context)
+		return;
+
 	if (ctx_isp->reported_frame_id == ctx_isp->frame_id) {
 		if (__cam_isp_ctx_recover_sof_timestamp(ctx_isp->base, request_id))
 			CAM_WARN(CAM_ISP, "Missed SOF. Unable to recover SOF timestamp.");
