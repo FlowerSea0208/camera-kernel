@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -2832,14 +2832,28 @@ notify_only:
 					CAM_ISP_CTX_EVENT_EPOCH, req);
 				break;
 			}
+			else
+			{
+				CAM_ERR(CAM_ISP,
+					"request_id %lld, req: %lld, reported_req_id %lld ctx id %d bubbile detected %d ",
+					request_id, req->request_id,
+					ctx_isp->reported_req_id,ctx->ctx_id,req_isp->bubble_detected);
+			}
 		}
 
 		if (ctx_isp->substate_activated == CAM_ISP_CTX_ACTIVATED_BUBBLE)
 			request_id = 0;
 
-		if (request_id != 0)
+		if (request_id != 0) {
 			ctx_isp->reported_req_id = request_id;
-
+		}
+		else
+		{
+			CAM_ERR(CAM_ISP,
+				"request_id %lld, req: %lld, since frame_cnt = %lld",
+				request_id, req->request_id,
+				ctx_isp->bubble_frame_cnt);
+		}
 		__cam_isp_ctx_send_sof_timestamp(ctx_isp, request_id,
 			CAM_REQ_MGR_SOF_EVENT_SUCCESS);
 
@@ -5124,8 +5138,8 @@ static int __cam_isp_ctx_flush_req(struct cam_context *ctx,
 	return 0;
 }
 
-#if 0
-static int __cam_isp_ctx_flush_offline (struct cam_context *ctx,
+static int __cam_isp_ctx_flush_offline_req_in_top_state (
+	struct cam_context *ctx,
 	struct cam_flush_dev_cmd *cmd)
 {
 	struct cam_isp_context           *ctx_isp =
@@ -5173,7 +5187,6 @@ static int __cam_isp_ctx_flush_offline (struct cam_context *ctx,
 	spin_unlock_bh(&ctx->lock);
 	return rc;
 }
-#endif
 
 static int __cam_isp_ctx_flush_req_in_top_state(
 	struct cam_context               *ctx,
@@ -5221,8 +5234,8 @@ static int __cam_isp_ctx_flush_req_in_top_state(
 			CAM_ERR(CAM_ISP, "Failed to stop HW in Flush rc: %d",
 				rc);
 
-		CAM_INFO(CAM_ISP, "Stop HW complete. Reset HW next.");
-		CAM_DBG(CAM_ISP, "Flush wait and active lists");
+		CAM_DBG(CAM_ISP, "ctx_id:%d Stop HW complete. Reset HW next.", ctx->ctx_id);
+		CAM_DBG(CAM_ISP, "ctx_id:%d Flush wait and active lists", ctx->ctx_id);
 
 		if (ctx->ctx_crm_intf && ctx->ctx_crm_intf->notify_timer) {
 			timer.link_hdl = ctx->link_hdl;
@@ -5953,11 +5966,16 @@ static int __cam_isp_ctx_flush_dev_in_top_state(struct cam_context *ctx,
 	flush_req.req_id = cmd->req_id;
 
 	CAM_DBG(CAM_ISP, "offline flush (type:%u, req:%lu)", flush_req.type, flush_req.req_id);
+	CAM_DBG(CAM_ISP, "cam ctx id %d offline ctx %d rdi only ctx %d state %d",
+			ctx->ctx_id,
+			ctx_isp->offline_context,
+			ctx_isp->rdi_only_context,
+			ctx->state);
 
 	switch (ctx->state) {
 	case CAM_CTX_ACQUIRED:
 	case CAM_CTX_ACTIVATED:
-		return __cam_isp_ctx_flush_req_in_top_state(ctx, &flush_req);
+		return __cam_isp_ctx_flush_offline_req_in_top_state(ctx, cmd);
 	case CAM_CTX_READY:
 		return __cam_isp_ctx_flush_req_in_ready(ctx, &flush_req);
 	default:
@@ -7414,6 +7432,10 @@ static int __cam_isp_ctx_stop_dev_in_activated_unlock(
 	ctx_isp->substate_activated = CAM_ISP_CTX_ACTIVATED_HALT;
 	spin_unlock_bh(&ctx->lock);
 
+	CAM_DBG(CAM_ISP, "cam ctx id %d offline ctx %d rdi only ctx %d",
+			ctx->ctx_id, ctx_isp->offline_context,
+			ctx_isp->rdi_only_context);
+
 	/* stop hw first */
 	if (ctx_isp->hw_ctx) {
 		stop.ctxt_to_hw_map = ctx_isp->hw_ctx;
@@ -7529,6 +7551,13 @@ static int __cam_isp_ctx_stop_dev_in_activated(struct cam_context *ctx,
 	__cam_isp_ctx_stop_dev_in_activated_unlock(ctx, cmd);
 	ctx_isp->init_received = false;
 	ctx->state = CAM_CTX_ACQUIRED;
+
+	CAM_DBG(CAM_ISP, "cam ctx id %d offline ctx %d rdi only ctx %d state %d",
+			ctx->ctx_id,
+			ctx_isp->offline_context,
+			ctx_isp->rdi_only_context,
+			ctx->state);
+
 	trace_cam_context_state("ISP", ctx);
 	return rc;
 }
@@ -8155,7 +8184,6 @@ static struct cam_ctx_ops
 			.config_dev = __cam_isp_ctx_config_dev_in_top_state,
 			.flush_dev = __cam_isp_ctx_flush_dev_in_top_state,
 			.release_hw = __cam_isp_ctx_release_hw_in_activated,
-			//.flush_dev = __cam_isp_ctx_flush_offline,
 		},
 		.crm_ops = {
 			.unlink = __cam_isp_ctx_unlink_in_activated,
