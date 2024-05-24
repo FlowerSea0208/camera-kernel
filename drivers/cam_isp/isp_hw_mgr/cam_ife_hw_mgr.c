@@ -5312,6 +5312,25 @@ static inline void cam_ife_mgr_reset_streamon_scratch_cfg(
 	ctx->concr_ctx->scratch_buf_info.sfe_scratch_config->streamon_buf_mask = 0;
 }
 
+static int cam_ife_mgr_update_offline_ife_out(
+	struct cam_ife_hw_mgr_ctx *ife_ctx)
+{
+	struct cam_isp_hw_mgr_res       *ife_src_res;
+	int i;
+	int rc;
+
+	for (i = 0; i < ife_ctx->num_in_ports; i++) {
+		list_for_each_entry(ife_src_res,
+				&ife_ctx->concr_ctx->res_list_ife_src, list) {
+			if (ife_src_res->res_id == CAM_ISP_HW_VFE_IN_CAMIF) {
+				rc = cam_ife_hw_mgr_acquire_res_ife_out_pixel(
+					ife_ctx, ife_src_res,
+					&ife_ctx->in_ports[i], true);
+			}
+		}
+	}
+	return rc;
+}
 static int cam_ife_mgr_acquire_offline_out(
 	struct cam_ife_hw_mgr_ctx *ife_ctx,
 	struct cam_hw_acquire_args *acquire_args)
@@ -15663,6 +15682,7 @@ static int cam_ife_mgr_check_start_processing(void *hw_mgr_priv,
 			ife_ctx->served_ctx_w = 1 - ife_ctx->served_ctx_w;
 			ife_ctx->served_ctx_id[ife_ctx->served_ctx_w] =
 							run_hw_mgr_ctx->ctx_idx;
+			cam_ife_mgr_update_offline_ife_out(run_hw_mgr_ctx);
 
 			rc = cam_ife_mgr_prepare_hw_update(hw_mgr_priv,
 					&c_elem->prepare);
