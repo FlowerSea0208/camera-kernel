@@ -12367,31 +12367,31 @@ offline:
 		ctx->flags.is_offline) {
 		if (ctx->ctx_type != CAM_IFE_CTX_TYPE_SFE) {
 			for (i = 0; i < ctx->num_base; i++) {
-				rc = cam_isp_add_go_cmd(prepare,
+				if (ctx->base[i].hw_type == CAM_ISP_HW_TYPE_VFE) {
+					rc = cam_isp_add_go_cmd(prepare,
 						&ctx->res_list_ife_in_rd,
 						ctx->base[i].idx,
 						&prepare_hw_data->kmd_cmd_buff_info);
 
-				if (rc)
-					CAM_ERR(CAM_ISP,
-						"Add %s GO_CMD failed i: %d, idx: %d, rc: %d",
-						(ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE ?
-						"CSID" : "IFE RD"),
+					if (rc)
+						CAM_ERR(CAM_ISP,
+						"Add IFE RD GO_CMD failed i: %d, idx: %d, rc: %d",
 						i, ctx->base[i].idx, rc);
+				}
 			}
 		} else {
 			for (i = 0; i < ctx->num_base; i++) {
-				rc = cam_isp_add_csid_offline_cmd(prepare,
+				if (ctx->base[i].hw_type == CAM_ISP_HW_TYPE_CSID) {
+					rc = cam_isp_add_csid_offline_cmd(prepare,
 						&ctx->res_list_ife_csid,
 						ctx->base[i].idx,
 						&prepare_hw_data->kmd_cmd_buff_info);
 
-				if (rc)
-					CAM_ERR(CAM_ISP,
-						"Add %s CSID GO_CMD failed i: %d, idx: %d, rc: %d",
-						(ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE ?
-						"CSID" : "IFE RD"),
+					if (rc)
+						CAM_ERR(CAM_ISP,
+						"Add CSID GO_CMD failed i: %d, idx: %d, rc: %d",
 						i, ctx->base[i].idx, rc);
+				}
 			}
 		}
 	}
