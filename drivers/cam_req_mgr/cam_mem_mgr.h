@@ -35,6 +35,7 @@ enum cam_smmu_mapping_client {
  * @hdls:           list of mapped handles
  * @num_hdl:        number of handles
  * @fd:             file descriptor of buffer
+ * @i_ino:          inode number of this dmabuf. Uniquely identifies a buffer
  * @buf_handle:     unique handle for buffer
  * @align:          alignment for allocation
  * @len:            size of buffer
@@ -50,7 +51,6 @@ enum cam_smmu_mapping_client {
  * @smmu_mapping_client: Client buffer (User or kernel)
  * @urefcount:      Reference counter to track whether the buffer is
  *                  mapped and in use by umd
- * @ref_lock:       Mutex lock for refcount
  */
 struct cam_mem_buf_queue {
 	struct dma_buf *dma_buf;
@@ -58,6 +58,7 @@ struct cam_mem_buf_queue {
 	int32_t hdls[CAM_MEM_MMU_MAX_HANDLE];
 	int32_t num_hdl;
 	int32_t fd;
+	unsigned long i_ino;
 	int32_t buf_handle;
 	int32_t align;
 	size_t len;
@@ -71,7 +72,6 @@ struct cam_mem_buf_queue {
 	struct kref krefcount;
 	enum cam_smmu_mapping_client smmu_mapping_client;
 	struct kref urefcount;
-	struct mutex ref_lock;
 };
 
 /**
