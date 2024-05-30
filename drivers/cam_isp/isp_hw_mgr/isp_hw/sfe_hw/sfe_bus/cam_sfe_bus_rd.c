@@ -1544,6 +1544,21 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		}
 
 		rm_data = sfe_bus_rd_data->rm_res[i]->res_priv;
+
+		CAM_DBG(CAM_SFE,
+			"RM: %d i %d scratch cfg %d io cfg %d %dx%d update buf %d %dx%d rm data %d %dx%d",
+			sfe_bus_rd_data->num_rm, i,
+			update_buf->use_scratch_cfg,
+			io_cfg->planes[i].plane_stride,
+			io_cfg->planes[i].width,
+			io_cfg->planes[i].height,
+			update_buf->rm_update->stride,
+			update_buf->rm_update->width,
+			update_buf->rm_update->height,
+			rm_data->stride,
+			rm_data->width,
+			rm_data->height);
+
 		if (update_buf->use_scratch_cfg) {
 			stride = update_buf->rm_update->stride;
 			width = update_buf->rm_update->width;
@@ -1554,10 +1569,16 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 			height = io_cfg->planes[i].height;
 		}
 
-		/* If width & height updated in blob, use that */
-		if (rm_data->width && rm_data->height) {
-			width =  rm_data->width;
-			height = rm_data->height;
+		/* If width & height updated in blob in real time cases , use that */
+		if (!sfe_bus_rd_data->is_offline) {
+			if (rm_data->width && rm_data->height) {
+				width =  rm_data->width;
+				height = rm_data->height;
+			}
+
+			CAM_DBG(CAM_SFE, "SFE:%d RM:%d width:0x%X height:0x%X",
+				rm_data->common_data->core_index,
+				rm_data->index, width,height);
 		}
 
 		iova = update_buf->rm_update->image_buf[i] + rm_data->offset;
@@ -1569,6 +1590,14 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		}
 
 		/* update size register */
+		if (sfe_bus_rd_data->is_offline) {
+			rm_data->unpacker_cfg = cam_sfe_bus_get_unpacker_fmt(
+					update_buf->rm_update->unpacker_fmt);
+
+			CAM_SFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
+				rm_data->hw_regs->unpacker_cfg, rm_data->unpacker_cfg);
+		}
+
 		cam_sfe_bus_rd_pxls_to_bytes(width,
 			rm_data->unpacker_cfg, &width_in_bytes);
 		rm_data->height = height;
