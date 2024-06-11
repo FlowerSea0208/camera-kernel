@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -367,7 +367,7 @@ static inline int __cam_ife_mgr_get_hw_soc_info(
 			rc = hw_intf->hw_ops.process_cmd(
 				hw_intf->hw_priv,
 				CAM_ISP_HW_CMD_QUERY_REGSPACE_DATA, &soc_info,
-				sizeof(void *));
+				(uint32_t)sizeof(void *));
 			if (rc) {
 				CAM_ERR(CAM_ISP,
 					"Failed in %d regspace data query res_id: %u split idx: %d rc : %d",
@@ -483,6 +483,12 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 	bool user_triggered_dump)
 {
 	int rc = 0, i;
+
+	if (!ctx->flags.init_done) {
+		CAM_WARN(CAM_ISP, "Cannot dump register as HW not initialized, ctx_idx: %u",
+			ctx->ctx_index);
+		return 0;
+	}
 
 	if (cam_presil_mode_enabled()) {
 		if (g_ife_hw_mgr.debug_cfg.enable_presil_reg_dump) {
@@ -8129,6 +8135,7 @@ static int cam_ife_mgr_start_hw(void *hw_mgr_priv, void *start_hw_args)
 				"SAFE SCM call failed:Check TZ/HYP dependency, ctx_idx: %u",
 				ctx->ctx_index);
 			rc = -EFAULT;
+			mutex_unlock(&g_ife_hw_mgr.ctx_mutex);
 			goto deinit_hw;
 		}
 	}
@@ -14188,8 +14195,7 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 	int rc = 0;
 	struct cam_hw_cmd_args *hw_cmd_args = cmd_args;
 	struct cam_ife_hw_mgr  *hw_mgr = hw_mgr_priv;
-	struct cam_ife_hw_mgr_ctx *ctx = (struct cam_ife_hw_mgr_ctx *)
-		hw_cmd_args->ctxt_to_hw_map;
+	struct cam_ife_hw_mgr_ctx *ctx = NULL;
 	struct cam_isp_hw_cmd_args *isp_hw_cmd_args = NULL;
 	struct cam_packet          *packet;
 	unsigned long rem_jiffies = 0;
@@ -14200,6 +14206,7 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 		return -EINVAL;
 	}
 
+	ctx = (struct cam_ife_hw_mgr_ctx *)hw_cmd_args->ctxt_to_hw_map;
 	if (!ctx || !ctx->flags.ctx_in_use) {
 		CAM_ERR(CAM_ISP, "Fatal: Invalid context is used");
 		return -EPERM;

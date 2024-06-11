@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "tpg_hw.h"
@@ -1086,6 +1086,12 @@ int tpg_hw_copy_settings_config(
 		return -EINVAL;
 	}
 
+	if (settings->settings_array_offset >
+		sizeof(struct tpg_settings_config_t)) {
+		CAM_ERR(CAM_TPG, "Invalid Array Offset");
+		return -EINVAL;
+	}
+
 	reg_settings = (struct tpg_reg_settings *)
 		((uint8_t *)settings + settings->settings_array_offset);
 
@@ -1330,13 +1336,15 @@ struct tpg_hw_request *tpg_hw_create_request(
 	uint64_t request_id)
 {
 	struct tpg_hw_request *req = NULL;
-	uint32_t num_vc_channels = hw->hw_info->max_vc_channels;
+	uint32_t num_vc_channels = 0;
 	uint32_t i = 0;
 
 	if (!hw) {
 		CAM_ERR(CAM_TPG, "Invalid params");
 		return NULL;
 	}
+
+	num_vc_channels = hw->hw_info->max_vc_channels;
 
 	/* Allocate request */
 	req = kzalloc(sizeof(struct tpg_hw_request),
