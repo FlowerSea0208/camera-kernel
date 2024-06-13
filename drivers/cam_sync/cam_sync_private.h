@@ -31,7 +31,7 @@
 #endif
 
 #define CAM_SYNC_OBJ_NAME_LEN           64
-#define CAM_SYNC_MAX_OBJS               8192
+#define CAM_SYNC_MAX_OBJS               16384
 #define CAM_GENERIC_FENCE_BATCH_MAX     10
 #define CAM_SYNC_MAX_V4L2_EVENTS        250
 #define CAM_SYNC_DEBUG_FILENAME         "cam_debug"
