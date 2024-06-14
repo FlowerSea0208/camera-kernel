@@ -106,6 +106,10 @@ struct cam_sfe_bus_rd_info {
 	uint32_t                  mid[CAM_SFE_BUS_MAX_MID_PER_PORT];
 	uint32_t                  max_width;
 	uint32_t                  max_height;
+	uint32_t                  max_clk_threshold;
+	uint32_t                  nom_clk_threshold;
+	uint32_t                  min_clk_threshold;
+	uint32_t                  bytes_per_clk;
 };
 
 /*

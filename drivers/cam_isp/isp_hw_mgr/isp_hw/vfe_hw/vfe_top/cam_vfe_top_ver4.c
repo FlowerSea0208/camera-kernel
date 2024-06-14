@@ -21,6 +21,7 @@
 #define CAM_SHIFT_TOP_CORE_VER_4_CFG_DSP_EN            8
 #define CAM_VFE_CAMIF_IRQ_SOF_DEBUG_CNT_MAX            2
 #define CAM_VFE_LEN_LOG_BUF                            256
+#define CAM_VFE_CAMIF_OFFLINE_EPOCH0_LINE              200
 
 struct cam_vfe_top_ver4_common_data {
 	struct cam_hw_intf                         *hw_intf;
@@ -1578,6 +1579,10 @@ static int cam_vfe_resource_start(
 	if (rsrc_data->horizontal_bin || rsrc_data->qcfa_bin ||
 		rsrc_data->sfe_binned_epoch_cfg)
 		val >>= 1;
+
+	if (rsrc_data->is_offline &&
+		val > CAM_VFE_CAMIF_OFFLINE_EPOCH0_LINE / 2)
+		val = CAM_VFE_CAMIF_OFFLINE_EPOCH0_LINE / 2;
 
 	cam_io_w_mb(val, rsrc_data->mem_base +
 				rsrc_data->common_reg->epoch_height_cfg);

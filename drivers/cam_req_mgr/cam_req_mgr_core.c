@@ -4063,6 +4063,7 @@ static int cam_req_mgr_cb_notify_trigger(
 	notify_trigger->trigger = trigger_data->trigger;
 	notify_trigger->req_id = trigger_data->req_id;
 	notify_trigger->sof_timestamp_val = trigger_data->sof_timestamp_val;
+	notify_trigger->trigger_id = trigger_data->trigger_id;
 	task->process_cb = &cam_req_mgr_process_trigger;
 	rc = cam_req_mgr_workq_enqueue_task(task, link, CRM_TASK_PRIORITY_0);
 
