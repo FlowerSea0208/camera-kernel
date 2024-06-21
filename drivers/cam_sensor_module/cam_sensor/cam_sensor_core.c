@@ -14,6 +14,7 @@
 #include "cam_packet_util.h"
 #include "cam_req_mgr_dev.h"
 #include "cam_hdmi_bdg_core.h"
+#include "cam_dp_bdg_core.h"
 
 #define CAM_SENSOR_PIPELINE_DELAY_MASK        0xFF
 #define CAM_SENSOR_MODESWITCH_DELAY_SHIFT     8
@@ -1231,8 +1232,12 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				cam_sensor_power_down(s_ctrl);
 				goto free_power_settings;
 			}
-			/*pass camera ctrl to hdmi driver*/
-			cam_hdmi_bdg_set_cam_ctrl(s_ctrl);
+			/*pass camera ctrl to hdmi or dp driver*/
+			if (!strcmp(s_ctrl->sensor_name, HDMI_SENSOR_NAME)) {
+				cam_hdmi_bdg_set_cam_ctrl(s_ctrl);
+			} else if (!strcmp(s_ctrl->sensor_name, DP_SENSOR_NAME)) {
+				cam_dp_bdg_set_cam_ctrl(s_ctrl);
+			}
 		}
 
 		/* Match sensor ID */
@@ -1265,7 +1270,8 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				cam_sensor_power_down(s_ctrl);
 				goto free_power_settings;
 			}
-			if (!strcmp(s_ctrl->sensor_name, "lt6911gxc")) {
+			if (!strcmp(s_ctrl->sensor_name, HDMI_SENSOR_NAME) ||
+				!strcmp(s_ctrl->sensor_name, DP_SENSOR_NAME)) {
 				s_ctrl->is_always_on = 1;
 			}
 		}
@@ -1730,7 +1736,7 @@ int cam_sensor_power(struct v4l2_subdev *sd, int on)
 
 int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 {
-	int rc= 0;
+	int rc = 0;
 	struct cam_sensor_power_ctrl_t *power_info;
 	struct cam_camera_slave_info   *slave_info;
 	struct cam_hw_soc_info         *soc_info;
@@ -1898,7 +1904,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_READ: {
 		        i2c_set = &s_ctrl->i2c_data.read_settings;
 		        break;
-							   }
+		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE:
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_FRAME_SKIP_UPDATE:
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_PROBE:

@@ -27,6 +27,7 @@
 #include "cam_tpg_dev.h"
 #include "cam_flash_dev.h"
 #include "cam_hdmi_bdg_core.h"
+#include "cam_dp_bdg_core.h"
 
 #include "cam_icp_v1_dev.h"
 #include "cam_icp_v2_dev.h"
@@ -121,6 +122,7 @@ static const struct camera_submodule_component camera_sensor[] = {
 	{&cam_ois_driver_init, &cam_ois_driver_exit},
 	{&cam_flash_init_module, &cam_flash_exit_module},
 	{&hdmi_bdg_irq_handler_init, &hdmi_bdg_irq_handler_exit},
+	{&dp_bdg_irq_handler_init, &dp_bdg_irq_handler_exit},
 #endif
 };
 
