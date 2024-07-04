@@ -5733,7 +5733,12 @@ static int cam_isp_ctx_flush_all_affected_ctx_stream_grp(
 
 		switch (cmd_type) {
 		case CAM_ISP_CTX_FLUSH_AFFECTED_CTX_SET_FLUSH_IN_PROGRESS:
+			mutex_lock(&ctx_isp->isp_mutex);
+			active_ctx->state = CAM_CTX_FLUSHED;
+			mutex_unlock(&ctx_isp->isp_mutex);
 			atomic_set(&ctx_isp->flush_in_progress, 1);
+			cam_req_mgr_worker_pause(ctx_isp->hw_mgr_worker);
+			cam_req_mgr_worker_flush(ctx_isp->hw_mgr_worker);
 			break;
 		case CAM_ISP_CTX_FLUSH_AFFECTED_CTX_REQ_LIST:
 			rc = cam_isp_ctx_flush_affected_ctx_req_list(active_ctx, flush_req);
@@ -8044,12 +8049,15 @@ static int __cam_isp_ctx_config_dev_in_top_state(
 		if (ctx_isp->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL)
 			goto done;
 
+		mutex_lock(&ctx_isp->isp_mutex);
 		if ((ctx->state == CAM_CTX_FLUSHED) || (ctx->state < CAM_CTX_READY)) {
-			rc = -EINVAL;
+			rc = -ECANCELED;
 			CAM_ERR(CAM_ISP, "Received update req %lld in wrong state:%d ctx:%u",
 				req->request_id, ctx->state, ctx->ctx_id);
+			mutex_unlock(&ctx_isp->isp_mutex);
 			goto put_ref;
 		}
+		mutex_unlock(&ctx_isp->isp_mutex);
 
 		if (ctx_isp->offline_context) {
 			__cam_isp_ctx_enqueue_request_in_order(ctx, req);
@@ -9044,10 +9052,12 @@ static int __cam_isp_ctx_start_dev_in_ready(struct cam_context *ctx,
 	start_isp.is_trigger_type =
 		(ctx_isp->stream_type == CAM_REQ_MGR_LINK_TRIGGER_TYPE) ? true : false;
 
+	mutex_lock(&ctx_isp->isp_mutex);
 	if (ctx->state == CAM_CTX_FLUSHED)
 		start_isp.start_only = true;
 	else
 		start_isp.start_only = false;
+	mutex_unlock(&ctx_isp->isp_mutex);
 
 	__cam_isp_context_reset_ctx_params(ctx_isp);
        if (ctx_isp->acquire_type == CAM_ISP_ACQUIRE_TYPE_VIRTUAL)
@@ -9898,8 +9908,11 @@ static int __cam_isp_ctx_apply_default_settings(
 		return 0;
 
 	mutex_lock(&ctx_isp->isp_mutex);
-	if ((ctx_isp->aeb_enabled) && (atomic_read(&ctx_isp->internal_recovery_set)))
-		return __cam_isp_ctx_reset_and_recover(false, ctx);
+	if ((ctx_isp->aeb_enabled) && (atomic_read(&ctx_isp->internal_recovery_set))) {
+		rc = __cam_isp_ctx_reset_and_recover(false, ctx);
+		mutex_unlock(&ctx_isp->isp_mutex);
+		return rc;
+	}
 	mutex_unlock(&ctx_isp->isp_mutex);
 
 	CAM_DBG(CAM_ISP,
