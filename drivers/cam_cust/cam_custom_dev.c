@@ -78,8 +78,12 @@ static int cam_custom_subdev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
-	if (g_custom_dev.open_cnt == 0)
-		cam_node_shutdown(node);
+	if(g_custom_dev.open_cnt != 0){
+		CAM_ERR(CAM_CUSTOM, "g_custom_dev.open_cnt %d",g_custom_dev.open_cnt);
+		g_custom_dev.open_cnt = 0;
+	}
+
+	cam_node_shutdown(node);
 
 end:
 	mutex_unlock(&g_custom_dev.custom_dev_mutex);

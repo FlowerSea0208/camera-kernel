@@ -141,6 +141,11 @@ static int cam_ope_subdev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
+	if(g_ope_dev.open_cnt != 0){
+		CAM_ERR(CAM_OPE, "g_ope_dev.open_cnt %d",g_ope_dev.open_cnt);
+		g_ope_dev.open_cnt = 0;
+	}
+
 	rc = cam_node_shutdown(node);
 	if (rc < 0) {
 		CAM_ERR(CAM_OPE, "HW close failed");

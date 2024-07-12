@@ -97,8 +97,12 @@ static int cam_cre_subdev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
-	if (g_cre_dev.open_cnt == 0)
-		cam_node_shutdown(node);
+	if(g_cre_dev.open_cnt != 0){
+		CAM_ERR(CAM_CRE, "g_cre_dev.open_cnt %d",g_cre_dev.open_cnt);
+		g_cre_dev.open_cnt = 0;
+	}
+
+	cam_node_shutdown(node);
 
 end:
 	mutex_unlock(&g_cre_dev.cre_lock);

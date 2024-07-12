@@ -104,8 +104,12 @@ static int cam_lrme_dev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
-	if (lrme_dev->open_cnt == 0)
-		cam_node_shutdown(node);
+	if(lrme_dev.open_cnt != 0){
+		CAM_ERR(CAM_LRME, "lrme_dev.open_cnt %d",lrme_dev.open_cnt);
+		lrme_dev.open_cnt = 0;
+	}
+
+	cam_node_shutdown(node);
 
 end:
 	mutex_unlock(&lrme_dev->lock);

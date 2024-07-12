@@ -112,8 +112,11 @@ static int cam_isp_subdev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
-	if (g_isp_dev.open_cnt == 0)
-		cam_node_shutdown(node);
+	if(g_isp_dev.open_cnt != 0){
+		CAM_ERR(CAM_ISP, "g_isp_dev.open_cnt %d",g_isp_dev.open_cnt);
+		g_isp_dev.open_cnt = 0;
+	}
+	cam_node_shutdown(node);
 
 end:
 	mutex_unlock(&g_isp_dev.isp_mutex);

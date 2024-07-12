@@ -126,8 +126,12 @@ static int cam_jpeg_subdev_close_internal(struct v4l2_subdev *sd,
 		goto end;
 	}
 
-	if (g_jpeg_dev.open_cnt == 0)
-		cam_node_shutdown(node);
+	if(g_jpeg_dev.open_cnt != 0){
+		CAM_ERR(CAM_JPEG, "g_jpeg_dev.open_cnt %d",g_jpeg_dev.open_cnt);
+		g_jpeg_dev.open_cnt = 0;
+	}
+
+	cam_node_shutdown(node);
 
 end:
 	mutex_unlock(&g_jpeg_dev.jpeg_mutex);
