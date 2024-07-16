@@ -83,6 +83,7 @@ int cam_ife_virt_csid_get_hw_caps(void *hw_priv, void *get_hw_cap_args, uint32_t
 	hw_caps->is_lite = false;
 	hw_caps->only_master_rup = 1;
 	hw_caps->is_virt = true;
+	hw_caps->camif_irq_support = true;
 	return 0;
 }
 
