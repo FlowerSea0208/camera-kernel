@@ -207,7 +207,7 @@ static int cam_jpeg_add_command_buffers(struct cam_packet *packet,
 
 			cmd_buf_kaddr = (uint32_t *)kaddr;
 
-			if ((cmd_desc[i].offset / sizeof(uint32_t)) >= len) {
+			if (cmd_desc[i].offset >= len) {
 				CAM_ERR(CAM_JPEG, "Invalid offset: %u cmd buf len: %zu",
 					cmd_desc[i].offset, len);
 			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
@@ -1990,6 +1990,7 @@ static void cam_jpeg_mgr_dump_pf_data(
 iodump:
 	cam_packet_util_dump_io_bufs(packet, hw_mgr->iommu_hdl, hw_mgr->iommu_sec_hdl,
 		pf_args, hw_pid_support);
+	cam_packet_util_put_packet_addr(pf_req_info->packet_handle);
 }
 
 static int cam_jpeg_mgr_cmd(void *hw_mgr_priv, void *cmd_args)

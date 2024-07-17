@@ -133,6 +133,10 @@ struct cam_sfe_bus_rd_priv {
 	void                               *tasklet_info;
 	uint32_t                            top_irq_shift;
 	uint32_t                            latency_buf_allocation;
+	uint32_t                            max_clk_threshold;
+	uint32_t                            nom_clk_threshold;
+	uint32_t                            min_clk_threshold;
+	uint32_t                            bytes_per_clk;
 };
 
 static void cam_sfe_bus_rd_pxls_to_bytes(uint32_t pxls, uint32_t fmt,
@@ -1308,6 +1312,15 @@ static int cam_sfe_bus_init_sfe_bus_read_resource(
 	rsrc_data->secure_mode = CAM_SECURE_MODE_NON_SECURE;
 	sfe_bus_rd->hw_intf = bus_rd_priv->common_data.hw_intf;
 
+	bus_rd_priv->max_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].max_clk_threshold;
+	bus_rd_priv->nom_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].nom_clk_threshold;
+	bus_rd_priv->min_clk_threshold  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].min_clk_threshold;
+	bus_rd_priv->bytes_per_clk  =
+		bus_rd_hw_info->sfe_bus_rd_info[0].bytes_per_clk;
+
 	return 0;
 }
 
@@ -1531,6 +1544,21 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		}
 
 		rm_data = sfe_bus_rd_data->rm_res[i]->res_priv;
+
+		CAM_DBG(CAM_SFE,
+			"RM: %d i %d scratch cfg %d io cfg %d %dx%d update buf %d %dx%d rm data %d %dx%d",
+			sfe_bus_rd_data->num_rm, i,
+			update_buf->use_scratch_cfg,
+			io_cfg->planes[i].plane_stride,
+			io_cfg->planes[i].width,
+			io_cfg->planes[i].height,
+			update_buf->rm_update->stride,
+			update_buf->rm_update->width,
+			update_buf->rm_update->height,
+			rm_data->stride,
+			rm_data->width,
+			rm_data->height);
+
 		if (update_buf->use_scratch_cfg) {
 			stride = update_buf->rm_update->stride;
 			width = update_buf->rm_update->width;
@@ -1541,10 +1569,16 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 			height = io_cfg->planes[i].height;
 		}
 
-		/* If width & height updated in blob, use that */
-		if (rm_data->width && rm_data->height) {
-			width =  rm_data->width;
-			height = rm_data->height;
+		/* If width & height updated in blob in real time cases , use that */
+		if (!sfe_bus_rd_data->is_offline) {
+			if (rm_data->width && rm_data->height) {
+				width =  rm_data->width;
+				height = rm_data->height;
+			}
+
+			CAM_DBG(CAM_SFE, "SFE:%d RM:%d width:0x%X height:0x%X",
+				rm_data->common_data->core_index,
+				rm_data->index, width,height);
 		}
 
 		iova = update_buf->rm_update->image_buf[i] + rm_data->offset;
@@ -1556,6 +1590,14 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		}
 
 		/* update size register */
+		if (sfe_bus_rd_data->is_offline) {
+			rm_data->unpacker_cfg = cam_sfe_bus_get_unpacker_fmt(
+					update_buf->rm_update->unpacker_fmt);
+
+			CAM_SFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
+				rm_data->hw_regs->unpacker_cfg, rm_data->unpacker_cfg);
+		}
+
 		cam_sfe_bus_rd_pxls_to_bytes(width,
 			rm_data->unpacker_cfg, &width_in_bytes);
 		rm_data->height = height;
@@ -1788,6 +1830,25 @@ end:
 	return 0;
 }
 
+static int cam_sfe_bus_rd_get_off_clk_thr(void *priv, void *cmd_args,
+	uint32_t arg_size)
+{
+	struct cam_sfe_bus_rd_priv    *bus_priv;
+	struct cam_isp_hw_get_off_clk_thr  *args = cmd_args;
+
+	if (arg_size != sizeof(struct cam_isp_hw_get_off_clk_thr)) {
+		CAM_ERR(CAM_ISP, "invalid ars size");
+		return -EINVAL;
+	}
+	bus_priv = (struct cam_sfe_bus_rd_priv  *) priv;
+	args->max_clk_threshold = bus_priv->max_clk_threshold;
+	args->nom_clk_threshold = bus_priv->nom_clk_threshold;
+	args->min_clk_threshold = bus_priv->min_clk_threshold;
+	args->bytes_per_clk     = bus_priv->bytes_per_clk;
+
+	return 0;
+}
+
 static int cam_sfe_bus_init_hw(void *hw_priv,
 	void *init_hw_args, uint32_t arg_size)
 {
@@ -1923,6 +1984,9 @@ static int cam_sfe_bus_rd_process_cmd(
 	}
 
 	switch (cmd_type) {
+	case CAM_ISP_HW_CMD_GET_CLK_THRESHOLDS:
+		rc = cam_sfe_bus_rd_get_off_clk_thr(priv, cmd_args, arg_size);
+		break;
 	case CAM_ISP_HW_CMD_GET_BUF_UPDATE_RM:
 		rc = cam_sfe_bus_rd_update_rm(priv, cmd_args, arg_size);
 		break;

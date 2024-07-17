@@ -2123,7 +2123,9 @@ static int cam_vfe_bus_ver3_update_acquire_vfe_out(void *bus_priv, void *acquire
 	rsrc_data->is_dual = out_acquire_args->is_dual;
 	rsrc_data->is_master = out_acquire_args->is_master;
 
-	rsrc_node->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
+	if (!update_only)
+		rsrc_node->res_state = CAM_ISP_RESOURCE_STATE_RESERVED;
+
 	out_acquire_args->rsrc_node = rsrc_node;
 
 	CAM_DBG(CAM_ISP, "Acquire successful");
@@ -3563,8 +3565,8 @@ static int cam_vfe_bus_ver3_update_wm(void *priv, void *cmd_args,
 		val = (wm_data->height << 16) | wm_data->width;
 		CAM_VFE_ADD_REG_VAL_PAIR(reg_val_pair, j,
 			wm_data->hw_regs->image_cfg_0, val);
-		CAM_DBG(CAM_ISP, "WM:%d image height and width 0x%X",
-			wm_data->index, reg_val_pair[j-1]);
+		CAM_DBG(CAM_ISP, "WM:%d image height and width 0x%X WxH %dx%d",
+			wm_data->index, reg_val_pair[j-1],wm_data->width,wm_data->height);
 
 		/* For initial configuration program all bus registers */
 		if (update_buf->use_scratch_cfg) {
