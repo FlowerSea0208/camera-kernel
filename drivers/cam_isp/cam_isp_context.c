@@ -5736,6 +5736,8 @@ static int cam_isp_ctx_flush_all_affected_ctx_stream_grp(
 			mutex_lock(&ctx_isp->isp_mutex);
 			active_ctx->state = CAM_CTX_FLUSHED;
 			mutex_unlock(&ctx_isp->isp_mutex);
+			crm_timer_modify(ctx_isp->independent_crm_sof_timer,
+				CAM_REQ_MGR_WATCHDOG_MAX_TIMEOUT);
 			atomic_set(&ctx_isp->flush_in_progress, 1);
 			cam_req_mgr_worker_pause(ctx_isp->hw_mgr_worker);
 			cam_req_mgr_worker_flush(ctx_isp->hw_mgr_worker);
