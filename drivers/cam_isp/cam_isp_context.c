@@ -648,7 +648,7 @@ static int __cam_isp_ctx_notify_trigger_util(
 
 	rc = ctx->ctx_crm_intf->notify_trigger(&notify);
 	if (rc)
-		CAM_ERR(CAM_ISP,
+		CAM_ERR_RATE_LIMIT(CAM_ISP,
 			"Failed to notify CRM %s on frame: %llu ctx: %u link: 0x%x last_buf_done_req: %lld rc: %d",
 			__cam_isp_ctx_crm_trigger_point_to_string(trigger_type),
 			ctx_isp->frame_id, ctx->ctx_id, ctx->link_hdl,
@@ -2472,7 +2472,7 @@ static int __cam_isp_ctx_apply_pending_req(
 		goto end;
 	}
 
-	CAM_DBG(CAM_REQ, "Apply request %lld in substate %d ctx %u",
+	CAM_DBG(CAM_REQ, "Apply request %llu in substate %d ctx %u",
 		req->request_id, ctx_isp->substate_activated, ctx->ctx_id);
 	req_isp = (struct cam_isp_ctx_req *) req->req_priv;
 
@@ -2783,12 +2783,12 @@ static int __cam_isp_ctx_notify_sof_in_activated_state(
 
 			if (last_cdm_done_req >= req->request_id) {
 				CAM_DBG(CAM_ISP,
-					"CDM callback detected for req: %lld, possible buf_done delay, waiting for buf_done",
+					"CDM callback detected for req: %llu, possible buf_done delay, waiting for buf_done",
 					req->request_id);
 				ctx_isp->bubble_frame_cnt = 0;
 			} else {
 				CAM_DBG(CAM_ISP,
-					"CDM callback not happened for req: %lld, possible CDM stuck or workqueue delay",
+					"CDM callback not happened for req: %llu, possible CDM stuck or workqueue delay",
 					req->request_id);
 				req_isp->num_acked = 0;
 				req_isp->num_deferred_acks = 0;
@@ -2800,18 +2800,18 @@ static int __cam_isp_ctx_notify_sof_in_activated_state(
 				atomic_set(&ctx_isp->process_bubble, 0);
 				ctx_isp->active_req_cnt--;
 				CAM_DBG(CAM_REQ,
-					"Move active req: %lld to pending list(cnt = %d) [bubble re-apply],ctx %u",
+					"Move active req: %llu to pending list(cnt = %d) [bubble re-apply],ctx %u",
 					req->request_id,
 					ctx_isp->active_req_cnt, ctx->ctx_id);
 			}
 		} else if (req_isp->bubble_detected) {
 			ctx_isp->bubble_frame_cnt++;
 			CAM_DBG(CAM_ISP,
-				"Waiting on bufdone for bubble req: %lld, since frame_cnt = %lld",
+				"Waiting on bufdone for bubble req: %llu, since frame_cnt = %lld",
 				req->request_id,
 				ctx_isp->bubble_frame_cnt);
 		} else {
-			CAM_DBG(CAM_ISP, "Delayed bufdone for req: %lld",
+			CAM_DBG(CAM_ISP, "Delayed bufdone for req: %llu",
 				req->request_id);
 		}
 	}
@@ -2839,7 +2839,7 @@ notify_only:
 			else
 			{
 				CAM_ERR(CAM_ISP,
-					"request_id %lld, req: %lld, reported_req_id %lld ctx id %d bubbile detected %d ",
+					"request_id %llu, req: %llu, reported_req_id %lld ctx id %u bubbile detected %d ",
 					request_id, req->request_id,
 					ctx_isp->reported_req_id,ctx->ctx_id,req_isp->bubble_detected);
 			}
@@ -2854,7 +2854,7 @@ notify_only:
 		else
 		{
 			CAM_ERR(CAM_ISP,
-				"request_id %lld, req: %lld, since frame_cnt = %lld",
+				"request_id %llu, req: %llu, since frame_cnt = %llu",
 				request_id, req->request_id,
 				ctx_isp->bubble_frame_cnt);
 		}
