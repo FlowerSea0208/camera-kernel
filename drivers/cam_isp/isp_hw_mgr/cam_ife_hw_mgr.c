@@ -12712,6 +12712,7 @@ static unsigned int cam_ife_mgr_flush_in_queue(
 			if (!(c_elem->ready && just_incomplete)) {
 				CAM_DBG(CAM_ISP, "flush req %d %llu",
 					c_elem->ctx_idx, c_elem->request_id);
+				c_elem->prepare.packet = NULL;
 				list_del_init(&c_elem->list);
 				kfree(c_elem);
 			} else {
@@ -16266,6 +16267,11 @@ static int cam_ife_mgr_v_release_hw(void *hw_mgr_priv, void *release_hw_args)
 			hw_mgr_ctx->concr_ctx =
 				ife_hw_mgr->acquired_hw_pool[ife_idx].ife_ctx;
 		} else {
+			mutex_lock(&ife_hw_mgr->ctx_mutex);
+			cam_ife_mgr_flush_in_queue(ife_hw_mgr,
+				hw_mgr_ctx->ctx_idx,
+				false, -1);
+			mutex_unlock(&ife_hw_mgr->ctx_mutex);
 			/* No hw is stopped - just release sw context */
 			hw_mgr_ctx->concr_ctx = NULL;
 		}
