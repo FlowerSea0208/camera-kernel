@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/uaccess.h>
@@ -2192,6 +2192,14 @@ static int cam_ope_mgr_process_cmd_buf_req(struct cam_ope_hw_mgr *hw_mgr,
 						hw_mgr->iommu_hdl);
 					goto end;
 				}
+				if ((len <= frame_process->cmd_buf[i][j].offset) ||
+					(frame_process->cmd_buf[i][j].size <
+					frame_process->cmd_buf[i][j].length) ||
+					((len - frame_process->cmd_buf[i][j].offset) <
+					 frame_process->cmd_buf[i][j].length)) {
+					CAM_ERR(CAM_OPE, "Invalid offset.");
+					return -EINVAL;
+				}
 				cpu_addr = cpu_addr +
 					frame_process->cmd_buf[i][j].offset;
 				CAM_DBG(CAM_OPE, "Hdl %x size %d len %d off %d",
@@ -2244,6 +2252,10 @@ static int cam_ope_mgr_process_cmd_buf_req(struct cam_ope_hw_mgr *hw_mgr,
 				uint32_t s_idx = 0;
 
 				s_idx = cmd_buf->stripe_idx;
+				if (s_idx < 0 || s_idx >= OPE_MAX_STRIPES) {
+					CAM_ERR(CAM_OPE, "Invalid index.");
+					return -EINVAL;
+				}
 				num_cmd_bufs =
 				ope_request->num_stripe_cmd_bufs[i][s_idx];
 
@@ -3341,7 +3353,7 @@ static int cam_ope_mgr_prepare_hw_update(void *hw_priv,
 	prepare_args->priv = ctx_data->req_list[request_idx];
 	prepare_args->pf_data->packet = packet;
 	prepare_args->pf_data->req    = ope_req;
-	CAM_INFO(CAM_REQ, "OPE req %x num_batch %d", ope_req, ope_req->num_batch);
+	CAM_DBG(CAM_REQ, "OPE req %x num_batch %d", ope_req, ope_req->num_batch);
 	ope_req->hang_data.packet = packet;
 	ktime_get_boottime_ts64(&ts);
 	ctx_data->last_req_time = (uint64_t)((ts.tv_sec * 1000000000) +
