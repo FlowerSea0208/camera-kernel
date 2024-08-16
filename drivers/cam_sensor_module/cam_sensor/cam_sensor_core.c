@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -13,6 +13,8 @@
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
 #include "cam_req_mgr_dev.h"
+#include "cam_hdmi_bdg_core.h"
+#include "cam_dp_bdg_core.h"
 
 #define CAM_SENSOR_PIPELINE_DELAY_MASK        0xFF
 #define CAM_SENSOR_MODESWITCH_DELAY_SHIFT     8
@@ -1230,9 +1232,16 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				cam_sensor_power_down(s_ctrl);
 				goto free_power_settings;
 			}
+			/*pass camera ctrl to hdmi or dp driver*/
+			if (!strcmp(s_ctrl->sensor_name, HDMI_SENSOR_NAME)) {
+				cam_hdmi_bdg_set_cam_ctrl(s_ctrl);
+			} else if (!strcmp(s_ctrl->sensor_name, DP_SENSOR_NAME)) {
+				cam_dp_bdg_set_cam_ctrl(s_ctrl);
+			}
 		}
 
 		/* Match sensor ID */
+		s_ctrl->is_always_on = 0;
 		rc = cam_sensor_match_id(s_ctrl);
 		if (rc < 0) {
 			CAM_INFO(CAM_SENSOR,
@@ -1261,13 +1270,19 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 				cam_sensor_power_down(s_ctrl);
 				goto free_power_settings;
 			}
+			if (!strcmp(s_ctrl->sensor_name, HDMI_SENSOR_NAME) ||
+				!strcmp(s_ctrl->sensor_name, DP_SENSOR_NAME)) {
+				s_ctrl->is_always_on = 1;
+			}
 		}
 
-		rc = cam_sensor_power_down(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "Fail in %s sensor Power Down",
-				s_ctrl->sensor_name);
-			goto free_power_settings;
+		if (0 == s_ctrl->is_always_on) {
+			rc = cam_sensor_power_down(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR, "Fail in %s sensor Power Down",
+					s_ctrl->sensor_name);
+				goto free_power_settings;
+			}
 		}
 
 		/*
@@ -1278,11 +1293,12 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensor_state = CAM_SENSOR_INIT;
 
 		CAM_INFO(CAM_SENSOR,
-				"Probe success for %s slot:%d,slave_addr:0x%x,sensor_id:0x%x",
+				"Probe success for %s slot:%d,slave_addr:0x%x,sensor_id:0x%x, is_always_on:%d",
 				s_ctrl->sensor_name,
 				s_ctrl->soc_info.index,
 				s_ctrl->sensordata->slave_info.sensor_slave_addr,
-				s_ctrl->sensordata->slave_info.sensor_id);
+				s_ctrl->sensordata->slave_info.sensor_id,
+				s_ctrl->is_always_on);
 
 	}
 		break;
@@ -1341,15 +1357,17 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_up(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Sensor Power up failed for %s sensor_id:0x%x, slave_addr:0x%x",
-				s_ctrl->sensor_name,
-				s_ctrl->sensordata->slave_info.sensor_id,
-				s_ctrl->sensordata->slave_info.sensor_slave_addr
-				);
-			goto release_mutex;
+		if (!s_ctrl->is_always_on) {
+			rc = cam_sensor_power_up(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"Sensor Power up failed for %s sensor_id:0x%x, slave_addr:0x%x",
+					s_ctrl->sensor_name,
+					s_ctrl->sensordata->slave_info.sensor_id,
+					s_ctrl->sensordata->slave_info.sensor_slave_addr
+					);
+				goto release_mutex;
+			}
 		}
 
 		s_ctrl->sensor_state = CAM_SENSOR_ACQUIRE;
@@ -1360,10 +1378,11 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->num_batched_frames = 0;
 		memset(s_ctrl->sensor_res, 0, sizeof(s_ctrl->sensor_res));
 		CAM_INFO(CAM_SENSOR,
-			"CAM_ACQUIRE_DEV Success for %s sensor_id:0x%x,sensor_slave_addr:0x%x",
+			"CAM_ACQUIRE_DEV Success for %s sensor_id:0x%x,sensor_slave_addr:0x%x,is_always_on:%d",
 			s_ctrl->sensor_name,
 			s_ctrl->sensordata->slave_info.sensor_id,
-			s_ctrl->sensordata->slave_info.sensor_slave_addr);
+			s_ctrl->sensordata->slave_info.sensor_slave_addr,
+			s_ctrl->is_always_on);
 	}
 		break;
 	case CAM_RELEASE_DEV: {
@@ -1386,15 +1405,17 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 			goto release_mutex;
 		}
 
-		rc = cam_sensor_power_down(s_ctrl);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Sensor Power Down failed for %s sensor_id: 0x%x, slave_addr:0x%x",
-				s_ctrl->sensor_name,
-				s_ctrl->sensordata->slave_info.sensor_id,
-				s_ctrl->sensordata->slave_info.sensor_slave_addr
-				);
-			goto release_mutex;
+		if (!s_ctrl->is_always_on) {
+			rc = cam_sensor_power_down(s_ctrl);
+			if (rc < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"Sensor Power Down failed for %s sensor_id: 0x%x, slave_addr:0x%x",
+					s_ctrl->sensor_name,
+					s_ctrl->sensordata->slave_info.sensor_id,
+					s_ctrl->sensordata->slave_info.sensor_slave_addr
+					);
+				goto release_mutex;
+			}
 		}
 
 		cam_sensor_release_per_frame_resource(s_ctrl);
@@ -1715,7 +1736,7 @@ int cam_sensor_power(struct v4l2_subdev *sd, int on)
 
 int cam_sensor_power_up(struct cam_sensor_ctrl_t *s_ctrl)
 {
-	int rc= 0;
+	int rc = 0;
 	struct cam_sensor_power_ctrl_t *power_info;
 	struct cam_camera_slave_info   *slave_info;
 	struct cam_hw_soc_info         *soc_info;
@@ -1883,7 +1904,7 @@ int cam_sensor_apply_settings(struct cam_sensor_ctrl_t *s_ctrl,
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_READ: {
 		        i2c_set = &s_ctrl->i2c_data.read_settings;
 		        break;
-							   }
+		}
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE:
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_FRAME_SKIP_UPDATE:
 		case CAM_SENSOR_PACKET_OPCODE_SENSOR_PROBE:
