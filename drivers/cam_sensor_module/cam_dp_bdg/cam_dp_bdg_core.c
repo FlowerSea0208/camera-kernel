@@ -1090,6 +1090,7 @@ int cam_dp_bdg_get_src_resolution(bool *signal_stable,
 		*signal_stable = false;
 		*height = -1;
 		*width = -1;
+		*id = -1;
 		return -EINVAL;
 	}
 	/* camera_io_init(&(cam_dp_bdg_cam_ctrl->io_master_info));*/
