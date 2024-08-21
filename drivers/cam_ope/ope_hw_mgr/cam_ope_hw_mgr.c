@@ -259,8 +259,8 @@ static int cam_ope_mgr_reapply_config(struct cam_ope_hw_mgr *hw_mgr,
 	CAM_DBG(CAM_OPE, "reapply req_id = %lld", request_id);
 
 	task = cam_req_mgr_worker_get_task(ope_hw_mgr->cmd_work);
-	if (!task) {
-		CAM_ERR(CAM_OPE, "no empty task");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 		return -ENOMEM;
 	}
 
@@ -738,8 +738,8 @@ static int32_t cam_ope_process_request_timer(void *priv, void *data)
 				NULL, 0);
 
 		task = cam_req_mgr_worker_get_task(ope_hw_mgr->msg_work);
-		if (!task) {
-			CAM_ERR(CAM_OPE, "no empty task");
+		if (IS_ERR_OR_NULL(task)) {
+			CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 			mutex_unlock(&ctx_data->ctx_mutex);
 			return 0;
 		}
@@ -859,8 +859,8 @@ static void cam_ope_req_timer_cb(struct timer_list *timer_data)
 
 	spin_lock_irqsave(&ope_hw_mgr->hw_mgr_lock, flags);
 	task = cam_req_mgr_worker_get_task(ope_hw_mgr->timer_work);
-	if (!task) {
-		CAM_ERR(CAM_OPE, "no empty task");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 		spin_unlock_irqrestore(&ope_hw_mgr->hw_mgr_lock, flags);
 		return;
 	}
@@ -996,8 +996,8 @@ static void cam_ope_device_timer_cb(struct timer_list *timer_data)
 
 	spin_lock_irqsave(&ope_hw_mgr->hw_mgr_lock, flags);
 	task = cam_req_mgr_worker_get_task(ope_hw_mgr->timer_work);
-	if (!task) {
-		CAM_ERR(CAM_OPE, "no empty task");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 		spin_unlock_irqrestore(&ope_hw_mgr->hw_mgr_lock, flags);
 		return;
 	}
@@ -1755,8 +1755,8 @@ int32_t cam_ope_hw_mgr_cb(uint32_t irq_status, void *data)
 
 	spin_lock_irqsave(&hw_mgr->hw_mgr_lock, flags);
 	task = cam_req_mgr_worker_get_task(ope_hw_mgr->msg_work);
-	if (!task) {
-		CAM_ERR(CAM_OPE, "no empty task");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 		spin_unlock_irqrestore(&hw_mgr->hw_mgr_lock, flags);
 		return -ENOMEM;
 	}
@@ -2191,6 +2191,14 @@ static int cam_ope_mgr_process_cmd_buf_req(struct cam_ope_hw_mgr *hw_mgr,
 						hw_mgr->iommu_hdl);
 					goto end;
 				}
+				if ((len <= frame_process->cmd_buf[i][j].offset) ||
+					(frame_process->cmd_buf[i][j].size <
+					frame_process->cmd_buf[i][j].length) ||
+					((len - frame_process->cmd_buf[i][j].offset) <
+					 frame_process->cmd_buf[i][j].length)) {
+					CAM_ERR(CAM_OPE, "Invalid offset.");
+					return -EINVAL;
+				}
 				cpu_addr = cpu_addr +
 					frame_process->cmd_buf[i][j].offset;
 				CAM_DBG(CAM_OPE, "Hdl %x size %d len %d off %d",
@@ -2239,6 +2247,10 @@ static int cam_ope_mgr_process_cmd_buf_req(struct cam_ope_hw_mgr *hw_mgr,
 				uint32_t s_idx = 0;
 
 				s_idx = cmd_buf->stripe_idx;
+				if (s_idx < 0 || s_idx >= OPE_MAX_STRIPES) {
+					CAM_ERR(CAM_OPE, "Invalid index.");
+					return -EINVAL;
+				}
 				num_cmd_bufs =
 				ope_request->num_stripe_cmd_bufs[i][s_idx];
 
@@ -3404,8 +3416,8 @@ static int cam_ope_mgr_enqueue_config(struct cam_ope_hw_mgr *hw_mgr,
 	CAM_DBG(CAM_OPE, "req_id = %lld %pK", request_id, config_args->priv);
 
 	task = cam_req_mgr_worker_get_task(ope_hw_mgr->cmd_work);
-	if (!task) {
-		CAM_ERR(CAM_OPE, "no empty task");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_OPE, "no empty task = %d", PTR_ERR(task));
 		return -ENOMEM;
 	}
 

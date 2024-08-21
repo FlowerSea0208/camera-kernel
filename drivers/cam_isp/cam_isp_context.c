@@ -720,7 +720,12 @@ static int __cam_isp_ctx_notify_trigger_util(
 					ctx->ctx_id, ctx_isp->last_applied_req_id,
 					ctx_isp->req_info.last_bufdone_req_id);
 			ctx_isp->debug_frame_drop_cnt++;
-			CAM_INFO(CAM_ISP, "pending list empty, skipping ctx:%u", ctx->ctx_id);
+			if (ctx_isp->debug_frame_drop_cnt % 5 == 0) {
+				CAM_INFO(CAM_ISP,
+					"pending list empty, skipping ctx:%u drop num %d",
+					ctx->ctx_id,
+					ctx_isp->debug_frame_drop_cnt);
+			}
 			return -EINVAL;
 		}
 		if ((ctx_isp->sensor_pd > 1) &&
@@ -769,12 +774,12 @@ static int __cam_isp_ctx_notify_trigger_util(
 
 		task = cam_req_mgr_worker_get_task(ctx_isp->hw_mgr_worker);
 		if (PTR_ERR(task) == -EIO) {
-			CAM_DBG(CAM_CRM, "worker %s paused, skip enqueue apply",
-					ctx_isp->hw_mgr_worker->worker_name);
+			CAM_INFO_RATE_LIMIT(CAM_CRM, "worker %s paused, skip enqueue apply",
+				ctx_isp->hw_mgr_worker->worker_name);
 			return -EBUSY;
 		}
-		if (!task) {
-			CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task");
+		if (IS_ERR_OR_NULL(task)) {
+			CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task = %d", PTR_ERR(task));
 			return -EBUSY;
 		}
 
@@ -1062,12 +1067,12 @@ static void cam_isp_ctx_sof_independent_timer_cb(struct timer_list *timer_data)
 	task = cam_req_mgr_worker_get_task(ctx_isp->hw_mgr_worker);
 
 	if (PTR_ERR(task) == -EIO) {
-		CAM_DBG(CAM_ISP, "worker %s paused, skip timer enqueue",
-				ctx_isp->hw_mgr_worker->worker_name);
+		CAM_INFO_RATE_LIMIT(CAM_ISP, "worker %s paused, skip timer enqueue",
+			ctx_isp->hw_mgr_worker->worker_name);
 		return;
 	}
 	if (!task) {
-		CAM_ERR(CAM_ISP, "No task for worker");
+		CAM_ERR(CAM_ISP, "No task = %d for worker ", PTR_ERR(task));
 		return;
 	}
 
@@ -2848,8 +2853,8 @@ static int __cam_isp_ctx_schedule_apply_req_offline(
 	struct crm_worker_task *task;
 
 	task = cam_req_mgr_worker_get_task(ctx_isp->worker);
-	if (!task) {
-		CAM_ERR(CAM_ISP, "No task for worker");
+	if (IS_ERR_OR_NULL(task)) {
+		CAM_ERR(CAM_ISP, "No task = %d for worker", PTR_ERR(task));
 		return -ENOMEM;
 	}
 
@@ -5736,6 +5741,8 @@ static int cam_isp_ctx_flush_all_affected_ctx_stream_grp(
 			mutex_lock(&ctx_isp->isp_mutex);
 			active_ctx->state = CAM_CTX_FLUSHED;
 			mutex_unlock(&ctx_isp->isp_mutex);
+			crm_timer_modify(ctx_isp->independent_crm_sof_timer,
+				CAM_REQ_MGR_WATCHDOG_MAX_TIMEOUT);
 			atomic_set(&ctx_isp->flush_in_progress, 1);
 			cam_req_mgr_worker_pause(ctx_isp->hw_mgr_worker);
 			cam_req_mgr_worker_flush(ctx_isp->hw_mgr_worker);
@@ -6460,8 +6467,8 @@ static int __cam_isp_send_pause_resume_cmd_impacted_ife_ctx(
 			break;
 		case CAM_ISP_CTX_PAUSE_CMD:
 			task = cam_req_mgr_worker_get_task(active_ctx_isp->hw_mgr_worker);
-			if (!task) {
-				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task");
+			if (IS_ERR_OR_NULL(task)) {
+				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task = %d", PTR_ERR(task));
 				return -EBUSY;
 			}
 
@@ -6488,9 +6495,9 @@ static int __cam_isp_send_pause_resume_cmd_impacted_ife_ctx(
 			break;
 		case CAM_ISP_CTX_RESUME_CMD:
 			task = cam_req_mgr_worker_get_task(active_ctx_isp->hw_mgr_worker);
-			if (!task) {
-				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task ctx:%u",
-					active_ctx->ctx_id);
+			if (IS_ERR_OR_NULL(task)) {
+				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task = %d ctx:%u",
+					PTR_ERR(task), active_ctx->ctx_id);
 				return -EBUSY;
 			}
 
@@ -8100,13 +8107,14 @@ done:
 				"independent CRM apply from config_dev ctx:%u", ctx->ctx_id);
 			task = cam_req_mgr_worker_get_task(ctx_isp->hw_mgr_worker);
 			if (PTR_ERR(task) == -EIO) {
-				CAM_DBG(CAM_CRM, "worker %s is paused, skip apply ctx:%u",
-						ctx_isp->hw_mgr_worker->worker_name, ctx->ctx_id);
+				CAM_INFO_RATE_LIMIT(CAM_CRM, "worker %s is paused, skip apply ctx:%u",
+					ctx_isp->hw_mgr_worker->worker_name, ctx->ctx_id);
 				rc = -EBUSY;
 				goto end;
 			}
-			if (!task) {
-				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task ctx:%u", ctx->ctx_id);
+			if (IS_ERR_OR_NULL(task)) {
+				CAM_ERR_RATE_LIMIT(CAM_CRM, "no empty task = %d ctx:%u",
+					PTR_ERR(task), ctx->ctx_id);
 				return -EBUSY;
 			}
 
