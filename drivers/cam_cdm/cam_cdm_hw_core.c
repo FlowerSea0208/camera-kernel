@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -33,6 +33,7 @@
 #define CAM_CDM_DBG_GEN_IRQ_USR_DATA 0xff
 
 static void cam_hw_cdm_work(struct work_struct *work);
+static struct lock_class_key fifo_lock_key;
 
 /* DT match table entry for all CDM variants*/
 static const struct of_device_id msm_cam_hw_cdm_dt_match[] = {
@@ -2229,6 +2230,7 @@ static int cam_hw_cdm_component_bind(struct device *dev,
 		INIT_LIST_HEAD(&cdm_core->bl_fifo[i].bl_request_list);
 
 		mutex_init(&cdm_core->bl_fifo[i].fifo_lock);
+		lockdep_set_class(&cdm_core->bl_fifo[i].fifo_lock, &fifo_lock_key);
 
 		init_completion(&cdm_core->bl_fifo[i].bl_complete);
 
